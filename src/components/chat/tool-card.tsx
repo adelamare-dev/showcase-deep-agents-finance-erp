@@ -51,12 +51,7 @@ const TOOL_CONFIG: Record<
       const q = (args.query as string) || "...";
       return `Researching: ${q.slice(0, 60)}${q.length > 60 ? "..." : ""}`;
     },
-    getResultSummary: (result) => {
-      if (typeof result === "string" && result.length > 0) {
-        return result.slice(0, 100) + (result.length > 100 ? "..." : "");
-      }
-      return "Research complete";
-    },
+    getResultSummary: () => "Completed data gathering",
   },
   do_projections: {
     icon: TrendingUp,
@@ -64,12 +59,7 @@ const TOOL_CONFIG: Record<
       const q = (args.query as string) || "...";
       return `Projecting: ${q.slice(0, 60)}${q.length > 60 ? "..." : ""}`;
     },
-    getResultSummary: (result) => {
-      if (typeof result === "string" && result.length > 0) {
-        return result.slice(0, 100) + (result.length > 100 ? "..." : "");
-      }
-      return "Projections complete";
-    },
+    getResultSummary: () => "Completed projections",
   },
   navigate_and_filter: {
     icon: ArrowRight,
