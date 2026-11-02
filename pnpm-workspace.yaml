@@ -1,0 +1,36 @@
+# Standalone project: this file makes the app its own workspace root.
+
+# Versions published without provenance after earlier releases had it, and
+# with no trusted successor inside the range their dependents accept:
+# - undici-types@6.21.0 is pinned by @types/node@20 (~6.21.0)
+# - semver@6.3.1 is the last 6.x, required by eslint-plugin-react (^6.3.1)
+#   via eslint-config-next
+# - undici@5.29.0 is the last 5.x, required by @ai-sdk/provider-utils (^5)
+#   via @copilotkit/runtime
+# Pinned to exact versions so any future release is still checked.
+trustPolicyExclude:
+  - undici-types@6.21.0
+  - semver@6.3.1
+  - undici@5.29.0
+
+# Dependency build scripts, reviewed explicitly so strictDepBuilds can pass.
+allowBuilds:
+  # Download telemetry only; nothing to build.
+  "@scarf/scarf": false
+  # Ships prebuilt @unrs/resolver-binding-* binaries; the script only fetches one when missing.
+  unrs-resolver: false
+
+# Cooldown : aucune version âgée de moins de 7 jours n'est résoluble
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true # échec plutôt que fallback immature
+minimumReleaseAgeIgnoreMissingTime: false
+
+trustPolicy: no-downgrade # bloque les releases à confiance dégradée
+blockExoticSubdeps: true # bloque les sub-deps git/tarball profondes
+trustLockfile: false # re-vérifie la politique à chaque install
+
+strictDepBuilds: true # builds de deps non approuvées = échec
+dangerouslyAllowAllBuilds: false # jamais de postinstall global
+
+audit:
+  level: high
