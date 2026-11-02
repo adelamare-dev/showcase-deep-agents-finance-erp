@@ -12,6 +12,7 @@ export function DashboardToolbar() {
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const saveInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -22,10 +23,16 @@ export function DashboardToolbar() {
     const name = saveName.trim();
     if (!name || saving) return;
     setSaving(true);
-    await saveCurrent(name);
-    setSaveName("");
-    setShowSaveInput(false);
-    setSaving(false);
+    setSaveError(null);
+    try {
+      await saveCurrent(name);
+      setSaveName("");
+      setShowSaveInput(false);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "The dashboard was not saved.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -36,6 +43,12 @@ export function DashboardToolbar() {
           <span className="font-medium text-foreground">
             {currentDashboardName}
           </span>
+        </span>
+      )}
+
+      {saveError && (
+        <span role="alert" className="text-xs text-red-600">
+          {saveError}
         </span>
       )}
 

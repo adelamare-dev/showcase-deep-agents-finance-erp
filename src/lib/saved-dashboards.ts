@@ -26,6 +26,9 @@ function isValidWidget(value: unknown): value is DashboardWidget {
   return true;
 }
 
+export const INLINE_DATA_REFUSAL =
+  "This dashboard contains a chart with inline figures and cannot be saved.";
+
 function isValidDashboard(value: unknown): value is SavedDashboard {
   return (
     isRecord(value) &&
@@ -73,6 +76,9 @@ export async function saveDashboard(
   widgets: DashboardWidget[],
   description?: string,
 ): Promise<SavedDashboard> {
+  // The read filter drops such widgets, so accepting them would lose the
+  // dashboard silently on the next read.
+  if (!widgets.every(isValidWidget)) throw new Error(INLINE_DATA_REFUSAL);
   const now = new Date().toISOString();
   const entry: SavedDashboard = {
     id: crypto.randomUUID(),

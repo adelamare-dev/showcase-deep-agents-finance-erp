@@ -87,4 +87,17 @@ async (page, h) => {
       h.assertEqual(errors, [], "no page error");
     });
   });
+  await h.test("A dashboard saved from the toolbar is stored and read back", async () => {
+    return await withPage(() => {}, undefined, async (p, errors) => {
+      await h.visit("/", p);
+      await p.getByRole("button", { name: "Save" }).first().click();
+      await p.getByPlaceholder("Dashboard name...").fill("Saved From Toolbar");
+      await p.getByPlaceholder("Dashboard name...").press("Enter");
+      await p.getByText("Current:").first().waitFor({ state: "visible", timeout: 10000 });
+      const text = await gallery(p);
+      h.assert(text.includes("Saved From Toolbar"), "the saved dashboard is listed after a reload");
+      h.assertEqual(errors, [], "no page error");
+    });
+  });
+
 }

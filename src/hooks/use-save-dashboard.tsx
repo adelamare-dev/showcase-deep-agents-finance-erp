@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
 import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
@@ -19,6 +19,7 @@ function SaveHandler({
   result?: unknown;
 }) {
   const { saveCurrent } = useDashboard();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (status !== ToolCallStatus.Complete) return;
@@ -26,10 +27,19 @@ function SaveHandler({
     if (processedSaveKeys.has(key)) return;
     processedSaveKeys.add(key);
     queueMicrotask(() => {
-      saveCurrent(name);
+      saveCurrent(name).catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "The dashboard was not saved.");
+      });
     });
   }, [status, name, saveCurrent]);
 
+  if (error) {
+    return (
+      <p role="alert" className="py-1 text-sm text-red-600">
+        {error}
+      </p>
+    );
+  }
   if (status === ToolCallStatus.Complete) {
     return (
       <CompletedToolCard
