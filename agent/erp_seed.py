@@ -67,9 +67,6 @@ BUDGETS = {
     "Other": 20000,
 }
 
-# Change shown on the KPIs that have no history to derive it from.
-KPI_CHANGES = {"Accounts Receivable": 15.8, "Cash": 4.1, "Accounts Payable": -3.2}
-
 CASH_ACCOUNTS = [("1000", "Cash: Operating Account", 612000), ("1010", "Cash: Savings Reserve", 480000)]
 FIXED_ASSETS = 890000
 SHORT_TERM_LOANS = 150000
@@ -92,16 +89,16 @@ _CLIENT_INVOICES = [
     ("Juniper Retail Group", [("Seasonal forecasting study", 1, 24000)], -95, -65, "pending"),
 ]
 
-# (supplier, description, amount, issued offset, due offset, paid)
+# (supplier, amount, issued offset, due offset, paid)
 _BILLS = [
-    ("Tallgrass Cloud Hosting", "Hosting, current month", 14800, -26, 2, False),
-    ("Redfern Staffing", "Contract analysts, current month", 21400, -24, 4, False),
-    ("Sablewood Facilities", "Office lease and services", 12600, -24, 6, False),
-    ("Pinecrest Insurance Brokers", "Quarterly liability premium", 9200, -18, 12, False),
-    ("Quillon Office Supplies", "Stationery and consumables", 1850, -35, -5, False),
-    ("Vantor Telecom", "Connectivity, previous month", 3400, -50, -20, True),
-    ("Delmar Hardware Distribution", "Network equipment restock", 17900, -45, -15, True),
-    ("Tallgrass Cloud Hosting", "Hosting, previous month", 14200, -56, -26, True),
+    ("Tallgrass Cloud Hosting", 14800, -26, 2, False),
+    ("Redfern Staffing", 21400, -24, 4, False),
+    ("Sablewood Facilities", 12600, -24, 6, False),
+    ("Pinecrest Insurance Brokers", 9200, -18, 12, False),
+    ("Quillon Office Supplies", 1850, -35, -5, False),
+    ("Vantor Telecom", 3400, -50, -20, True),
+    ("Delmar Hardware Distribution", 17900, -45, -15, True),
+    ("Tallgrass Cloud Hosting", 14200, -56, -26, True),
 ]
 
 # (description, amount, credit or debit, category, account code, days ago, status)
@@ -183,14 +180,13 @@ def seed(as_of: date) -> dict:
             "id": f"bill-{n:03d}",
             "number": f"BILL-{n:04d}",
             "supplier": supplier,
-            "description": description,
             "amount": amount,
             "currency": "USD",
             "status": "paid" if paid else "pending",
             "issuedDate": _iso(as_of, issued),
             "dueDate": _iso(as_of, due),
         }
-        for n, (supplier, description, amount, issued, due, paid) in enumerate(_BILLS, 1)
+        for n, (supplier, amount, issued, due, paid) in enumerate(_BILLS, 1)
     ]
 
     transactions = [
@@ -236,8 +232,11 @@ def seed(as_of: date) -> dict:
         for n, (name, role, department, start, status, salary) in enumerate(_EMPLOYEES, 1)
     ]
 
-    # Balance sheet. Receivables, payables and inventory are the sums of the
-    # records above; retained earnings is the balancing figure of the seed.
+    # Balance sheet. Cash, fixed assets, debt and owner's equity are stored
+    # balances. Receivables, payables and inventory are derived from the records
+    # by the store on every read, so they are seeded at 0 and never trusted.
+    # Retained earnings is the balancing figure of the opening position: a
+    # constant fixed here once, from the opening records, and never recomputed.
     receivables = sum(i["amount"] for i in invoices if i["status"] == "pending")
     payables = sum(b["amount"] for b in bills if b["status"] == "pending")
     stock = sum(i["quantity"] * i["unitCost"] for i in inventory)
@@ -250,10 +249,10 @@ def seed(as_of: date) -> dict:
     by_category = [sum(row[c] for row in MONTHLY_EXPENSES) for c in range(len(EXPENSE_CATEGORIES))]
     account_rows = [
         *[(code, name, "asset", balance) for code, name, balance in CASH_ACCOUNTS],
-        ("1100", "Accounts Receivable", "asset", receivables),
-        ("1200", "Inventory", "asset", stock),
+        ("1100", "Accounts Receivable", "asset", 0),
+        ("1200", "Inventory", "asset", 0),
         ("1500", "Fixed Assets", "asset", FIXED_ASSETS),
-        ("2000", "Accounts Payable", "liability", payables),
+        ("2000", "Accounts Payable", "liability", 0),
         ("2100", "Short-term Loans", "liability", SHORT_TERM_LOANS),
         ("2500", "Long-term Debt", "liability", LONG_TERM_DEBT),
         ("3000", "Owner's Equity", "equity", OWNER_EQUITY),

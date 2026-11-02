@@ -21,6 +21,90 @@ def names_in(value) -> set[str]:
     return found
 
 
+def balance(snap, code):
+    return next(a["balance"] for a in snap["accounts"] if a["code"] == code)
+
+
+def pay_bill(store, bill, cash_code="1000"):
+    """Mark a bill paid and debit a cash account by the same amount, as a payment would."""
+    with store._lock:
+        bill["status"] = "paid"
+        next(a for a in store._data["accounts"] if a["code"] == cash_code)["balance"] -= bill["amount"]
+
+
+def check_position(snap):
+    """Invariants recomputed from the records and the stored base balances, not from totals."""
+    t = snap["totals"]
+    assert t["assets"] == t["liabilities"] + t["equity"]
+    assert t["accountsReceivable"] == sum(i["amount"] for i in snap["invoices"] if i["status"] in ("pending", "overdue"))
+    assert t["accountsPayable"] == sum(b["amount"] for b in snap["bills"] if b["status"] != "paid")
+    assert t["cash"] == sum(a["balance"] for a in snap["accounts"] if a["code"].startswith("10"))
+    assert balance(snap, "1100") == t["accountsReceivable"]
+    assert balance(snap, "2000") == t["accountsPayable"]
+    assert balance(snap, "1200") == sum(i["quantity"] * i["unitCost"] for i in snap["inventoryItems"])
+    kpis = {k["label"]: k["value"] for k in snap["kpis"]}
+    assert kpis["Accounts Receivable"] == f"${t['accountsReceivable']:,}"
+    assert kpis["Accounts Payable"] == f"${t['accountsPayable']:,}"
+    assert kpis["Cash"] == f"${t['cash']:,}"
+
+
+def test_opening_retained_earnings_is_a_seed_constant(store):
+    import erp_seed
+
+    snap = store.snapshot()
+    records = erp_seed.seed(store.as_of)
+    open_invoices = sum(i["amount"] for i in records["invoices"] if i["status"] == "pending")
+    unpaid = sum(b["amount"] for b in records["bills"] if b["status"] == "pending")
+    stock = sum(i["quantity"] * i["unitCost"] for i in records["inventoryItems"])
+    cash = sum(b for _, _, b in erp_seed.CASH_ACCOUNTS)
+    assets = cash + open_invoices + stock + erp_seed.FIXED_ASSETS
+    liabilities = unpaid + erp_seed.SHORT_TERM_LOANS + erp_seed.LONG_TERM_DEBT
+    assert balance(snap, "3100") == assets - liabilities - erp_seed.OWNER_EQUITY
+
+
+def test_position_holds_on_the_seed(store):
+    check_position(store.snapshot())
+
+
+def test_paying_a_bill_moves_cash_and_payables_only(store):
+    before = store.snapshot()
+    bill = next(b for b in store._data["bills"] if b["status"] == "pending")
+    pay_bill(store, bill)
+    after = store.snapshot()
+    check_position(after)
+    b, a = before["totals"], after["totals"]
+    assert a["cash"] == b["cash"] - bill["amount"]
+    assert a["accountsPayable"] == b["accountsPayable"] - bill["amount"]
+    assert a["equity"] == b["equity"]
+    assert a["assets"] == b["assets"] - bill["amount"]
+    assert balance(after, "3100") == balance(before, "3100")
+
+
+def test_new_client_invoice_raises_receivables_only(store):
+    before = store.snapshot()["totals"]
+    with store._lock:
+        store._data["invoices"].append(
+            {"id": "inv-new", "number": "INV-9999", "client": "Test Client", "amount": 7000, "currency": "USD",
+             "status": "pending", "issuedDate": store.as_of.isoformat(), "dueDate": store.as_of.isoformat(), "items": []}
+        )
+    snap = store.snapshot()
+    assert snap["totals"]["accountsReceivable"] == before["accountsReceivable"] + 7000
+    assert snap["totals"]["equity"] == before["equity"]
+    assert snap["totals"]["cash"] == before["cash"]
+    assert balance(snap, "1100") == snap["totals"]["accountsReceivable"]
+    assert snap["arAging"]["total"] == snap["totals"]["accountsReceivable"]
+
+
+def test_stock_change_moves_the_inventory_account(store):
+    before = store.snapshot()
+    item = store._data["inventoryItems"][0]
+    with store._lock:
+        item["quantity"] += 3
+    after = store.snapshot()
+    assert balance(after, "1200") == balance(before, "1200") + 3 * item["unitCost"]
+    assert after["totals"]["assets"] == before["totals"]["assets"] + 3 * item["unitCost"]
+
+
 def test_balance_sheet_balances(store):
     t = store.totals()
     assert t["assets"] == t["liabilities"] + t["equity"]
@@ -126,7 +210,7 @@ def test_at_least_three_bills_fall_due_within_a_week(store):
 def test_bills_follow_the_bill_type(store):
     keys = {"id", "number", "supplier", "amount", "currency", "status", "issuedDate", "dueDate"}
     for bill in store.snapshot()["bills"]:
-        assert keys <= bill.keys()
+        assert keys == bill.keys()
         assert bill["status"] in ("paid", "pending", "overdue")
         assert bill["currency"] == "USD"
 

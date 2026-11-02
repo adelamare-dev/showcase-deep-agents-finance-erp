@@ -143,13 +143,22 @@ class ErpStore:
 
     # -- public reads --------------------------------------------------------
 
-    def totals(self) -> dict:
-        """Balance-sheet and income figures, read from the chart of accounts."""
-        with self._lock:
-            accounts = self._data["accounts"]
-            by_type = {kind: sum(a["balance"] for a in accounts if a["type"] == kind) for kind in
-                       ("asset", "liability", "equity", "revenue", "expense")}
-            by_code = {a["code"]: a["balance"] for a in accounts}
+    @staticmethod
+    def _accounts(data: dict) -> list[dict]:
+        """Chart of accounts with receivables, payables and inventory computed from the records."""
+        derived = {
+            "1100": sum(i["amount"] for i in data["invoices"] if i["status"] in ("pending", "overdue")),
+            "1200": sum(i["quantity"] * i["unitCost"] for i in data["inventoryItems"]),
+            "2000": sum(b["amount"] for b in data["bills"] if b["status"] != "paid"),
+        }
+        return [{**a, "balance": derived.get(a["code"], a["balance"])} for a in data["accounts"]]
+
+    @classmethod
+    def _totals(cls, data: dict) -> dict:
+        accounts = cls._accounts(data)
+        by_type = {kind: sum(a["balance"] for a in accounts if a["type"] == kind) for kind in
+                   ("asset", "liability", "equity", "revenue", "expense")}
+        by_code = {a["code"]: a["balance"] for a in accounts}
         revenue, expenses = by_type["revenue"], by_type["expense"]
         return {
             "cash": sum(v for code, v in by_code.items() if code.startswith(CASH_CODE_PREFIX)),
@@ -163,11 +172,16 @@ class ErpStore:
             "netProfit": revenue - expenses,
         }
 
+    def totals(self) -> dict:
+        """Balance-sheet and income figures, computed from the records on every call."""
+        with self._lock:
+            return self._totals(self._data)
+
     def snapshot(self) -> dict:
         """Every dataset in the camelCase shape of `src/types/erp.ts`, plus `totals`."""
-        totals = self.totals()
         with self._lock:
             data = copy.deepcopy(self._data)
+        totals = self._totals(data)
         invoices = self._with_overdue(data["invoices"])
         months, quarterly, by_category = self._quarters()
 
@@ -210,13 +224,14 @@ class ErpStore:
         ]
 
         previous, latest = quarterly[-2], quarterly[-1]
+        # Receivables, cash and payables have no history to compare with: their change is 0.
         kpi_rows = [
             ("Total Revenue", _usd(totals["revenue"]), _change(latest["revenue"], previous["revenue"]), "dollar-sign"),
             ("Net Profit", _usd(totals["netProfit"]), _change(latest["profit"], previous["profit"]), "trending-up"),
-            ("Accounts Receivable", _usd(totals["accountsReceivable"]), sd.KPI_CHANGES["Accounts Receivable"], "file-text"),
+            ("Accounts Receivable", _usd(totals["accountsReceivable"]), 0.0, "file-text"),
             ("Operating Expenses", _usd(totals["expenses"]), _change(latest["expenses"], previous["expenses"]), "receipt"),
-            ("Cash", _usd(totals["cash"]), sd.KPI_CHANGES["Cash"], "wallet"),
-            ("Accounts Payable", _usd(totals["accountsPayable"]), sd.KPI_CHANGES["Accounts Payable"], "credit-card"),
+            ("Cash", _usd(totals["cash"]), 0.0, "wallet"),
+            ("Accounts Payable", _usd(totals["accountsPayable"]), 0.0, "credit-card"),
         ]
         kpis = [
             {"label": label, "value": value, "change": change, "trend": _trend(change), "icon": icon}
@@ -229,7 +244,7 @@ class ErpStore:
             "expenseBreakdown": breakdown,
             "invoices": invoices,
             "bills": self._with_overdue(data["bills"]),
-            "accounts": data["accounts"],
+            "accounts": self._accounts(data),
             "transactions": data["transactions"],
             "inventoryItems": self._inventory(data["inventoryItems"]),
             "employees": data["employees"],

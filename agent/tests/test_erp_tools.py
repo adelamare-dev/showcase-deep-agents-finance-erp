@@ -46,10 +46,13 @@ def test_query_filters_on_other_datasets(tool_store):
 
 
 def test_tools_follow_a_mutation_of_the_store(tool_store):
+    bill = next(b for b in tool_store._data["bills"] if b["status"] == "pending")
+    payable_before = tool_store.totals()["accountsPayable"]
     with tool_store._lock:
-        tool_store._data["bills"][0]["status"] = "paid"
+        bill["status"] = "paid"
     rows = json.loads(tools.query_bills.invoke({"status": "paid"}))
-    assert tool_store._data["bills"][0]["id"] in {b["id"] for b in rows}
+    assert bill["id"] in {b["id"] for b in rows}
+    assert tool_store.totals()["accountsPayable"] == payable_before - bill["amount"]
 
 
 @pytest.mark.parametrize("quarters", [1, 4, 5, 6, 8, 12])
