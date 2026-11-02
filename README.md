@@ -81,7 +81,7 @@ Browser (:3000)
   |  FastAPI (:8123)
   |       |
   |       v
-  |  LangGraph Orchestrator (7 frontend tools + task)
+  |  LangGraph Orchestrator (7 frontend tools + 2 subagent tools)
   |      /         \
   |     v           v
   |  Research    Projections
