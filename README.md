@@ -8,7 +8,7 @@ A finance ERP showcase powered by CopilotKit deep agents. An AI assistant can an
 
 - 7 frontend tools (6 UI + 1 HITL) registered via `useRenderTool` / `useHumanInTheLoop`
 - 12 dashboard widget types with 4 pre-built templates (Executive Summary, Cash Flow Risk, Cost Control, Revenue Overview)
-- Dashboard gallery (`/dashboards`) for browsing, loading, saving, and deleting layouts (saved layouts live in the browser's `localStorage`)
+- Dashboard gallery (`/dashboards`) for browsing, loading, saving, and deleting layouts (saved layouts live in the browser's `localStorage` under a versioned key; dashboards saved under an older version are ignored)
 - Multi-agent orchestration: orchestrator + research subagent (14 tools) + projections subagent (6 tools)
 - Human-in-the-loop approval for invoice payments and inventory reorders
 
@@ -26,7 +26,9 @@ cp agent/.env.example agent/.env      # then set the API key in agent/.env
 pnpm dev                              # web on http://localhost:3000, agent on http://127.0.0.1:8123
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). Use `localhost`: `127.0.0.1:3000` or a fallback port is refused by CORS and shows "Could not load the company data".
+
+The agent service must be running for any page to show, since all data comes from it.
 
 For a production-style run, `pnpm demo` builds the web app and starts both servers without hot reload.
 
@@ -37,6 +39,7 @@ For a production-style run, `pnpm demo` builds the web app and starts both serve
 | Variable            | Description                                                                                           |
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
 | `MISTRAL_API_KEY`   | Mistral API key (format `mstrl_...`), required                                                        |
+| `FRONTEND_ORIGIN`   | Browser origin allowed by CORS (default: `http://localhost:3000`)                                     |
 
 ### `.env` at the repo root (optional)
 
@@ -46,6 +49,7 @@ Copy `.env.example` to `.env` to change a default; the web app works without it.
 | ------------------- | -------------------------------------------------------------------------------- |
 | `REMOTE_ACTION_URL` | Agent URL (default: `http://127.0.0.1:8123/copilotkit/agents/finance_erp_agent`) |
 | `COPILOTKIT_TELEMETRY_DISABLED` | CopilotKit telemetry is off by default; set to `false` to opt in         |
+| `NEXT_PUBLIC_ERP_API_URL` | Agent URL the browser reads the company data from (default: `http://localhost:8123`) |
 
 ## Scripts
 

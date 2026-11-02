@@ -34,7 +34,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 - `pnpm demo` makes a production build, then runs both servers without reload. Mode for measurements and meetings.
 - `pnpm build` / `pnpm start` are web only. `pnpm dev:agent` / `pnpm start:agent` are agent only.
 - `pnpm lint` runs ESLint on the web app (`agent/` is ignored).
-- `pnpm test:agent` runs pytest in `agent/`, offline.
+- `pnpm test:agent` runs pytest in `agent/`. It makes no model call and needs no real key; `uv` itself needs network for its `malware-check`.
 - `pnpm e2e:build` assembles the browser scenarios into `.playwright-mcp/scenarios/`.
 - Binaries: `pnpm exec <bin>`, never `npx`. Python: `uv run`, from `agent/`.
 
@@ -61,9 +61,9 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 
 - **Figures still come from the model in two places.** `render_chat_visual` and `custom_chart` (a widget of `update_dashboard`) receive their data from the model's arguments, not from the store, until the dataset catalog lands. Do not present them as exact. The save path already refuses a dashboard carrying inline figures.
 - **`request_approval` changes no data.** Approving a payment or a reorder only returns the answer to the model; no invoice or stock record is updated.
-- **`useRenderTool` requires `parameters`** in `@copilotkit/react-core` 1.80.0: each front-end tool declares a permissive `zod` schema of the fields it reads. Cards were validated at build and load time only; real rendering is still to be proven.
+- **`useRenderTool` requires `parameters`** in `@copilotkit/react-core` 1.80.0: each front-end tool declares a permissive `zod` schema of the fields it reads. The live browser scenario rendered the research, cash and approval cards.
 - **No `instructions` prop on `CopilotSidebar`** in 1.80.0. Instructions go through `useAgentContext` (`shell.tsx`), like the KPIs and the dashboard layout.
-- **`pnpm lint` is red, and was before the migration**: 6 errors and 4 warnings in `src/` (a stray `.superpowers/` scratch file adds one more warning when present). Errors: `use-update-dashboard.tsx` (5 x `no-explicit-any`) and `cash-waterfall-chart.tsx` (variable reassigned after render). Warnings: `cash-position-card.tsx`, `dashboard-grid.tsx`, `shell.tsx` (2). Not a regression; fix before the final handover. Add none.
+- **`pnpm lint` is red, and was before the migration**: 6 errors and 4 warnings in `src/`. Errors: `use-update-dashboard.tsx` (5 x `no-explicit-any`) and `cash-waterfall-chart.tsx` (variable reassigned after render). Warnings: `cash-position-card.tsx`, `dashboard-grid.tsx`, `shell.tsx` (2). Not a regression; fix before the final handover. Add none.
 - **`@copilotkit/*` stays on 1.80.0**: 1.83.0 is refused by `minimumReleaseAge`. Do not force the bump or loosen the cooldown.
 - **Windows `MAX_PATH`**: a clone that is too deep breaks `agent/.venv` past 260 characters. Keep the path short.
 - **Subagents run in isolated threads** (`isolated_subagents.py`) on purpose: it keeps internal events out of the parent stream. Do not "simplify" to `subagents=[...]`.
