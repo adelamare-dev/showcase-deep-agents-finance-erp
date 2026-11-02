@@ -4,8 +4,6 @@ import type { NextConfig } from "next";
 // here rather than in an env file that a fresh clone would not have.
 process.env.COPILOTKIT_TELEMETRY_DISABLED ??= "true";
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

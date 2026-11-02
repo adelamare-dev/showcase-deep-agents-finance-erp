@@ -81,8 +81,9 @@ class ErpStore:
 
     # -- derived records ----------------------------------------------------
 
-    def _with_overdue(self, records: list[dict]) -> list[dict]:
-        today = self._as_of.isoformat()
+    @staticmethod
+    def _with_overdue(records: list[dict], as_of: date) -> list[dict]:
+        today = as_of.isoformat()
         out = copy.deepcopy(records)
         for record in out:
             if record["status"] == "pending" and record["dueDate"] < today:
@@ -98,9 +99,10 @@ class ErpStore:
             )
         return out
 
-    def _quarters(self) -> tuple[list[dict], list[dict], list[dict]]:
+    @staticmethod
+    def _quarters(as_of: date) -> tuple[list[dict], list[dict], list[dict]]:
         """Monthly points, quarterly points and the monthly expense rows of the trailing year."""
-        year, quarter = quarter_of(self._as_of)
+        year, quarter = quarter_of(as_of)
         _, first_quarter = shift_quarter(year, quarter, -3)
         start = (first_quarter - 1) * 3
         months, by_category = [], []
@@ -129,7 +131,7 @@ class ErpStore:
         for n, (revenue, expenses) in enumerate(sd.EARLIER_QUARTERS + recent):
             quarterly.append(
                 {
-                    "quarter": quarter_label(self._as_of, n - 7),
+                    "quarter": quarter_label(as_of, n - 7),
                     "revenue": revenue,
                     "expenses": expenses,
                     "profit": revenue - expenses,
@@ -137,14 +139,15 @@ class ErpStore:
             )
         return months, quarterly, by_category
 
-    def _aging(self, invoices: list[dict]) -> dict:
+    @staticmethod
+    def _aging(invoices: list[dict], as_of: date) -> dict:
         buckets = {"current": 0, "thirtyDay": 0, "sixtyDay": 0, "ninetyPlus": 0}
         paid = 0
         for inv in invoices:
             if inv["status"] == "paid":
                 paid += inv["amount"]
             elif inv["status"] in ("pending", "overdue"):
-                late = (self._as_of - date.fromisoformat(inv["dueDate"])).days
+                late = (as_of - date.fromisoformat(inv["dueDate"])).days
                 key = "current" if late <= 0 else "thirtyDay" if late <= 30 else "sixtyDay" if late <= 60 else "ninetyPlus"
                 buckets[key] += inv["amount"]
         total = sum(buckets.values())
@@ -191,15 +194,16 @@ class ErpStore:
         """Every dataset in the camelCase shape of `src/types/erp.ts`, plus `totals`."""
         with self._lock:
             data = copy.deepcopy(self._data)
+            as_of = self._as_of
         totals = self._totals(data)
-        invoices = self._with_overdue(data["invoices"])
-        months, quarterly, by_category = self._quarters()
+        invoices = self._with_overdue(data["invoices"], as_of)
+        months, quarterly, by_category = self._quarters(as_of)
 
         flow = []
         for n, (operating, investing, financing) in enumerate(sd.CASH_FLOW):
             flow.append(
                 {
-                    "quarter": quarter_label(self._as_of, n - 7),
+                    "quarter": quarter_label(as_of, n - 7),
                     "operating": operating,
                     "investing": investing,
                     "financing": financing,
@@ -240,7 +244,7 @@ class ErpStore:
                 "color": color,
                 "values": [
                     {
-                        "quarter": quarter_label(self._as_of, k),
+                        "quarter": quarter_label(as_of, k),
                         "value": round(latest["revenue"] * (1 + growth) ** k),
                     }
                     for k in range(1, FORECAST_QUARTERS + 1)
@@ -267,7 +271,7 @@ class ErpStore:
             "revenueData": months,
             "expenseBreakdown": breakdown,
             "invoices": invoices,
-            "bills": self._with_overdue(data["bills"]),
+            "bills": self._with_overdue(data["bills"], as_of),
             "accounts": self._accounts(data),
             "transactions": data["transactions"],
             "inventoryItems": self._inventory(data["inventoryItems"]),
@@ -275,7 +279,7 @@ class ErpStore:
             "quarterlyRevenue": quarterly,
             "revenueScenarios": scenarios,
             "cashFlowData": flow,
-            "arAging": self._aging(invoices),
+            "arAging": self._aging(invoices, as_of),
             "budgetVsActual": budget,
             "monthlyExpenseByCategory": by_category,
             "totals": totals,
