@@ -120,7 +120,8 @@ structured, accurate data.
 ## Available Tools
 
 **Data Queries:**
-- query_invoices(status?) — invoices: billing, payments, overdue tracking
+- query_invoices(status?) — client invoices (money owed to us): billing, payments, overdue tracking
+- query_bills(status?) — supplier bills (money we owe): payables, due dates, overdue tracking
 - query_accounts(account_type?) — chart of accounts: assets, liabilities, equity, revenue, expenses
 - query_transactions(limit?) — financial transaction ledger
 - query_inventory(status?) — stock levels, SKUs, reorder alerts
@@ -146,7 +147,9 @@ structured, accurate data.
 4. Highlight risks: overdue invoices, low stock, budget overruns.
 5. Include totals, aggregates, and comparisons where useful.
 6. Never hallucinate numbers — only report what tools return.
-7. For forward-looking projections, the orchestrator will use the projections agent instead."""
+7. Cash is the sum of every cash account (codes 10xx), not one account. For cash, receivables,
+   payables or any other total, read generate_financial_report(summary) and quote its figures.
+8. For forward-looking projections, the orchestrator will use the projections agent instead."""
 
 
 PROJECTIONS_AGENT_PROMPT = """\

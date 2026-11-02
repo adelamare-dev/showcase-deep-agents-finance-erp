@@ -18,7 +18,7 @@ Chantier en cours : l'agent tourne sur **Mistral** (`ministral-14b-2512` pour l'
 | Chat, outils UI, contexte agent | `src/components/layout/shell.tsx` + `src/hooks/use-*.tsx` |
 | Agent FastAPI (`:8123`) | `agent/main.py`, graphe dans `agent/agent.py`, modèles dans `agent/models.py` |
 | Prompts, outils, sous-agents | `agent/prompts.py`, `agent/tools.py`, `agent/frontend_tools.py`, `agent/isolated_subagents.py` |
-| Données de démo | `src/lib/data.ts` et `agent/tools.py` (doublon, voir Pièges) |
+| Données de démo | agent : `agent/erp_store.py` (source), `agent/erp_seed.py`, `GET /api/erp/snapshot` ; web : `src/lib/data.ts` encore lu par les pages (voir Pièges) |
 | Postgres (démo) | `docker-compose.yml`, `agent/seed.sql`, `src/lib/db.ts` |
 
 ## Commandes
@@ -37,7 +37,7 @@ Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker 
 
 ## Règles du repo
 
-- **Source unique de données.** À terme l'agent possède les données et le front les lit par REST ; tant que `src/lib/data.ts` et `agent/tools.py` coexistent, toute valeur touchée doit l'être des deux côtés. **Aucun chiffre affiché** (carte, graphique, approbation) ne vient du modèle : il choisit un identifiant, le code remplit.
+- **Source unique de données.** À terme l'agent possède les données et le front les lit par REST ; tant que le web lit `src/lib/data.ts`, toute valeur touchée doit l'être des deux côtés. **Aucun chiffre affiché** (carte, graphique, approbation) ne vient du modèle : il choisit un identifiant, le code remplit.
 - **Aucun identifiant de spec ou de plan** (`T3`, « ticket », « tâche 4 »…) dans le code, les noms, les commentaires ou les messages imprimés.
 - **Identifiants de modèle datés**, jamais `-latest`. `MISTRAL_API_KEY` n'est jamais imprimée, journalisée ni commitée.
 - **Dates relatives à aujourd'hui**, jamais codées en dur, dès que le store arrive.
@@ -54,7 +54,7 @@ Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker 
 
 ## Pièges
 
-- **Données en double, aujourd'hui.** `agent/tools.py` recopie les jeux de `src/lib/data.ts` (factures, comptes, stock, RH) : les deux doivent rester cohérents jusqu'à la source unique. C'est la cause première d'un chiffre faux, donc de l'échec de la démo.
+- **Données en double, temporairement.** L'agent lit `ErpStore` (jeu neuf, identités neutres, dates relatives) ; les pages web lisent encore `src/lib/data.ts`, qui n'a plus rien de commun avec lui. Tant que les pages ne passent pas par `/api/erp/snapshot`, l'interface et les réponses de l'agent affichent des chiffres différents : c'est attendu, pas un bogue à corriger dans `data.ts`.
 - **`useRenderTool` exige `parameters`** en `@copilotkit/react-core` 1.80.0 : chaque outil front déclare un schéma `zod` permissif décrivant les champs lus. Les cartes n'ont été validées qu'au build et au chargement — le rendu réel reste à prouver.
 - **Pas de prop `instructions` sur `CopilotSidebar`** en 1.80.0. Les consignes passent par `useAgentContext` (`shell.tsx`), comme les KPI et la disposition du dashboard.
 - **`pnpm lint` est rouge, antérieur à ce chantier** : 8 erreurs, 5 avertissements (`setState` dans un effet dans `dashboards/page.tsx`, ref lue au rendu dans `dashboard-context.tsx`, `any` dans `use-update-dashboard.tsx`, réaffectation après rendu dans `cash-waterfall-chart.tsx`). Ce n'est pas une régression ; à corriger avant la remise finale.

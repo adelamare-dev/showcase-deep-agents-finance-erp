@@ -14,7 +14,7 @@ Service FastAPI + LangGraph qui expose le graphe `finance_erp_agent` en AG-UI su
 ## Conventions
 
 - `load_dotenv()` en tête de module, **avant** tout import qui lit l'environnement (`main.py`, `agent.py`).
-- Un module de domaine par rôle : `tools.py` (données, `research_tools` / `projections_tools`), `frontend_tools.py` (UI `ui_tools` + HITL `hitl_tools`), `isolated_subagents.py` (`do_research` / `do_projections`).
+- Un module de domaine par rôle : `erp_seed.py` (jeu de départ, dates en décalages de jours) et `erp_store.py` (`ErpStore`, `get_store()`) pour les données ; `erp_api.py` (routes `/api/erp/*`) ; `tools.py` (outils de lecture et calculs de prévision, aucune donnée, `research_tools` / `projections_tools`), `frontend_tools.py` (UI `ui_tools` + HITL `hitl_tools`), `isolated_subagents.py` (`do_research` / `do_projections`).
 - La docstring d'un `@tool` est la description vue par le modèle : elle est en anglais, et la modifier change le comportement de l'agent.
 - Prompts en constantes majuscules dans `prompts.py` ; aucun identifiant de spec ni de plan dans le texte envoyé au modèle.
 
@@ -22,6 +22,8 @@ Service FastAPI + LangGraph qui expose le graphe `finance_erp_agent` en AG-UI su
 
 - Les modules s'importent **à plat** (`from tools import research_tools`) : ils ne résolvent que si le processus démarre avec `agent/` comme répertoire courant. Lancer `uv run …` depuis `agent/`, jamais depuis la racine.
 - `agent/` n'est couvert ni par ESLint ni par tsconfig : `pnpm lint` et `pnpm build` ne disent rien de ce dossier.
+- **Source unique** : tout chiffre vient de `get_store()` (singleton de processus, pas le lifespan FastAPI, car les outils tournent hors requête et dans des threads ; `threading.Lock` autour de `reset` et des mutations). Montants en **dollars entiers (`int`)** : les sommes sont exactes et `actifs == passif + capitaux propres` se teste avec `==`. Les valeurs dérivées (totaux, KPI, vieillissement, statut `overdue`, étiquettes de trimestre) se calculent à la lecture. Les tests passent `as_of` fixe (fin d'année, 29 février, début de trimestre) via la fixture `store`.
+- CORS limité à `FRONTEND_ORIGIN` (défaut `http://localhost:3000`), méthodes `GET` et `POST`.
 - Les sous-agents tournent dans un `ThreadPoolExecutor` **par conception** : les callbacks LangChain ne traversent pas la frontière de thread, ce qui empêche les événements internes de fuiter dans le chat. Ne pas les remplacer par `subagents=[...]`.
 - `MemorySaver` est le checkpointer : l'état ne survit pas au redémarrage du serveur, et c'est voulu pour la démo.
 - Modèles : tout client Mistral se construit dans `models.py` (identifiants datés, timeout, une seule tentative). L'orchestrateur utilise `_StreamingToolCallMistral` : Mistral livre un appel d'outil en un seul chunk portant `finish_reason`, que `ag_ui_langgraph` ignorerait sans ce redécoupage.

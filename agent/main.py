@@ -1,5 +1,7 @@
 """Finance ERP Agent — FastAPI + CopilotKit AG-UI entry point."""
 
+import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,13 +10,24 @@ from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from copilotkit import LangGraphAGUIAgent
 from copilotkit.langgraph import copilotkit_customize_config
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from agent import build_agent
+from erp_api import router as erp_router
 from frontend_tools import ui_tools, hitl_tools
 from isolated_subagents import do_research, do_projections
 from models import ORCHESTRATOR_RECURSION_LIMIT
 
 app = FastAPI(title="Finance ERP Agent")
+
+# The browser reads the ERP routes directly; only the web app's origin may.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+app.include_router(erp_router)
 
 agent_graph = build_agent()
 
