@@ -22,15 +22,18 @@ async (page, h) => {
     await h.open("/");
     await h.sendPrompt("Process payment for all overdue invoices");
     await h.expectVisible(approveButton(), 90000);
-    const before = await h.chatText();
+    const messages = page.getByTestId("copilot-assistant-message");
+    const countBefore = await messages.count();
+    const textBefore = countBefore > 0 ? await lastAssistantText() : "";
     await approveButton().click();
     // Once answered, the approval card leaves the chat and the graph resumes.
     await approveButton().waitFor({ state: "detached", timeout: 30000 });
     await h.waitForRunEnd();
-    const after = await h.chatText();
-    h.assert(after.length > before.length, "the chat grew after the approval");
+    const countAfter = await messages.count();
     const answer = await lastAssistantText();
-    h.assert(answer.length > 0, "the run ends with a final assistant answer");
+    h.assert(countAfter > countBefore, `a new assistant message follows the approval (${countBefore} -> ${countAfter})`);
+    h.assert(answer.length > 0 && answer !== textBefore, "the final assistant answer differs from the pre-approval one");
+    h.assert(!answer.includes("Approve Payment"), "the final assistant answer is not the approval card");
     return { finalAnswerChars: answer.length };
   });
 }

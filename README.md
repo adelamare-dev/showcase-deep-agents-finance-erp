@@ -75,7 +75,7 @@ Browser (:3000)
   |  Next.js API route (/api/copilotkit)
   |       |
   |       v
-  |  CopilotKit Runtime (LangGraphHttpAgent)
+  |  CopilotKit Runtime (HttpAgent)
   |       |  AG-UI / SSE
   |       v
   |  FastAPI (:8123)
