@@ -99,5 +99,25 @@ async (page, h) => {
       h.assertEqual(errors, [], "no page error");
     });
   });
+  await h.test("Duplicating a template saves the template's widgets, not the ones on screen", async () => {
+    return await withPage(() => {}, undefined, async (p, errors) => {
+      // The live dashboard starts as the default layout, which differs from this template.
+      await gallery(p);
+      await p.getByText("Cost Control").first().click();
+      await p.getByRole("button", { name: "Duplicate" }).click();
+      await p.waitForFunction(
+        (key) => (window.localStorage.getItem(key) || "").includes("(Copy)"),
+        KEY,
+        { timeout: 10000 },
+      );
+      const saved = JSON.parse(await p.evaluate((key) => window.localStorage.getItem(key), KEY));
+      const copy = saved.find((d) => d.name === "Cost Control (Copy)");
+      h.assert(copy, "a copy named after the template is stored");
+      const ids = copy.widgets.map((w) => w.id).sort();
+      h.assert(ids.includes("budget-variance"), "the copy carries the template's budget variance widget");
+      h.assert(!ids.includes("kpi-cards"), "the copy does not carry the widgets that were on screen");
+      h.assertEqual(errors, [], "no page error");
+    });
+  });
 
 }

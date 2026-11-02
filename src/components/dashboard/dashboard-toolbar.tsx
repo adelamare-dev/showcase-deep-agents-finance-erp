@@ -35,6 +35,11 @@ export function DashboardToolbar() {
     }
   };
 
+  const handleCancel = () => {
+    setSaveError(null);
+    setShowSaveInput(false);
+  };
+
   return (
     <div className="flex items-center gap-2 px-8 pt-6">
       {currentDashboardName && (
@@ -61,10 +66,13 @@ export function DashboardToolbar() {
               type="text"
               placeholder="Dashboard name..."
               value={saveName}
-              onChange={(e) => setSaveName(e.target.value)}
+              onChange={(e) => {
+                setSaveName(e.target.value);
+                setSaveError(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void handleSave();
-                if (e.key === "Escape") setShowSaveInput(false);
+                if (e.key === "Escape") handleCancel();
               }}
               className="h-8 w-48 rounded-lg border border-border bg-card px-3 text-sm text-foreground placeholder-muted-foreground outline-none focus:ring-2 focus:ring-ring/30"
             />
@@ -79,7 +87,7 @@ export function DashboardToolbar() {
             <Button
               size="icon-sm"
               variant="ghost"
-              onClick={() => setShowSaveInput(false)}
+              onClick={handleCancel}
             >
               <X className="h-4 w-4" />
             </Button>

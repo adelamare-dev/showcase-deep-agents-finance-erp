@@ -10,6 +10,7 @@ import { WidgetRenderer } from "@/components/dashboard/widget-renderer";
 import { colSpanClass } from "@/components/dashboard/widget-renderer";
 import { useDashboard } from "@/context/dashboard-context";
 import type { SavedDashboard } from "@/types/dashboard";
+import { saveDashboard } from "@/lib/saved-dashboards";
 import {
   ArrowLeft,
   Play,
@@ -133,6 +134,7 @@ function DetailView({
   onDelete,
   onDuplicate,
   isActive,
+  error,
 }: {
   dashboard: SavedDashboard;
   onBack: () => void;
@@ -140,6 +142,7 @@ function DetailView({
   onDelete: () => void;
   onDuplicate: () => void;
   isActive: boolean;
+  error: string | null;
 }) {
   return (
     <div className="space-y-6">
@@ -209,6 +212,12 @@ function DetailView({
         </div>
       </div>
 
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
       {/* Widget preview */}
       <div className="rounded-xl border border-border bg-card p-6">
         <h3 className="mb-4 text-sm font-semibold text-foreground">
@@ -250,11 +259,11 @@ function DashboardsContent() {
     savedDashboards,
     refreshSaved,
     deleteSaved,
-    saveCurrent,
   } = useDashboard();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -283,7 +292,15 @@ function DashboardsContent() {
   };
 
   const handleDuplicate = async (dashboard: SavedDashboard) => {
-    await saveCurrent(`${dashboard.name} (Copy)`);
+    setDuplicateError(null);
+    try {
+      await saveDashboard(`${dashboard.name} (Copy)`, dashboard.widgets);
+      await refreshSaved();
+    } catch (e) {
+      setDuplicateError(
+        e instanceof Error ? e.message : "The dashboard was not duplicated.",
+      );
+    }
   };
 
   if (loading) {
@@ -317,7 +334,11 @@ function DashboardsContent() {
         {selected ? (
           <DetailView
             dashboard={selected}
-            onBack={() => setSelectedId(null)}
+            onBack={() => {
+              setDuplicateError(null);
+              setSelectedId(null);
+            }}
+            error={duplicateError}
             onLoad={() => handleLoad(selected)}
             onDelete={() => void handleDelete(selected.id)}
             onDuplicate={() => void handleDuplicate(selected)}
