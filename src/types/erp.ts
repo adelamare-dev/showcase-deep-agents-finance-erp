@@ -93,6 +93,12 @@ export interface QuarterlyDataPoint {
   profit: number;
 }
 
+export interface RevenueScenario {
+  label: string;
+  color: string;
+  values: { quarter: string; value: number }[];
+}
+
 export interface CashFlowDataPoint {
   quarter: string;
   operating: number;

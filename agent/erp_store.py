@@ -37,6 +37,16 @@ def quarter_label(day: date, by: int = 0) -> str:
     return f"Q{quarter} {year}"
 
 
+# Quarterly growth assumed by each forecast scenario. The projections start from
+# the last actual quarter and are never stored.
+FORECAST_SCENARIOS = [
+    ("Optimistic", "#22c55e", 0.10),
+    ("Base", "#3b82f6", 0.05),
+    ("Conservative", "#ef4444", 0.02),
+]
+FORECAST_QUARTERS = 4
+
+
 def _usd(amount: int) -> str:
     return f"${amount:,}"
 
@@ -224,6 +234,20 @@ class ErpStore:
         ]
 
         previous, latest = quarterly[-2], quarterly[-1]
+        scenarios = [
+            {
+                "label": label,
+                "color": color,
+                "values": [
+                    {
+                        "quarter": quarter_label(self._as_of, k),
+                        "value": round(latest["revenue"] * (1 + growth) ** k),
+                    }
+                    for k in range(1, FORECAST_QUARTERS + 1)
+                ],
+            }
+            for label, color, growth in FORECAST_SCENARIOS
+        ]
         # Receivables, cash and payables have no history to compare with: their change is 0.
         kpi_rows = [
             ("Total Revenue", _usd(totals["revenue"]), _change(latest["revenue"], previous["revenue"]), "dollar-sign"),
@@ -249,6 +273,7 @@ class ErpStore:
             "inventoryItems": self._inventory(data["inventoryItems"]),
             "employees": data["employees"],
             "quarterlyRevenue": quarterly,
+            "revenueScenarios": scenarios,
             "cashFlowData": flow,
             "arAging": self._aging(invoices),
             "budgetVsActual": budget,

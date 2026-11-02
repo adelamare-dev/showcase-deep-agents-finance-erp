@@ -38,41 +38,8 @@ function ForecastChart({
 }: {
   scenarios?: RevenueForecastWidget["config"]["scenarios"];
 }) {
-  // Default scenarios if none provided
-  const defaultScenarios = [
-    {
-      label: "Optimistic",
-      color: "#22c55e",
-      values: [
-        { quarter: "Q2 2026", value: 1050000 },
-        { quarter: "Q3 2026", value: 1160000 },
-        { quarter: "Q4 2026", value: 1280000 },
-        { quarter: "Q1 2027", value: 1410000 },
-      ],
-    },
-    {
-      label: "Base",
-      color: "#3b82f6",
-      values: [
-        { quarter: "Q2 2026", value: 920000 },
-        { quarter: "Q3 2026", value: 975000 },
-        { quarter: "Q4 2026", value: 1020000 },
-        { quarter: "Q1 2027", value: 1070000 },
-      ],
-    },
-    {
-      label: "Conservative",
-      color: "#ef4444",
-      values: [
-        { quarter: "Q2 2026", value: 780000 },
-        { quarter: "Q3 2026", value: 810000 },
-        { quarter: "Q4 2026", value: 835000 },
-        { quarter: "Q1 2027", value: 855000 },
-      ],
-    },
-  ];
-
-  const sc = scenarios ?? defaultScenarios;
+  const { revenueScenarios } = useErp();
+  const sc = scenarios ?? revenueScenarios;
   const optimistic = sc.find((s) => s.label === "Optimistic") ?? sc[0];
   const base = sc.find((s) => s.label === "Base") ?? sc[1] ?? sc[0];
   const conservative =

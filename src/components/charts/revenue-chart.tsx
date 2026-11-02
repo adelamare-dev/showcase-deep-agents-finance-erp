@@ -24,7 +24,8 @@ interface RevenueChartConfig {
 }
 
 export function RevenueChart({ config }: { config?: RevenueChartConfig }) {
-  const { revenueData } = useErp();
+  const { revenueData, quarterlyRevenue } = useErp();
+  const lastQuarter = quarterlyRevenue[quarterlyRevenue.length - 1]?.quarter;
   const showExpenses = config?.showExpenses ?? true;
   const showProfit = config?.showProfit ?? true;
 
@@ -34,7 +35,7 @@ export function RevenueChart({ config }: { config?: RevenueChartConfig }) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Revenue vs Expenses</CardTitle>
-            <CardDescription>Monthly breakdown, FY 2026</CardDescription>
+            <CardDescription>Monthly breakdown, trailing 12 months{lastQuarter ? ` to ${lastQuarter}` : ""}</CardDescription>
           </div>
           <div className="flex gap-4 text-xs">
             <div className="flex items-center gap-1.5">

@@ -180,6 +180,23 @@ def test_quarter_labels_follow_as_of(store):
     assert len(set(month_names)) == 12
 
 
+def test_revenue_scenarios_follow_as_of_and_actuals(store):
+    snap = store.snapshot()
+    last = snap["quarterlyRevenue"][-1]["revenue"]
+    scenarios = {s["label"]: s for s in snap["revenueScenarios"]}
+    assert list(scenarios) == ["Optimistic", "Base", "Conservative"]
+    expected = [quarter_label(store.as_of, k) for k in range(1, 5)]
+    for scenario in scenarios.values():
+        assert [v["quarter"] for v in scenario["values"]] == expected
+        assert all(type(v["value"]) is int for v in scenario["values"])
+        assert scenario["color"].startswith("#")
+    assert expected[0] not in [q["quarter"] for q in snap["quarterlyRevenue"]]
+    assert scenarios["Base"]["values"][0]["value"] == round(last * 1.05)
+    for k in range(4):
+        low, mid, high = (scenarios[n]["values"][k]["value"] for n in ("Conservative", "Base", "Optimistic"))
+        assert low < mid < high
+
+
 def test_quarter_label_crosses_year_boundaries():
     assert quarter_label(date(2027, 1, 1), -1) == "Q4 2026"
     assert quarter_label(date(2026, 12, 31), 1) == "Q1 2027"
@@ -218,7 +235,7 @@ def test_bills_follow_the_bill_type(store):
 def test_snapshot_has_the_agreed_keys(store):
     assert set(store.snapshot()) == {
         "kpis", "revenueData", "expenseBreakdown", "invoices", "bills", "accounts", "transactions",
-        "inventoryItems", "employees", "quarterlyRevenue", "cashFlowData", "arAging",
+        "inventoryItems", "employees", "quarterlyRevenue", "revenueScenarios", "cashFlowData", "arAging",
         "budgetVsActual", "monthlyExpenseByCategory", "totals",
     }
     assert set(store.totals()) == {

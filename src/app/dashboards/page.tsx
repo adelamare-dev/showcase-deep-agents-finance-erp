@@ -83,10 +83,12 @@ function DashboardRow({
             <Layers className="h-3 w-3" />
             {dashboard.widgets.length} widgets
           </span>
-          <span className="inline-flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {new Date(dashboard.updatedAt).toLocaleDateString()}
-          </span>
+          {dashboard.category !== "template" && (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {new Date(dashboard.updatedAt).toLocaleDateString()}
+            </span>
+          )}
         </div>
       </div>
 
@@ -170,8 +172,14 @@ function DetailView({
               </Badge>
               {isActive && <Badge variant="default">Active</Badge>}
               <span className="text-xs text-muted-foreground self-center">
-                {dashboard.widgets.length} widgets &middot; Updated{" "}
-                {new Date(dashboard.updatedAt).toLocaleDateString()}
+                {dashboard.widgets.length} widgets
+                {dashboard.category !== "template" && (
+                  <>
+                    {" "}
+                    &middot; Updated{" "}
+                    {new Date(dashboard.updatedAt).toLocaleDateString()}
+                  </>
+                )}
               </span>
             </div>
           </div>

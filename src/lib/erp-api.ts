@@ -11,6 +11,7 @@ import type {
   KPI,
   MonthlyExpenseByCategory,
   QuarterlyDataPoint,
+  RevenueScenario,
   RevenueDataPoint,
   Totals,
   Transaction,
@@ -32,6 +33,7 @@ export type ErpSnapshot = {
   inventoryItems: InventoryItem[];
   employees: Employee[];
   quarterlyRevenue: QuarterlyDataPoint[];
+  revenueScenarios: RevenueScenario[];
   cashFlowData: CashFlowDataPoint[];
   arAging: ARAgingData;
   budgetVsActual: BudgetVsActual[];

@@ -84,6 +84,24 @@ async (page, h) => {
     return { employees: snap.employees.length, payroll };
   });
 
+  await h.test("The forecast headline on the Revenue Overview template is the store's base case", async () => {
+    const snap = await h.snapshot();
+    h.assert(Array.isArray(snap.revenueScenarios), "the snapshot serves the revenue scenarios");
+    const base = snap.revenueScenarios.find((s) => s.label === "Base");
+    h.assert(base && base.values.length > 0, "the snapshot serves a base scenario");
+    const target = base.values[base.values.length - 1].value;
+    await h.visit("/dashboards");
+    await page.getByRole("button", { name: /Revenue Overview/ }).first().click();
+    await page.getByText("base case target").first().waitFor({ state: "visible", timeout: 30000 });
+    const headline = await page
+      .getByText("base case target")
+      .first()
+      .locator("xpath=preceding-sibling::span[1]")
+      .innerText();
+    h.assertEqual(headline, h.formatUsd(target), "the headline is the last base-case value of the snapshot");
+    return { headline, target };
+  });
+
   await h.test("No page asks a dashboards route or a database", async () => {
     const own = requested.filter((u) => u.startsWith(h.WEB_URL + "/api/") && !u.includes("/api/copilotkit"));
     h.assertEqual(own, [], "the web app serves no other API route");
