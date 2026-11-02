@@ -22,6 +22,7 @@
     "start:agent": "cd agent && uv run uvicorn main:app --host 127.0.0.1 --port 8123",
     "lint": "eslint .",
     "test:agent": "cd agent && uv run pytest -q",
+    "e2e:build": "node e2e/build.mjs",
     "postinstall": "cd agent && uv sync"
   },
   "dependencies": {

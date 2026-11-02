@@ -30,6 +30,7 @@ Chantier en cours : l'agent tourne sur **Mistral** (`ministral-14b-2512` pour l'
 - `pnpm lint` — ESLint sur le web (`agent/` est ignoré).
 - `pnpm test:agent` — pytest dans `agent/`, hors ligne (aucune clé réelle ni appel réseau).
 - `cd agent && uv run python scripts/probe_models.py` — sonde les modèles Mistral (statut et quotas `x-ratelimit-*`), sans imprimer la clé.
+- `pnpm e2e:build` — assemble `e2e/lib/helpers.js` + `e2e/scenarios/*.js` en `.playwright-mcp/scenarios/` ; on les lance avec l'outil `browser_run_code_unsafe` du plugin Playwright (`filename`), serveurs démarrés au préalable. Pas de `@playwright/test`. Voir `e2e/README.md`.
 - Binaires : `pnpm exec <bin>`, jamais `npx`. Python : `uv run`.
 
 Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker non requis pour `pnpm dev`.
@@ -62,6 +63,7 @@ Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker 
 - **Windows `MAX_PATH`** : un clone trop profond casse `agent/.venv` au-delà de 260 caractères. Garder un chemin court.
 - **Les sous-agents tournent en threads isolés** (`isolated_subagents.py`) : c'est voulu, ça empêche les événements internes de fuiter dans le flux parent. Ne pas « simplifier » en `subagents=[...]`.
 - **`agent/` est invisible pour ESLint** (`eslint.config.mjs` l'ignore) : `pnpm lint` ne dit rien de ce dossier, et un lint vert ne prouve rien côté Python.
+- **Un scénario E2E est une seule expression** (`async (page, h) => {...}`) : ni `import`, ni `require`, ni `;` final, car `browser_run_code_unsafe` l'exécute dans une VM sans module. Les helpers viennent de `h`. Barre latérale du chat fermée : toujours « visible » hors écran, `h.open` teste sa position.
 
 ## Vérification
 

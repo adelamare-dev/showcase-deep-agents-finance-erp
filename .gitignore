@@ -54,7 +54,7 @@ __pycache__/
 *.pem
 
 # LLM
-.playwright-mcp
+.playwright-mcp/
 .playwright
 .superpowers
 SETUP/

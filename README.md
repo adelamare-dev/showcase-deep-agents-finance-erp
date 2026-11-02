@@ -38,7 +38,9 @@ For a production-style run, `pnpm demo` builds the web app and starts both serve
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
 | `MISTRAL_API_KEY`   | Mistral API key (format `mstrl_...`), required                                                        |
 
-### `.env.local` (optional)
+### `.env` at the repo root (optional)
+
+Copy `.env.example` to `.env` to change a default; the web app works without it.
 
 | Variable            | Description                                                                      |
 | ------------------- | -------------------------------------------------------------------------------- |
@@ -54,6 +56,16 @@ For a production-style run, `pnpm demo` builds the web app and starts both serve
 | `pnpm build`       | Production build of the web app                      |
 | `pnpm lint`        | ESLint                                               |
 | `pnpm test:agent`  | Agent tests (pytest)                                 |
+
+## End-to-end tests
+
+Browser scenarios live in `e2e/scenarios/` and are driven by the Playwright MCP plugin, not by a test runner: the repo has no Playwright dependency.
+
+```bash
+pnpm e2e:build      # assembles helpers + each scenario into .playwright-mcp/scenarios/<name>.js
+```
+
+Start the servers (`pnpm demo`; live scenarios need a real `MISTRAL_API_KEY` in `agent/.env`), then run a built file with the plugin's `browser_run_code_unsafe` tool and `filename: ".playwright-mcp/scenarios/live.agent.js"`. A scenario passes when the tool returns `passed` with an empty `failed` list. See `e2e/README.md`.
 
 ## Architecture
 
