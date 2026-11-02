@@ -22,7 +22,7 @@ import { useManageDashboard } from "@/hooks/use-manage-dashboard";
 import { useSaveDashboard } from "@/hooks/use-save-dashboard";
 import { useDashboard } from "@/context/dashboard-context";
 import { Sidebar } from "./sidebar";
-import { kpis } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 
 const demoSuggestions = [
   {
@@ -179,6 +179,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
 function ShellInner({ children }: { children: React.ReactNode }) {
   const { widgets, savedDashboards, currentDashboardName } = useDashboard();
+  const { kpis } = useErp();
 
   // Persistent follow-up chips that appear above the input after the first
   // turn — the dashboard suggestion rotates based on the current layout so

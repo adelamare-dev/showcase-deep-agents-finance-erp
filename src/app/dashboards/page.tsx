@@ -245,7 +245,6 @@ function DashboardsContent() {
     saveCurrent,
   } = useDashboard();
 
-  const [dashboards, setDashboards] = useState<SavedDashboard[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -257,10 +256,8 @@ function DashboardsContent() {
     void load();
   }, [refreshSaved]);
 
-  // Use savedDashboards from context (kept in sync via refreshSaved)
-  useEffect(() => {
-    setDashboards(savedDashboards);
-  }, [savedDashboards]);
+  // The context keeps savedDashboards in sync through refreshSaved.
+  const dashboards = savedDashboards;
 
   const selected = dashboards.find((d) => d.id === selectedId);
 

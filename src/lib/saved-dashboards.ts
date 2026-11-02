@@ -1,48 +1,71 @@
+import { DASHBOARD_TEMPLATES } from "@/content/dashboard-templates";
 import type { DashboardWidget, SavedDashboard } from "@/types/dashboard";
 
-const BASE = "/api/dashboards";
-const LOCAL_KEY = "finance-erp-dashboards";
+// Versioned so a change of format never reads an older entry as a current one.
+const LOCAL_KEY = "finance-os.dashboards.v2";
 
 // ---------------------------------------------------------------------------
-// localStorage helpers (fallback when no Postgres)
+// localStorage helpers. Storage can be missing, blocked, full or corrupted:
+// every access is guarded and an unreadable entry is ignored.
 // ---------------------------------------------------------------------------
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// Widgets that embed their own data points are not accepted: every figure
+// must come from the agent service at render time.
+function isValidWidget(value: unknown): value is DashboardWidget {
+  if (!isRecord(value)) return false;
+  if (typeof value.id !== "string" || typeof value.type !== "string") {
+    return false;
+  }
+  if (value.config !== undefined) {
+    if (!isRecord(value.config) || "data" in value.config) return false;
+  }
+  return true;
+}
+
+function isValidDashboard(value: unknown): value is SavedDashboard {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.createdAt === "string" &&
+    typeof value.updatedAt === "string" &&
+    Array.isArray(value.widgets) &&
+    value.widgets.every(isValidWidget)
+  );
+}
 
 function getLocalCustom(): SavedDashboard[] {
-  if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(LOCAL_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = window.localStorage.getItem(LOCAL_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(isValidDashboard)
+      .map((d) => ({ ...d, category: "custom" as const }));
   } catch {
     return [];
   }
 }
 
 function persistLocal(dashboards: SavedDashboard[]) {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(dashboards));
+  try {
+    window.localStorage.setItem(LOCAL_KEY, JSON.stringify(dashboards));
+  } catch {
+    // Storage unavailable: the dashboard lives for this session only.
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Public API — merges server templates with local custom dashboards
+// Public API: built-in templates plus the dashboards saved in this browser
 // ---------------------------------------------------------------------------
 
 export async function getSavedDashboards(): Promise<SavedDashboard[]> {
-  try {
-    const res = await fetch(BASE);
-    if (!res.ok) return getLocalCustom();
-    const serverDashboards: SavedDashboard[] = await res.json();
-
-    // If server returned custom dashboards (Postgres is connected), use server data only
-    const hasServerCustom = serverDashboards.some(
-      (d) => d.category === "custom",
-    );
-    if (hasServerCustom) return serverDashboards;
-
-    // Otherwise merge: server templates + localStorage custom
-    const localCustom = getLocalCustom();
-    return [...serverDashboards, ...localCustom];
-  } catch {
-    return getLocalCustom();
-  }
+  return [...DASHBOARD_TEMPLATES, ...getLocalCustom()];
 }
 
 export async function saveDashboard(
@@ -50,82 +73,29 @@ export async function saveDashboard(
   widgets: DashboardWidget[],
   description?: string,
 ): Promise<SavedDashboard> {
-  try {
-    const res = await fetch(BASE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, widgets, description, category: "custom" }),
-    });
-    const entry: SavedDashboard = await res.json();
-
-    // Also persist locally as fallback
-    const local = getLocalCustom();
-    local.push({ ...entry, category: "custom" });
-    persistLocal(local);
-
-    return entry;
-  } catch {
-    // Offline fallback
-    const now = new Date().toISOString();
-    const entry: SavedDashboard = {
-      id: crypto.randomUUID(),
-      name,
-      description,
-      category: "custom",
-      widgets,
-      createdAt: now,
-      updatedAt: now,
-    };
-    const local = getLocalCustom();
-    local.push(entry);
-    persistLocal(local);
-    return entry;
-  }
-}
-
-export async function updateSavedDashboard(
-  id: string,
-  widgets: DashboardWidget[],
-): Promise<SavedDashboard | null> {
-  try {
-    const res = await fetch(`${BASE}/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ widgets }),
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
+  const now = new Date().toISOString();
+  const entry: SavedDashboard = {
+    id: crypto.randomUUID(),
+    name,
+    description,
+    category: "custom",
+    widgets,
+    createdAt: now,
+    updatedAt: now,
+  };
+  persistLocal([...getLocalCustom(), entry]);
+  return entry;
 }
 
 export async function deleteSavedDashboard(id: string): Promise<void> {
-  try {
-    await fetch(`${BASE}/${id}`, { method: "DELETE" });
-  } catch {
-    // ignore
-  }
-  // Also remove from localStorage
-  const local = getLocalCustom().filter((d) => d.id !== id);
-  persistLocal(local);
+  persistLocal(getLocalCustom().filter((d) => d.id !== id));
 }
 
 export async function loadSavedDashboard(
   id: string,
 ): Promise<DashboardWidget[] | null> {
-  try {
-    const res = await fetch(`${BASE}/${id}`);
-    if (res.ok) {
-      const data: SavedDashboard = await res.json();
-      return data.widgets;
-    }
-  } catch {
-    // fall through to local
-  }
-  // Check localStorage
-  const local = getLocalCustom().find((d) => d.id === id);
-  return local?.widgets ?? null;
+  const found = (await getSavedDashboards()).find((d) => d.id === id);
+  return found?.widgets ?? null;
 }
 
 export async function findSavedDashboardByName(

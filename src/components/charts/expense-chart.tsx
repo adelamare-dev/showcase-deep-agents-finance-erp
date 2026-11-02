@@ -1,6 +1,6 @@
 "use client";
 
-import { expenseBreakdown } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import {
   Card,
@@ -15,6 +15,7 @@ interface ExpenseChartConfig {
 }
 
 export function ExpenseChart({ config }: { config?: ExpenseChartConfig }) {
+  const { expenseBreakdown } = useErp();
   const items = config?.categories
     ? expenseBreakdown.filter((e) => config.categories!.includes(e.category))
     : expenseBreakdown;

@@ -19,7 +19,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { cashFlowData } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import type { CashWaterfallWidget } from "@/types/dashboard";
 
@@ -41,6 +41,7 @@ function WaterfallChart({
   quarters?: number;
   showNetLine?: boolean;
 }) {
+  const { cashFlowData } = useErp();
   const data = cashFlowData.slice(-quarters);
 
   // Build waterfall data: each bar floats from a running base
@@ -215,6 +216,7 @@ function FlowComparisonChart({
 }: {
   comparisonData?: { quarter: string; inflow: number; outflow: number }[];
 }) {
+  const { cashFlowData } = useErp();
   // Default data derived from cashFlowData if none provided
   const data =
     comparisonData ??

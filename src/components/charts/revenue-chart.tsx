@@ -16,7 +16,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { revenueData } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 
 interface RevenueChartConfig {
   showProfit?: boolean;
@@ -24,6 +24,7 @@ interface RevenueChartConfig {
 }
 
 export function RevenueChart({ config }: { config?: RevenueChartConfig }) {
+  const { revenueData } = useErp();
   const showExpenses = config?.showExpenses ?? true;
   const showProfit = config?.showProfit ?? true;
 

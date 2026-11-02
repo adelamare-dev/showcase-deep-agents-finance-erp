@@ -5,6 +5,9 @@ import {
   TrendingUp,
   FileText,
   Receipt,
+  Wallet,
+  CreditCard,
+  Minus,
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
@@ -17,11 +20,14 @@ const iconMap: Record<string, React.ElementType> = {
   "trending-up": TrendingUp,
   "file-text": FileText,
   receipt: Receipt,
+  wallet: Wallet,
+  "credit-card": CreditCard,
 };
 
 export function KPICard({ kpi }: { kpi: KPI }) {
   const Icon = iconMap[kpi.icon] || DollarSign;
   const isPositive = kpi.trend === "up";
+  const isFlat = kpi.trend === "flat";
 
   return (
     <Card
@@ -36,12 +42,16 @@ export function KPICard({ kpi }: { kpi: KPI }) {
           <div
             className={cn(
               "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-              isPositive
-                ? "bg-emerald-50 text-emerald-600"
-                : "bg-red-50 text-red-600",
+              isFlat
+                ? "bg-muted text-muted-foreground"
+                : isPositive
+                  ? "bg-emerald-50 text-emerald-600"
+                  : "bg-red-50 text-red-600",
             )}
           >
-            {isPositive ? (
+            {isFlat ? (
+              <Minus className="h-3 w-3" />
+            ) : isPositive ? (
               <ArrowUpRight className="h-3 w-3" />
             ) : (
               <ArrowDownRight className="h-3 w-3" />

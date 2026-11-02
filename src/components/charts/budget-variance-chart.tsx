@@ -19,7 +19,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { budgetVsActual } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import type { BudgetVarianceWidget } from "@/types/dashboard";
 
@@ -28,6 +28,7 @@ export function BudgetVarianceChart({
 }: {
   config: BudgetVarianceWidget["config"];
 }) {
+  const { budgetVsActual } = useErp();
   const title = config.title ?? "Budget vs Actual Variance";
   const subtitle =
     config.subtitle ??

@@ -126,3 +126,26 @@ export interface MonthlyExpenseByCategory {
   rnd: number;
   other: number;
 }
+
+export interface Bill {
+  id: string;
+  number: string;
+  supplier: string;
+  amount: number;
+  currency: Currency;
+  status: "paid" | "pending" | "overdue";
+  issuedDate: string;
+  dueDate: string;
+}
+
+export interface Totals {
+  cash: number;
+  accountsReceivable: number;
+  accountsPayable: number;
+  assets: number;
+  liabilities: number;
+  equity: number;
+  revenue: number;
+  expenses: number;
+  netProfit: number;
+}

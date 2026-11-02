@@ -34,6 +34,14 @@
     await page.waitForTimeout(600);
   };
 
+  // Opens a route without touching the chat: the data pages need no agent run.
+  // `target` defaults to the shared page; pass another page to isolate storage.
+  const visit = async (path, target = page) => {
+    await target.setViewportSize({ width: 1280, height: 720 });
+    await target.goto(WEB_URL + path);
+    await target.waitForFunction(() => !document.body.innerText.includes("Loading data..."), null, { timeout: 30000 });
+  };
+
   const sendPrompt = async (text) => {
     await byId("copilot-chat-textarea").fill(text);
     await byId("copilot-send-button").click();
@@ -88,7 +96,7 @@
   const h = {
     WEB_URL, ERP_URL, SNAPSHOT_URL,
     assert, assertEqual, expectVisible,
-    open, sendPrompt, waitForRunEnd, chatText, snapshot,
+    open, visit, sendPrompt, waitForRunEnd, chatText, snapshot,
     moneyIn, formatUsd, test, run,
   };
   return h;

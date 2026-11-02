@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { accounts, transactions } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import type { Account, Transaction } from "@/types/erp";
 
@@ -18,6 +18,7 @@ const accountTypeColors: Record<string, string> = {
 };
 
 export default function AccountsPage() {
+  const { accounts, transactions } = useErp();
   const totalAssets = accounts
     .filter((a) => a.type === "asset")
     .reduce((sum, a) => sum + a.balance, 0);

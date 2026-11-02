@@ -13,7 +13,7 @@ import { SpendHeatmap } from "@/components/charts/spend-heatmap";
 import { RevenueForecastChart } from "@/components/charts/revenue-forecast-chart";
 import { MetricCards } from "@/components/dashboard/metric-cards";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { kpis, transactions, invoices } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -65,6 +65,7 @@ export function WidgetRenderer({ widget }: { widget: DashboardWidget }) {
 }
 
 function KpiCardsSection({ config }: { config: { metrics?: string[] } }) {
+  const { kpis } = useErp();
   const filtered = config.metrics
     ? kpis.filter((k) => config.metrics!.includes(k.label))
     : kpis;
@@ -79,6 +80,7 @@ function KpiCardsSection({ config }: { config: { metrics?: string[] } }) {
 }
 
 function RecentTransactionsSection({ config }: { config: { limit?: number } }) {
+  const { transactions } = useErp();
   const limit = config.limit ?? 5;
 
   return (
@@ -135,6 +137,7 @@ function OutstandingInvoicesSection({
 }: {
   config: { statuses?: ("pending" | "overdue")[] };
 }) {
+  const { invoices } = useErp();
   const statuses = config.statuses ?? ["pending", "overdue"];
   const filtered = invoices.filter((inv) =>
     statuses.includes(inv.status as "pending" | "overdue"),

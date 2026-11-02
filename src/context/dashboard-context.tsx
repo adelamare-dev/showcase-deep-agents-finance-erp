@@ -7,6 +7,7 @@ import {
   useCallback,
   useRef,
   useEffect,
+  useLayoutEffect,
 } from "react";
 import type { DashboardWidget, SavedDashboard } from "@/types/dashboard";
 import {
@@ -84,7 +85,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [widgets, setWidgetsState] =
     useState<DashboardWidget[]>(DEFAULT_WIDGETS);
   const widgetsRef = useRef(widgets);
-  widgetsRef.current = widgets;
+  useLayoutEffect(() => {
+    widgetsRef.current = widgets;
+  }, [widgets]);
 
   const [savedDashboards, setSavedDashboards] = useState<SavedDashboard[]>([]);
   const [currentDashboardName, setCurrentDashboardName] = useState<

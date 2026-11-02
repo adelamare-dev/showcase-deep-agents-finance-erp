@@ -18,8 +18,9 @@ Chantier en cours : l'agent tourne sur **Mistral** (`ministral-14b-2512` pour l'
 | Chat, outils UI, contexte agent | `src/components/layout/shell.tsx` + `src/hooks/use-*.tsx` |
 | Agent FastAPI (`:8123`) | `agent/main.py`, graphe dans `agent/agent.py`, modèles dans `agent/models.py` |
 | Prompts, outils, sous-agents | `agent/prompts.py`, `agent/tools.py`, `agent/frontend_tools.py`, `agent/isolated_subagents.py` |
-| Données de démo | agent : `agent/erp_store.py` (source), `agent/erp_seed.py`, `GET /api/erp/snapshot` ; web : `src/lib/data.ts` encore lu par les pages (voir Pièges) |
-| Postgres (démo) | `docker-compose.yml`, `agent/seed.sql`, `src/lib/db.ts` |
+| Données de démo | agent : `agent/erp_store.py` (source), `agent/erp_seed.py`, `GET /api/erp/snapshot` ; web : `src/context/erp-context.tsx` charge ce snapshot (`src/lib/erp-api.ts`, `NEXT_PUBLIC_ERP_API_URL`), les pages le lisent par `useErp()` |
+| Dashboards | templates en constantes (`src/content/dashboard-templates.ts`), dashboards enregistrés en `localStorage` (`src/lib/saved-dashboards.ts`, clé versionnée) |
+| Postgres | archive non branchée dans `templates/postgres/` (hors `tsconfig` et ESLint) ; lire son README avant tout usage |
 
 ## Commandes
 
@@ -33,11 +34,11 @@ Chantier en cours : l'agent tourne sur **Mistral** (`ministral-14b-2512` pour l'
 - `pnpm e2e:build` — assemble `e2e/lib/helpers.js` + `e2e/scenarios/*.js` en `.playwright-mcp/scenarios/` ; on les lance avec l'outil `browser_run_code_unsafe` du plugin Playwright (`filename`), serveurs démarrés au préalable. Pas de `@playwright/test`. Voir `e2e/README.md`.
 - Binaires : `pnpm exec <bin>`, jamais `npx`. Python : `uv run`.
 
-Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker non requis pour `pnpm dev`.
+Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Aucune base de données requise.
 
 ## Règles du repo
 
-- **Source unique de données.** À terme l'agent possède les données et le front les lit par REST ; tant que le web lit `src/lib/data.ts`, toute valeur touchée doit l'être des deux côtés. **Aucun chiffre affiché** (carte, graphique, approbation) ne vient du modèle : il choisit un identifiant, le code remplit.
+- **Source unique de données.** L'agent possède les données (`ErpStore`) et le front les lit par `GET /api/erp/snapshot` : aucune donnée métier dans `src/`. **Aucun chiffre affiché** (carte, graphique, approbation) ne vient du modèle : il choisit un identifiant, le code remplit.
 - **Aucun identifiant de spec ou de plan** (`T3`, « ticket », « tâche 4 »…) dans le code, les noms, les commentaires ou les messages imprimés.
 - **Identifiants de modèle datés**, jamais `-latest`. `MISTRAL_API_KEY` n'est jamais imprimée, journalisée ni commitée.
 - **Dates relatives à aujourd'hui**, jamais codées en dur, dès que le store arrive.
@@ -54,10 +55,10 @@ Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker 
 
 ## Pièges
 
-- **Données en double, temporairement.** L'agent lit `ErpStore` (jeu neuf, identités neutres, dates relatives) ; les pages web lisent encore `src/lib/data.ts`, qui n'a plus rien de commun avec lui. Tant que les pages ne passent pas par `/api/erp/snapshot`, l'interface et les réponses de l'agent affichent des chiffres différents : c'est attendu, pas un bogue à corriger dans `data.ts`.
+- **Le web ne démarre pas sans l'agent** : `ErpProvider` n'affiche ses enfants qu'une fois le snapshot chargé (sinon écran de chargement ou message avec Retry). Le CORS de l'agent n'autorise que `FRONTEND_ORIGIN` (défaut `http://localhost:3000`) : changer l'origine du web impose de changer aussi cette variable.
 - **`useRenderTool` exige `parameters`** en `@copilotkit/react-core` 1.80.0 : chaque outil front déclare un schéma `zod` permissif décrivant les champs lus. Les cartes n'ont été validées qu'au build et au chargement — le rendu réel reste à prouver.
 - **Pas de prop `instructions` sur `CopilotSidebar`** en 1.80.0. Les consignes passent par `useAgentContext` (`shell.tsx`), comme les KPI et la disposition du dashboard.
-- **`pnpm lint` est rouge, antérieur à ce chantier** : 8 erreurs, 5 avertissements (`setState` dans un effet dans `dashboards/page.tsx`, ref lue au rendu dans `dashboard-context.tsx`, `any` dans `use-update-dashboard.tsx`, réaffectation après rendu dans `cash-waterfall-chart.tsx`). Ce n'est pas une régression ; à corriger avant la remise finale.
+- **`pnpm lint` est rouge, antérieur à ce chantier** : 6 erreurs, 5 avertissements (`any` dans `use-update-dashboard.tsx`, réaffectation après rendu dans `cash-waterfall-chart.tsx`). `e2e/` et `.playwright-mcp/` sont ignorés (scénarios en expression unique). Ce n'est pas une régression ; à corriger avant la remise finale.
 - **`@ag-ui/client` est épinglé à la version exacte de `@copilotkit/runtime`** (1.0.2) : deux copies différentes rendent `HttpAgent` inassignable au runtime (`next build` échoue sur le type). À remonter avec `@copilotkit/*`.
 - **`@copilotkit/*` reste en 1.80.0** : la 1.83.0 est refusée par `minimumReleaseAge`. Ne pas forcer la montée, ne pas assouplir le cooldown.
 - **Windows `MAX_PATH`** : un clone trop profond casse `agent/.venv` au-delà de 260 caractères. Garder un chemin court.
@@ -69,7 +70,7 @@ Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker 
 
 Niveau par défaut : **standard**.
 
-- Web : `pnpm build` (vérification des types active) et `pnpm lint` — comparer aux 8 erreurs connues ci-dessus, ne pas en ajouter.
+- Web : `pnpm build` (vérification des types active) et `pnpm lint` — comparer aux 6 erreurs connues ci-dessus, ne pas en ajouter.
 - Agent hors ligne : `cd agent && uv run pytest -q` (aucun appel réseau attendu).
 - Bout en bout : `pnpm demo`, puis `GET http://127.0.0.1:8123/health` et la page `http://localhost:3000`.
 - Toute mesure live compare à des valeurs **lues dans le store au moment du test**, jamais écrites en dur. Un 429 n'est pas un échec du code : attendre la fenêtre, rejouer, le noter.

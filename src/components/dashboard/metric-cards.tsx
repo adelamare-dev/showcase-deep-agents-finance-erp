@@ -5,12 +5,15 @@ import {
   TrendingUp,
   FileText,
   Receipt,
+  Wallet,
+  CreditCard,
+  Minus,
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { kpis } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import type { MetricCardsWidget } from "@/types/dashboard";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -18,6 +21,8 @@ const iconMap: Record<string, React.ElementType> = {
   "trending-up": TrendingUp,
   "file-text": FileText,
   receipt: Receipt,
+  wallet: Wallet,
+  "credit-card": CreditCard,
 };
 
 export function MetricCards({
@@ -25,6 +30,7 @@ export function MetricCards({
 }: {
   config: MetricCardsWidget["config"];
 }) {
+  const { kpis } = useErp();
   const filtered = kpis.filter((k) => config.metrics.includes(k.label));
 
   return (
@@ -41,6 +47,7 @@ export function MetricCards({
       {filtered.map((kpi) => {
         const Icon = iconMap[kpi.icon] || DollarSign;
         const isPositive = kpi.trend === "up";
+        const isFlat = kpi.trend === "flat";
 
         return (
           <Card
@@ -56,12 +63,16 @@ export function MetricCards({
                 <div
                   className={cn(
                     "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
-                    isPositive
-                      ? "bg-emerald-50 text-emerald-600"
-                      : "bg-red-50 text-red-600",
+                    isFlat
+                      ? "bg-muted text-muted-foreground"
+                      : isPositive
+                        ? "bg-emerald-50 text-emerald-600"
+                        : "bg-red-50 text-red-600",
                   )}
                 >
-                  {isPositive ? (
+                  {isFlat ? (
+                    <Minus className="h-3.5 w-3.5" />
+                  ) : isPositive ? (
                     <ArrowUpRight className="h-3.5 w-3.5" />
                   ) : (
                     <ArrowDownRight className="h-3.5 w-3.5" />

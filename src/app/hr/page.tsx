@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { employees } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Plus, Mail } from "lucide-react";
 
@@ -21,6 +21,7 @@ export default function HRPage() {
 }
 
 function HRContent() {
+  const { employees } = useErp();
   const searchParams = useSearchParams();
   const activeFilter = searchParams.get("filter") || "all";
 

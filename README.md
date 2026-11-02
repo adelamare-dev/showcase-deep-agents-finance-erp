@@ -2,13 +2,13 @@
 
 A finance ERP showcase powered by CopilotKit deep agents. An AI assistant can analyze invoices, review accounts, check inventory, manage HR data, generate financial reports, compose themed dashboards, and provide actionable business insights.
 
-**Stack:** Next.js 16 (frontend) + FastAPI / LangGraph (agent) + Postgres (persistence) + CopilotKit (AI layer)
+**Stack:** Next.js 16 (frontend) + FastAPI / LangGraph (agent, owns the data) + CopilotKit (AI layer). No database is required.
 
 **Highlights:**
 
 - 7 frontend tools (6 UI + 1 HITL) registered via `useRenderTool` / `useHumanInTheLoop`
 - 12 dashboard widget types with 4 pre-built templates (Executive Summary, Cash Flow Risk, Cost Control, Revenue Overview)
-- Dashboard gallery (`/dashboards`) for browsing, loading, saving, and deleting layouts
+- Dashboard gallery (`/dashboards`) for browsing, loading, saving, and deleting layouts (saved layouts live in the browser's `localStorage`)
 - Multi-agent orchestration: orchestrator + research subagent (14 tools) + projections subagent (6 tools)
 - Human-in-the-loop approval for invoice payments and inventory reorders
 
@@ -89,8 +89,8 @@ Browser (:3000)
   |  (14 tools)  (6 tools)
   |     |
   |     v
-  |  ERP store (in memory) — every figure the agent quotes; served at /api/erp/snapshot
-  |  Postgres (:5432) — saved dashboards
+  |  ERP store (in memory) — every figure the agent quotes and the pages show;
+  |  served to the browser at /api/erp/snapshot
   |
 ```
 

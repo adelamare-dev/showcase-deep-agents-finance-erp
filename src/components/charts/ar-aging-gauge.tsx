@@ -13,7 +13,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { arAging } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import type { ArAgingGaugeWidget } from "@/types/dashboard";
 
@@ -29,6 +29,7 @@ export function ArAgingGauge({
 }: {
   config: ArAgingGaugeWidget["config"];
 }) {
+  const { arAging } = useErp();
   const title = config.title ?? "Accounts Receivable Aging";
   const warningThreshold = config.warningThreshold ?? 0.85;
   const criticalThreshold = config.criticalThreshold ?? 0.7;

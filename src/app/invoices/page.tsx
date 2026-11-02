@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { invoices } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import type { Invoice } from "@/types/erp";
@@ -23,6 +23,7 @@ export default function InvoicesPage() {
 }
 
 function InvoicesContent() {
+  const { invoices } = useErp();
   const searchParams = useSearchParams();
   const activeFilter = searchParams.get("filter") || "all";
 

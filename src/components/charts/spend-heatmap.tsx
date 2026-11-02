@@ -8,7 +8,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { monthlyExpenseByCategory } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import type { SpendHeatmapWidget } from "@/types/dashboard";
 
@@ -40,6 +40,7 @@ export function SpendHeatmap({
 }: {
   config: SpendHeatmapWidget["config"];
 }) {
+  const { monthlyExpenseByCategory } = useErp();
   const title = config.title ?? "Expense Heatmap";
   const subtitle = config.subtitle ?? "Monthly spend intensity by category";
   const scale =

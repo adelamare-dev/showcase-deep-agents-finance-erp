@@ -18,7 +18,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { quarterlyRevenue } from "@/lib/data";
+import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import type { RevenueForecastWidget } from "@/types/dashboard";
 
@@ -234,6 +234,7 @@ function QuarterlyChart({
   trailingQuarters?: number;
   showMarginLine?: boolean;
 }) {
+  const { quarterlyRevenue } = useErp();
   const data = quarterlyRevenue.slice(-trailingQuarters);
 
   const chartData = data.map((d) => ({
