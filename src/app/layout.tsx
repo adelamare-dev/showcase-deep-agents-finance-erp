@@ -41,7 +41,10 @@ export default function RootLayout({
       )}
     >
       <body className="antialiased">
-        <CopilotKitProvider runtimeUrl="/api/copilotkit">
+        <CopilotKitProvider
+          runtimeUrl="/api/copilotkit"
+          enableInspector={false}
+        >
           <CopilotChatConfigurationProvider agentId="finance_erp_agent">
             <DashboardProvider>{children}</DashboardProvider>
           </CopilotChatConfigurationProvider>

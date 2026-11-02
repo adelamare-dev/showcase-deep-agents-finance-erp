@@ -1,21 +1,23 @@
-import { CopilotRuntime, createCopilotEndpoint } from "@copilotkit/runtime/v2";
-import { LangGraphHttpAgent } from "@copilotkit/runtime/langgraph";
-import { handle } from "hono/vercel";
+import { HttpAgent } from "@ag-ui/client";
+import {
+  CopilotRuntime,
+  createCopilotRuntimeHandler,
+} from "@copilotkit/runtime/v2";
 
 const runtime = new CopilotRuntime({
   agents: {
-    finance_erp_agent: new LangGraphHttpAgent({
+    finance_erp_agent: new HttpAgent({
       url:
         process.env.REMOTE_ACTION_URL ||
-        "http://localhost:8123/copilotkit/agents/finance_erp_agent",
+        "http://127.0.0.1:8123/copilotkit/agents/finance_erp_agent",
     }),
   },
 });
 
-const app = createCopilotEndpoint({
+const handler = createCopilotRuntimeHandler({
   runtime,
   basePath: "/api/copilotkit",
 });
 
-export const GET = handle(app);
-export const POST = handle(app);
+export const GET = handler;
+export const POST = handler;

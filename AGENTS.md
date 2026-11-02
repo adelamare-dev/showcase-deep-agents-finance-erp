@@ -7,7 +7,7 @@
 
 Fork **autonome** du showcase `CopilotKit/examples/showcases/deep-agents-finance-erp` : aucune resynchronisation amont prévue. Repo public de démo (LinkedIn, rendez-vous), piloté en local, puis base d'un futur repo privé. Le succès se mesure à une orchestration **visible, contrôlée par un humain et exacte sur les chiffres** — pas à une absence de panne.
 
-Chantier en cours, arrêté après la tâche T1 : l'agent tourne encore sur **OpenAI**, pas sur Mistral. `SETUP/` (spec, plan, preuves) est volontairement **hors dépôt** et gitignored : ne rien en citer dans le code, les commits, le README ou l'interface.
+Chantier en cours : l'agent tourne sur **Mistral** (`ministral-14b-2512` pour l'orchestrateur et les sous-agents, `agent/models.py` ; `mistral-small-2603` a un quota de 0 requête/min sur ce compte). `SETUP/` (spec, plan, preuves) est volontairement **hors dépôt** et gitignored : ne rien en citer dans le code, les commits, le README ou l'interface.
 
 ## Stack et chemins
 
@@ -16,7 +16,7 @@ Chantier en cours, arrêté après la tâche T1 : l'agent tourne encore sur **Op
 | Web Next 16 (App Router, React 19, Tailwind v4, shadcn) | `src/app`, `src/components`, `src/hooks`, `src/lib`, `src/types` |
 | Runtime CopilotKit → agent | `src/app/api/copilotkit/[[...slug]]/route.ts` |
 | Chat, outils UI, contexte agent | `src/components/layout/shell.tsx` + `src/hooks/use-*.tsx` |
-| Agent FastAPI (`:8123`) | `agent/main.py`, graphe dans `agent/agent.py` |
+| Agent FastAPI (`:8123`) | `agent/main.py`, graphe dans `agent/agent.py`, modèles dans `agent/models.py` |
 | Prompts, outils, sous-agents | `agent/prompts.py`, `agent/tools.py`, `agent/frontend_tools.py`, `agent/isolated_subagents.py` |
 | Données de démo | `src/lib/data.ts` et `agent/tools.py` (doublon, voir Pièges) |
 | Postgres (démo) | `docker-compose.yml`, `agent/seed.sql`, `src/lib/db.ts` |
@@ -28,7 +28,8 @@ Chantier en cours, arrêté après la tâche T1 : l'agent tourne encore sur **Op
 - `pnpm demo` — build de production, puis les deux serveurs sans rechargement. Mode des mesures et des rendez-vous.
 - `pnpm build` / `pnpm start` — web seul. `pnpm dev:agent` / `pnpm start:agent` — agent seul.
 - `pnpm lint` — ESLint sur le web (`agent/` est ignoré).
-- `pnpm test:agent` — pytest dans `agent/`.
+- `pnpm test:agent` — pytest dans `agent/`, hors ligne (aucune clé réelle ni appel réseau).
+- `cd agent && uv run python scripts/probe_models.py` — sonde les modèles Mistral (statut et quotas `x-ratelimit-*`), sans imprimer la clé.
 - Binaires : `pnpm exec <bin>`, jamais `npx`. Python : `uv run`.
 
 Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker non requis pour `pnpm dev`.
@@ -55,9 +56,8 @@ Prérequis : Node ≥ 20.9 (`.nvmrc` épingle 24), pnpm 11, uv ≥ 0.11. Docker 
 - **Données en double, aujourd'hui.** `agent/tools.py` recopie les jeux de `src/lib/data.ts` (factures, comptes, stock, RH) : les deux doivent rester cohérents jusqu'à la source unique. C'est la cause première d'un chiffre faux, donc de l'échec de la démo.
 - **`useRenderTool` exige `parameters`** en `@copilotkit/react-core` 1.80.0 : chaque outil front déclare un schéma `zod` permissif décrivant les champs lus. Les cartes n'ont été validées qu'au build et au chargement — le rendu réel reste à prouver.
 - **Pas de prop `instructions` sur `CopilotSidebar`** en 1.80.0. Les consignes passent par `useAgentContext` (`shell.tsx`), comme les KPI et la disposition du dashboard.
-- **`hono` est une dépendance provisoire** : `route.ts` l'importe via `hono/vercel`, et `next build` échoue sans lui. À retirer avec la bascule Mistral.
 - **`pnpm lint` est rouge, antérieur à ce chantier** : 8 erreurs, 5 avertissements (`setState` dans un effet dans `dashboards/page.tsx`, ref lue au rendu dans `dashboard-context.tsx`, `any` dans `use-update-dashboard.tsx`, réaffectation après rendu dans `cash-waterfall-chart.tsx`). Ce n'est pas une régression ; à corriger avant la remise finale.
-- **`pnpm test:agent` est rouge** : `test_multi_turn.py` exige `OPENAI_API_KEY` dès la collecte (exit 2). Ce fichier disparaît avec la bascule Mistral.
+- **`@ag-ui/client` est épinglé à la version exacte de `@copilotkit/runtime`** (1.0.2) : deux copies différentes rendent `HttpAgent` inassignable au runtime (`next build` échoue sur le type). À remonter avec `@copilotkit/*`.
 - **`@copilotkit/*` reste en 1.80.0** : la 1.83.0 est refusée par `minimumReleaseAge`. Ne pas forcer la montée, ne pas assouplir le cooldown.
 - **Windows `MAX_PATH`** : un clone trop profond casse `agent/.venv` au-delà de 260 caractères. Garder un chemin court.
 - **Les sous-agents tournent en threads isolés** (`isolated_subagents.py`) : c'est voulu, ça empêche les événements internes de fuiter dans le flux parent. Ne pas « simplifier » en `subagents=[...]`.

@@ -8,7 +8,7 @@ Service FastAPI + LangGraph qui expose le graphe `finance_erp_agent` en AG-UI su
 
 - Resynchroniser l'environnement : `uv sync` (déjà lancé par `pnpm install`).
 - Serveur de dev : `uv run uvicorn main:app --host 127.0.0.1 --port 8123 --reload`.
-- Tests : `uv run pytest -q` — rouge aujourd'hui pour une raison connue (voir `AGENTS.md` à la racine).
+- Tests : `uv run pytest -q` — hors ligne : `tests/conftest.py` pose une fausse clé, et le modèle est simulé ou arrêté avant tout appel réseau.
 - Ajouter une dépendance : `uv add <pkg>`, puis vérifier que `exclude-newer`, `no-build` et `malware-check` de `pyproject.toml` ne la refusent pas. Une exception se justifie, ne s'assouplit pas.
 
 ## Conventions
@@ -24,7 +24,9 @@ Service FastAPI + LangGraph qui expose le graphe `finance_erp_agent` en AG-UI su
 - `agent/` n'est couvert ni par ESLint ni par tsconfig : `pnpm lint` et `pnpm build` ne disent rien de ce dossier.
 - Les sous-agents tournent dans un `ThreadPoolExecutor` **par conception** : les callbacks LangChain ne traversent pas la frontière de thread, ce qui empêche les événements internes de fuiter dans le chat. Ne pas les remplacer par `subagents=[...]`.
 - `MemorySaver` est le checkpointer : l'état ne survit pas au redémarrage du serveur, et c'est voulu pour la démo.
-- Le monkey-patch de `json.dumps` (`agent.py`) contourne la sérialisation des objets `Context` d'AG-UI. Il est temporaire : ne pas l'étendre.
+- Modèles : tout client Mistral se construit dans `models.py` (identifiants datés, timeout, une seule tentative). L'orchestrateur utilise `_StreamingToolCallMistral` : Mistral livre un appel d'outil en un seul chunk portant `finish_reason`, que `ag_ui_langgraph` ignorerait sans ce redécoupage.
+- Le profil de harnais est enregistré sous la clé `mistral` (celle que `ChatMistralAI` déclare) : il retire le système de fichiers virtuel et l'outil `task`. `build_agent()` n'est appelé que depuis `main.py` ; `tests/test_agent_tools.py` verrouille la liste des 9 outils exposés.
+- `CopilotKitMiddleware` sérialise déjà les objets `Context` d'AG-UI (copilotkit 0.1.96) : aucun patch de `json.dumps` n'est nécessaire, un test le garde.
 
 ↑ Voir `AGENTS.md` à la racine pour les principes de travail, les règles du repo et la vérification.
 

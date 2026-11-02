@@ -36,16 +36,14 @@ For a production-style run, `pnpm demo` builds the web app and starts both serve
 
 | Variable            | Description                                                                                           |
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
-| `MISTRAL_API_KEY`   | Mistral API key                                                                                       |
-| `OPENAI_API_KEY`    | OpenAI API key (currently used by the agent)                                                          |
-| `OPENAI_MODEL`      | Model to use                                                                                          |
-| `LANGCHAIN_API_KEY` | LangSmith key for tracing (optional)                                                                  |
+| `MISTRAL_API_KEY`   | Mistral API key (format `mstrl_...`), required                                                        |
 
 ### `.env.local` (optional)
 
 | Variable            | Description                                                                      |
 | ------------------- | -------------------------------------------------------------------------------- |
-| `REMOTE_ACTION_URL` | Agent URL (default: `http://localhost:8123/copilotkit/agents/finance_erp_agent`) |
+| `REMOTE_ACTION_URL` | Agent URL (default: `http://127.0.0.1:8123/copilotkit/agents/finance_erp_agent`) |
+| `COPILOTKIT_TELEMETRY_DISABLED` | CopilotKit telemetry is off by default; set to `false` to opt in         |
 
 ## Scripts
 

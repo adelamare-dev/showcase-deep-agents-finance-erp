@@ -10,12 +10,12 @@ Pattern adapted from deep-agents/agent/tools.py.
 
 from __future__ import annotations
 
-import os
 from concurrent.futures import ThreadPoolExecutor
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 
+from models import SUBAGENT_RECURSION_LIMIT, subagent_chat_model
 from prompts import RESEARCH_AGENT_PROMPT, PROJECTIONS_AGENT_PROMPT
 from tools import research_tools, projections_tools
 
@@ -23,23 +23,18 @@ from tools import research_tools, projections_tools
 def _run_subagent(query: str, system_prompt: str, agent_tools: list) -> str:
     """Create and invoke a deep agent in the current (isolated) thread."""
     from deepagents import create_deep_agent
-    from langchain_openai import ChatOpenAI
-
-    llm = ChatOpenAI(
-        model=os.environ.get("OPENAI_MODEL", "gpt-5.4-2026-03-05"),
-        temperature=0,
-        streaming=True,
-        api_key=os.environ.get("OPENAI_API_KEY"),
-    )
 
     agent = create_deep_agent(
-        model=llm,
+        model=subagent_chat_model(),
         system_prompt=system_prompt,
         tools=agent_tools,
         # No middleware — this runs in an isolated thread
     )
 
-    result = agent.invoke({"messages": [HumanMessage(content=query)]})
+    result = agent.invoke(
+        {"messages": [HumanMessage(content=query)]},
+        config={"recursion_limit": SUBAGENT_RECURSION_LIMIT},
+    )
     return result["messages"][-1].content
 
 

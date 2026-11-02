@@ -1,4 +1,4 @@
-"""Consolidated frontend tool stubs (5 tools, down from 14).
+"""Frontend tool stubs (7 tools: 6 UI renderers and 1 human-in-the-loop).
 
 These tools are registered at agent creation time so the model can call them
 via function calling. The AG-UI adapter streams ToolCall events, which the
