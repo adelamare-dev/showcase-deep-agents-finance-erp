@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
+import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
 
@@ -88,11 +89,24 @@ export function useManageDashboard() {
   useRenderTool(
     {
       name: "manage_dashboard",
-      render: ({ args, status, result }) => (
+      parameters: z.object({
+        action: z.string().optional(),
+        widgetId: z.string().optional(),
+        updates: z
+          .array(
+            z.object({
+              widgetId: z.string(),
+              colSpan: z.number().optional(),
+              order: z.number().optional(),
+            }),
+          )
+          .optional(),
+      }),
+      render: ({ parameters, status, result }) => (
         <DashboardManager
-          action={args?.action ?? ""}
-          widgetId={args?.widgetId}
-          updates={args?.updates}
+          action={parameters?.action ?? ""}
+          widgetId={parameters?.widgetId}
+          updates={parameters?.updates}
           status={status}
           result={result}
         />

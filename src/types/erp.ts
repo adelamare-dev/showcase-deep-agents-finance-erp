@@ -1,12 +1,14 @@
 export type Currency = "USD" | "EUR" | "GBP";
 
-export interface KPI {
+// A type alias (not an interface) so it is assignable to the JSON-serializable
+// context values passed to `useAgentContext`.
+export type KPI = {
   label: string;
   value: string;
   change: number;
   trend: "up" | "down" | "flat";
   icon: string;
-}
+};
 
 export interface Invoice {
   id: string;

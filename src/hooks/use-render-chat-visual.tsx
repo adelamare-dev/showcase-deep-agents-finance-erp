@@ -1,6 +1,7 @@
 "use client";
 
 import { useRenderTool } from "@copilotkit/react-core/v2";
+import { z } from "zod";
 import { InlineChatChart } from "@/components/chat/inline-chart";
 import { CashPositionCard } from "@/components/chat/cash-position-card";
 
@@ -8,7 +9,32 @@ export function useRenderChatVisual() {
   useRenderTool(
     {
       name: "render_chat_visual",
-      render: ({ args, status }) => {
+      parameters: z.object({
+        type: z.string().optional(),
+        accounts: z
+          .array(z.object({ name: z.string(), balance: z.number() }))
+          .optional(),
+        totalCash: z.number().optional(),
+        totalLiabilities: z.number().optional(),
+        netPosition: z.number().optional(),
+        title: z.string().optional(),
+        chartType: z.string().optional(),
+        data: z
+          .array(
+            z.object({
+              label: z.string(),
+              value: z.number(),
+              value2: z.number().optional(),
+            }),
+          )
+          .optional(),
+        series: z
+          .array(
+            z.object({ key: z.string(), color: z.string(), label: z.string() }),
+          )
+          .optional(),
+      }),
+      render: ({ parameters: args, status }) => {
         if (args?.type === "cash_position") {
           return (
             <CashPositionCard

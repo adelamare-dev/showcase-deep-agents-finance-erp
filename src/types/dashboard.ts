@@ -12,39 +12,41 @@ export type WidgetType =
   | "revenue-forecast"
   | "metric-cards";
 
-export interface BaseWidget {
+// Declared as type aliases (not interfaces) so widgets are assignable to the
+// JSON-serializable context values passed to `useAgentContext`.
+export type BaseWidget = {
   id: string;
   type: WidgetType;
   colSpan: 1 | 2 | 3 | 4;
   order: number;
-}
+};
 
-export interface KpiCardsWidget extends BaseWidget {
+export type KpiCardsWidget = BaseWidget & {
   type: "kpi-cards";
   config: { metrics?: string[] };
-}
+};
 
-export interface RevenueChartWidget extends BaseWidget {
+export type RevenueChartWidget = BaseWidget & {
   type: "revenue-chart";
   config: { showProfit?: boolean; showExpenses?: boolean };
-}
+};
 
-export interface ExpenseBreakdownWidget extends BaseWidget {
+export type ExpenseBreakdownWidget = BaseWidget & {
   type: "expense-breakdown";
   config: { categories?: string[] };
-}
+};
 
-export interface RecentTransactionsWidget extends BaseWidget {
+export type RecentTransactionsWidget = BaseWidget & {
   type: "recent-transactions";
   config: { limit?: number };
-}
+};
 
-export interface OutstandingInvoicesWidget extends BaseWidget {
+export type OutstandingInvoicesWidget = BaseWidget & {
   type: "outstanding-invoices";
   config: { statuses?: ("pending" | "overdue")[] };
-}
+};
 
-export interface CustomChartWidget extends BaseWidget {
+export type CustomChartWidget = BaseWidget & {
   type: "custom-chart";
   config: {
     title: string;
@@ -54,9 +56,9 @@ export interface CustomChartWidget extends BaseWidget {
     series: { key: string; color: string; label: string }[];
     formatValues?: "currency" | "number" | "percent";
   };
-}
+};
 
-export interface CashWaterfallWidget extends BaseWidget {
+export type CashWaterfallWidget = BaseWidget & {
   type: "cash-waterfall";
   config: {
     title?: string;
@@ -66,18 +68,18 @@ export interface CashWaterfallWidget extends BaseWidget {
     showNetLine?: boolean;
     comparisonData?: { quarter: string; inflow: number; outflow: number }[];
   };
-}
+};
 
-export interface ArAgingGaugeWidget extends BaseWidget {
+export type ArAgingGaugeWidget = BaseWidget & {
   type: "ar-aging-gauge";
   config: {
     title?: string;
     warningThreshold?: number;
     criticalThreshold?: number;
   };
-}
+};
 
-export interface BudgetVarianceWidget extends BaseWidget {
+export type BudgetVarianceWidget = BaseWidget & {
   type: "budget-variance";
   config: {
     title?: string;
@@ -85,9 +87,9 @@ export interface BudgetVarianceWidget extends BaseWidget {
     showPercentage?: boolean;
     categories?: string[];
   };
-}
+};
 
-export interface SpendHeatmapWidget extends BaseWidget {
+export type SpendHeatmapWidget = BaseWidget & {
   type: "spend-heatmap";
   config: {
     title?: string;
@@ -102,9 +104,9 @@ export interface SpendHeatmapWidget extends BaseWidget {
     )[];
     colorScale?: "purple" | "blue" | "red";
   };
-}
+};
 
-export interface RevenueForecastWidget extends BaseWidget {
+export type RevenueForecastWidget = BaseWidget & {
   type: "revenue-forecast";
   config: {
     title?: string;
@@ -118,15 +120,15 @@ export interface RevenueForecastWidget extends BaseWidget {
     trailingQuarters?: number;
     showMarginLine?: boolean;
   };
-}
+};
 
-export interface MetricCardsWidget extends BaseWidget {
+export type MetricCardsWidget = BaseWidget & {
   type: "metric-cards";
   config: {
     metrics: string[];
     stacked?: boolean;
   };
-}
+};
 
 export type DashboardWidget =
   | KpiCardsWidget

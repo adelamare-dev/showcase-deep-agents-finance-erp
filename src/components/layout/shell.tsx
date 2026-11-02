@@ -193,6 +193,14 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     [currentDashboardName],
   );
 
+  // The sidebar has no `instructions` prop in the v2 API; assistant guidance
+  // reaches the agent as context instead.
+  useAgentContext({
+    description: "Assistant instructions",
+    value:
+      "You are the FinanceOS AI assistant. Always use do_research for data queries and do_projections for forecasts. Prefer rendering rich UI components (charts, cards, dashboard widgets) over plain text whenever possible.",
+  });
+
   // Lightweight context — detailed data is available via backend research tools
   useAgentContext({
     description: "Key performance indicators for the company",
@@ -260,7 +268,6 @@ function ShellInner({ children }: { children: React.ReactNode }) {
           assistantMessage:
             HoverToolbarAssistantMessage as unknown as typeof CopilotChatAssistantMessage,
         }}
-        instructions="You are the FinanceOS AI assistant. Always use do_research for data queries and do_projections for forecasts. Prefer rendering rich UI components (charts, cards, dashboard widgets) over plain text whenever possible."
         labels={{
           modalHeaderTitle: "FinanceOS AI",
           welcomeMessageText: "Ask about invoices, accounts, inventory, or HR.",

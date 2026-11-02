@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
+import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { CompletedToolCard } from "@/components/chat/tool-card";
 
@@ -65,10 +66,14 @@ export function useNavigateAndFilter() {
   useRenderTool(
     {
       name: "navigate_and_filter",
-      render: ({ args, status, result }) => (
+      parameters: z.object({
+        page: z.string().optional(),
+        filter: z.string().optional(),
+      }),
+      render: ({ parameters, status, result }) => (
         <Navigator
-          page={args?.page ?? ""}
-          filter={args?.filter}
+          page={parameters?.page ?? ""}
+          filter={parameters?.filter}
           status={status}
           result={result}
         />

@@ -5,6 +5,7 @@ import {
   useInterrupt,
   useRenderTool,
 } from "@copilotkit/react-core/v2";
+import { z } from "zod";
 import { InvoiceApprovalCard } from "@/components/chat/invoice-approval-card";
 import { InventoryReorderCard } from "@/components/chat/inventory-reorder-card";
 
@@ -60,6 +61,7 @@ export function useRequestApproval() {
   useRenderTool(
     {
       name: "request_approval",
+      parameters: z.object({}),
       render: () => null,
     },
     [],
@@ -76,7 +78,8 @@ export function useRequestApproval() {
     render: ({ event, resolve }) => {
       const value = parseInterruptValue(event.value);
       const args = value?.__copilotkit_interrupt_value__?.args;
-      if (!args) return null;
+      // The interrupt API requires an element; an empty fragment renders nothing.
+      if (!args) return <></>;
 
       const respond = async (result: unknown) => {
         resolve(result);

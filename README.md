@@ -26,7 +26,7 @@ cp agent/.env.example agent/.env      # then set the API key in agent/.env
 pnpm dev                              # web on http://localhost:3000, agent on http://127.0.0.1:8123
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Postgres is optional and only backs saved dashboards: set `DATABASE_URL` in `.env.local` (and run `docker compose up -d` for a seeded database) to enable persistence.
+Open [http://localhost:3000](http://localhost:3000).
 
 For a production-style run, `pnpm demo` builds the web app and starts both servers without hot reload.
 
@@ -37,7 +37,7 @@ For a production-style run, `pnpm demo` builds the web app and starts both serve
 | Variable            | Description                                                                                           |
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
 | `MISTRAL_API_KEY`   | Mistral API key                                                                                       |
-| `OPENAI_API_KEY`    | OpenAI API key (currently used by the agent)                                     |
+| `OPENAI_API_KEY`    | OpenAI API key (currently used by the agent)                                                          |
 | `OPENAI_MODEL`      | Model to use                                                                                          |
 | `LANGCHAIN_API_KEY` | LangSmith key for tracing (optional)                                                                  |
 
@@ -46,7 +46,6 @@ For a production-style run, `pnpm demo` builds the web app and starts both serve
 | Variable            | Description                                                                      |
 | ------------------- | -------------------------------------------------------------------------------- |
 | `REMOTE_ACTION_URL` | Agent URL (default: `http://localhost:8123/copilotkit/agents/finance_erp_agent`) |
-| `DATABASE_URL`      | Postgres connection string, e.g. `postgresql://erp_user:erp_password@localhost:5432/finance_erp` |
 
 ## Scripts
 

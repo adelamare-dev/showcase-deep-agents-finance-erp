@@ -20,17 +20,17 @@ allowBuilds:
   # Ships prebuilt @unrs/resolver-binding-* binaries; the script only fetches one when missing.
   unrs-resolver: false
 
-# Cooldown : aucune version âgée de moins de 7 jours n'est résoluble
+# Cooldown: no version younger than 7 days can be resolved
 minimumReleaseAge: 10080
-minimumReleaseAgeStrict: true # échec plutôt que fallback immature
+minimumReleaseAgeStrict: true # fail rather than fall back to an immature version
 minimumReleaseAgeIgnoreMissingTime: false
 
-trustPolicy: no-downgrade # bloque les releases à confiance dégradée
-blockExoticSubdeps: true # bloque les sub-deps git/tarball profondes
-trustLockfile: false # re-vérifie la politique à chaque install
+trustPolicy: no-downgrade # block releases with degraded trust evidence
+blockExoticSubdeps: true # block git/tarball transitive dependencies
+trustLockfile: false # re-check the policy on every install
 
-strictDepBuilds: true # builds de deps non approuvées = échec
-dangerouslyAllowAllBuilds: false # jamais de postinstall global
+strictDepBuilds: true # unapproved dependency builds fail the install
+dangerouslyAllowAllBuilds: false # never allow dependency build scripts globally
 
 audit:
   level: high

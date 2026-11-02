@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
+import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
 
@@ -86,8 +87,10 @@ export function useSaveDashboard() {
   useRenderTool(
     {
       name: "save_dashboard",
-      render: ({ args, status, result }) => (
-        <SaveHandler name={args?.name ?? ""} status={status} result={result} />
+      parameters: z.object({ name: z.string().optional() }),
+      render: ({ parameters, status, result }) => (
+        <SaveHandler
+          name={parameters?.name ?? ""} status={status} result={result} />
       ),
     },
     [],
@@ -96,8 +99,10 @@ export function useSaveDashboard() {
   useRenderTool(
     {
       name: "load_dashboard",
-      render: ({ args, status, result }) => (
-        <LoadHandler name={args?.name ?? ""} status={status} result={result} />
+      parameters: z.object({ name: z.string().optional() }),
+      render: ({ parameters, status, result }) => (
+        <LoadHandler
+          name={parameters?.name ?? ""} status={status} result={result} />
       ),
     },
     [],
