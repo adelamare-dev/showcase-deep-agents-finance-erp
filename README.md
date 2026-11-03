@@ -69,7 +69,7 @@ Browser scenarios live in `e2e/scenarios/` and are driven by the Playwright MCP 
 pnpm e2e:build      # assembles helpers + each scenario into .playwright-mcp/scenarios/<name>.js
 ```
 
-Start the servers (`pnpm demo`; live scenarios need a real `MISTRAL_API_KEY` in `agent/.env`), then run a built file with the plugin's `browser_run_code_unsafe` tool and `filename: ".playwright-mcp/scenarios/live.agent.js"`. A scenario passes when the tool returns `passed` with an empty `failed` list. Scenarios that need a scripted model (`stub.*`) run on a local stand-in for the Mistral API and cost no credits: `node e2e/fixtures/stack.mjs` starts it with the agent and the web app. See `e2e/README.md`.
+Start the servers (`pnpm demo`; live scenarios need a real `MISTRAL_API_KEY` in `agent/.env`), then run a built file with the plugin's `browser_run_code_unsafe` tool and `filename: ".playwright-mcp/scenarios/live.agent.js"`. A scenario passes when the tool returns `passed` with an empty `failed` list. Scenarios that need a scripted model (`stub.*`) run on a local stand-in for the Mistral API and cost no credits: `node e2e/fixtures/stack.mjs` starts it with the agent and the web app (Windows only: it stops processes with `taskkill`). See `e2e/README.md`.
 
 ## Replaying the demo
 

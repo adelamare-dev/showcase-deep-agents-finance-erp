@@ -7,7 +7,6 @@ import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
 import { claimToolCall } from "@/lib/handled-tool-calls";
 
-
 function SaveHandler({
   name,
   status,

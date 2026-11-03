@@ -121,7 +121,10 @@ function SettingsMenu() {
         aria-label="Settings"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) setError(null);
+          setOpen((v) => !v);
+        }}
         className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <Settings className="h-5 w-5" />

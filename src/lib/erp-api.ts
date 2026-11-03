@@ -126,7 +126,12 @@ export async function fetchDataset<T extends ChartDataset | CashPositionDataset>
 
 // Puts the agent's books back to the seeded data.
 export async function resetErpData(): Promise<void> {
-  const res = await fetch(`${ERP_API_URL}/api/erp/reset`, { method: "POST" });
+  let res: Response;
+  try {
+    res = await fetch(`${ERP_API_URL}/api/erp/reset`, { method: "POST" });
+  } catch {
+    throw new Error("The data service is not reachable. Start the agent and try again.");
+  }
   if (!res.ok) {
     throw new Error(`The data service answered ${res.status}`);
   }

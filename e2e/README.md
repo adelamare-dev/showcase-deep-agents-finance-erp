@@ -34,7 +34,7 @@ nohup node e2e/fixtures/stack.mjs --logs <dir> > <dir>/stack.out 2>&1 &
 node e2e/fixtures/stack.mjs stop
 ```
 
-`stack.mjs` starts the stub (`:8790`, `STUB_PORT` to change it, and keep `STUB_URL` in `lib/helpers.js` in step), then the agent with `MISTRAL_BASE_URL` pointing at the stub and a fake key, then the web app. It refuses to start when 8790, 8123 or 3000 is taken. `stop` kills the whole tree it started.
+`stack.mjs` starts the stub (`:8790`, `STUB_PORT` to change it, and keep `STUB_URL` in `lib/helpers.js` in step), then the agent with `MISTRAL_BASE_URL` pointing at the stub and a fake key, then the web app. It refuses to start when 8790, 8123 or 3000 is taken. `stop` kills the whole tree it started. The launcher is Windows only: it stops processes with `taskkill`.
 
 A scenario scripts the model with `h.stubScript([...])`. Each model call takes the next step; an empty queue answers 500. Steps:
 

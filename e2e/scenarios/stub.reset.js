@@ -11,6 +11,8 @@ async (page, h) => {
   const storedDashboards = () => page.evaluate((key) => window.localStorage.getItem(key), DASHBOARDS_KEY);
   const heading = (text) => page.getByText(text, { exact: true });
   const fresh = async () => {
+    // A failed case may have left the blocked reset route behind.
+    await page.unroute("**/api/erp/reset").catch(() => {});
     await h.stubReset();
     await h.resetDemo();
     await page.evaluate((key) => window.localStorage.removeItem(key), DASHBOARDS_KEY);
@@ -55,11 +57,22 @@ async (page, h) => {
     h.assertEqual(await chatCount(), 0, "the conversation is empty");
     h.assertEqual(await byId("bill-approval-card").count(), 0, "no approval card is left");
 
+    // The agent must start a new thread too, not only the screen: its next
+    // request carries a short history, shorter than the end of the first take.
+    const lastCount = async () => (await h.stubRequests()).at(-1).messages;
+    const firstCount = await lastCount();
+    await h.stubScript([{ text: "Good morning." }]);
+    await h.sendPrompt("Hello");
+    await h.waitForRunEnd();
+    const afterReset = await lastCount();
+    h.assert(afterReset < firstCount, "the model got a short history after the reset (" + afterReset + " < " + firstCount + ")");
+    await h.clickReset();
+
     const second = await approveBills();
     h.assertEqual(second.ids, first.ids, "the second take finds the same bills");
     h.assertEqual(second.total, first.total, "the second take shows the same total");
     h.assertEqual(await h.snapshot(), paid, "the second take ends in the same books as the first");
-    return { ids: first.ids, total: first.total, cash };
+    return { ids: first.ids, total: first.total, cash, firstCount, afterReset };
   });
 
   await h.test("Reset is disabled while a run is in progress", async () => {
@@ -115,6 +128,71 @@ async (page, h) => {
     await h.stubReset();
     await customise();
     await h.clickReset();
+  });
+
+  await h.test("Reset with the chat panel closed starts a new thread", async () => {
+    await fresh();
+    const lastCount = async () => (await h.stubRequests()).at(-1).messages;
+    for (const text of ["First question", "Second question"]) {
+      await h.stubScript([{ text: "Answer to " + text }]);
+      await h.sendPrompt(text);
+      await h.waitForRunEnd();
+    }
+    const before = await lastCount();
+    const panelOpen = async () => (await byId("copilot-sidebar").boundingBox()).x < 1280;
+    await byId("copilot-chat-toggle").dispatchEvent("click");
+    for (let i = 0; i < 20 && (await panelOpen()); i++) await page.waitForTimeout(250);
+    h.assert(!(await panelOpen()), "the chat panel is closed");
+
+    await h.clickReset();
+    await byId("copilot-chat-toggle").dispatchEvent("click");
+    for (let i = 0; i < 20 && !(await panelOpen()); i++) await page.waitForTimeout(250);
+    await page.waitForTimeout(600);
+    h.assertEqual(await chatCount(), 0, "the reopened chat is empty");
+
+    await h.stubScript([{ text: "Good morning." }]);
+    await h.sendPrompt("Hello");
+    await h.waitForRunEnd();
+    const after = await lastCount();
+    h.assert(after < before, "the model got a short history (" + after + " < " + before + ")");
+    return { before, after };
+  });
+
+  await h.test("A failed reset says why and changes nothing", async () => {
+    await fresh();
+    await h.stubScript([{ text: "Everything looks fine." }]);
+    await h.sendPrompt("Status please");
+    await h.waitForRunEnd();
+    const books = await h.snapshot();
+    const messages = await chatCount();
+    const kpi = await byId("kpi-Cash").innerText();
+    h.assert(messages > 0, "the chat holds the take");
+
+    // The data service cannot be reached: the request dies like a refused connection.
+    await page.route("**/api/erp/reset", (route) => route.abort("connectionrefused"));
+    const item = await h.openSettings();
+    await item.click();
+    const alert = page.getByRole("alert").filter({ hasText: "data service" });
+    await h.expectVisible(alert, 10000);
+    h.assertEqual(
+      (await alert.innerText()).trim(),
+      "The data service is not reachable. Start the agent and try again.",
+      "the alert says what is wrong in plain words",
+    );
+    h.assert(await item.isEnabled(), "the control can be tried again");
+    h.assertEqual(await chatCount(), messages, "the chat is unchanged");
+    h.assertEqual(await byId("kpi-Cash").innerText(), kpi, "the dashboard is unchanged");
+    h.assertEqual(await h.snapshot(), books, "the books are unchanged");
+
+    // A stale alert is not shown when the menu is opened again.
+    await page.keyboard.press("Escape");
+    await item.waitFor({ state: "detached", timeout: 5000 });
+    await h.openSettings();
+    h.assertEqual(await alert.count(), 0, "the alert is gone after reopening the menu");
+
+    await page.unroute("**/api/erp/reset");
+    await h.clickReset();
+    h.assertEqual(await chatCount(), 0, "the reset works once the service is back");
   });
 
   await fresh();
