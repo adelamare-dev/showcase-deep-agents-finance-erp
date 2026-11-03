@@ -9,7 +9,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 
 **Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads the records from `GET /api/erp/snapshot` and every chart or card the model asks for from the dataset catalog (`agent/erp_datasets.py`, `GET /api/erp/datasets/{id}`): the model names a dataset and bounded parameters, the code fills in the figures. Postgres is archived in `templates/postgres/` and wired to nothing.
 
-**Not done yet.** Live subagent steps in the chat, supplier approval, a reset control, failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
+**Not done yet.** Supplier approval, a reset control, failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
 
 `SETUP/` (spec, plan, evidence) is deliberately **outside the repo** and gitignored: cite nothing from it in code, commits, README or UI.
 
@@ -66,7 +66,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 - **`pnpm lint` is red, and was before the migration**: 6 errors and 3 warnings in `src/`. Errors: `use-update-dashboard.tsx` (5 x `no-explicit-any`) and `cash-waterfall-chart.tsx` (variable reassigned after render). Warnings: `dashboard-grid.tsx`, `shell.tsx` (2). Not a regression; fix before the final handover. Add none.
 - **`@copilotkit/*` stays on 1.80.0**: 1.83.0 is refused by `minimumReleaseAge`. Do not force the bump or loosen the cooldown.
 - **Windows `MAX_PATH`**: a clone that is too deep breaks `agent/.venv` past 260 characters. Keep the path short.
-- **Subagents run in isolated threads** (`isolated_subagents.py`) on purpose: it keeps internal events out of the parent stream. Do not "simplify" to `subagents=[...]`.
+- **Subagents run in isolated threads** (`isolated_subagents.py`) on purpose: it keeps internal events out of the parent stream. Do not "simplify" to `subagents=[...]`. The one thing that crosses is a `subagent_step` custom event per subagent tool call, dispatched from the parent's loop and stored by `src/lib/subagent-steps.ts` under the card's tool call id; the card lists them live.
 - **`agent/` is invisible to ESLint** (`eslint.config.mjs` ignores it): a green lint says nothing about Python.
 - **CORS allows only `FRONTEND_ORIGIN`**, default `http://localhost:3000`. Opening the app on `http://127.0.0.1:3000` makes the snapshot request fail. Use `localhost`, or set `FRONTEND_ORIGIN`.
 - **`agent/.env` is not readable by agents** (workstation policy). Never try; check for the key with a script that prints only `bool(os.environ.get("MISTRAL_API_KEY"))`.

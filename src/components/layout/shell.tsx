@@ -11,9 +11,11 @@ import {
   useRenderTool,
   ToolCallStatus,
 } from "@copilotkit/react-core/v2";
+import { useEffect } from "react";
 import type React from "react";
 import { ToolCard } from "@/components/chat/tool-card";
 import { cn } from "@/lib/utils";
+import { SUBAGENT_STEP_EVENT, recordSubagentStep } from "@/lib/subagent-steps";
 import { useRenderChatVisual } from "@/hooks/use-render-chat-visual";
 import { useNavigateAndFilter } from "@/hooks/use-navigate-and-filter";
 import { useRequestApproval } from "@/hooks/use-request-approval";
@@ -228,17 +230,31 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     })),
   });
 
+  // The subagents report each of their tool calls as a custom event; the
+  // cards read them from the step store. `updates: []` keeps this component
+  // from re-rendering on every streamed message.
+  const { agent } = useAgent({ agentId: "finance_erp_agent", updates: [] });
+  useEffect(() => {
+    const subscription = agent.subscribe({
+      onCustomEvent: ({ event }) => {
+        if (event.name === SUBAGENT_STEP_EVENT) recordSubagentStep(event.value);
+      },
+    });
+    return () => subscription.unsubscribe();
+  }, [agent]);
+
   // Wildcard tool renderer — catches do_research, do_projections, and any
   // other tools not handled by a named hook. Shows persistent ToolCards.
   useRenderTool(
     {
       name: "*",
-      render: ({ name, status, args, result }) => {
+      render: ({ name, toolCallId, status, args, result }) => {
         const mappedStatus =
           status === ToolCallStatus.Complete ? "complete" : "inProgress";
         return (
           <ToolCard
             name={name}
+            toolCallId={toolCallId}
             status={mappedStatus}
             args={args ?? {}}
             result={result}

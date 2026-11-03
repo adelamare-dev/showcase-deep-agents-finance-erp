@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
 from ag_ui.core import Context
 from copilotkit import CopilotKitMiddleware
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableLambda
 from langchain_mistralai import ChatMistralAI
 
 import isolated_subagents
@@ -71,7 +73,18 @@ def test_subagents_expose_data_tools_only(monkeypatch):
     )
     monkeypatch.setattr(isolated_subagents, "subagent_chat_model", lambda: model)
 
-    isolated_subagents.do_research.invoke({"query": "overdue invoices"})
+    call = {
+        "type": "tool_call",
+        "id": "call-research",
+        "name": "do_research",
+        "args": {"query": "overdue invoices"},
+    }
+
+    # The tool reports its steps as events, which need a run to belong to.
+    async def run_tool(_, config):
+        return await isolated_subagents.do_research.ainvoke(call, config)
+
+    asyncio.run(RunnableLambda(run_tool).ainvoke(None))
 
     assert "query_invoices" in model.bound_tools
     assert not model.bound_tools & REMOVED_TOOLS

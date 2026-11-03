@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { stepLabel, useSubagentSteps } from "@/lib/subagent-steps";
 import {
   Check,
   ChevronDown,
@@ -28,6 +29,8 @@ interface ToolCardProps {
   status: "inProgress" | "executing" | "complete";
   args: Record<string, unknown>;
   result?: unknown;
+  // Id of the tool call the card draws; subagent steps are filed under it.
+  toolCallId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +114,13 @@ const TOOL_CONFIG: Record<
 // ToolCard (entry point)
 // ---------------------------------------------------------------------------
 
-export function ToolCard({ name, status, args, result }: ToolCardProps) {
+export function ToolCard({
+  name,
+  status,
+  args,
+  result,
+  toolCallId,
+}: ToolCardProps) {
   const config = TOOL_CONFIG[name];
   if (config) {
     return (
@@ -120,6 +129,7 @@ export function ToolCard({ name, status, args, result }: ToolCardProps) {
         status={status}
         args={args}
         result={result}
+        toolCallId={toolCallId}
         config={config}
       />
     );
@@ -158,9 +168,12 @@ function SpecializedToolCard({
   status,
   args,
   result,
+  toolCallId,
   config,
 }: SpecializedToolCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const isSubagent = name === "do_research" || name === "do_projections";
+  const steps = useSubagentSteps(isSubagent ? toolCallId : undefined);
   const isComplete = status === "complete";
   const isExecuting = status === "inProgress" || status === "executing";
 
@@ -227,6 +240,21 @@ function SpecializedToolCard({
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           )}
       </div>
+
+      {/* Subagent steps, live while the tool runs and kept once it is done */}
+      {isSubagent && steps.length > 0 && (
+        <ul className="mt-2 space-y-1 border-t border-border pt-2">
+          {steps.map((step, index) => (
+            <li
+              key={index}
+              data-testid="subagent-step"
+              className="text-xs text-muted-foreground"
+            >
+              {stepLabel(step.tool)}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* Expanded details */}
       {expanded && isComplete && (
