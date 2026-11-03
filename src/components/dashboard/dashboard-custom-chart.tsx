@@ -20,6 +20,8 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { useDataset } from "@/hooks/use-dataset";
+import type { ChartDataset } from "@/lib/erp-api";
 import type { CustomChartWidget } from "@/types/dashboard";
 
 function formatTick(value: number, format?: "currency" | "number" | "percent") {
@@ -54,14 +56,49 @@ const CHART_HEIGHT: Record<number, number> = {
 };
 
 export function DashboardCustomChart({
-  config,
+  config: widgetConfig,
   colSpan = 2,
 }: {
   config: CustomChartWidget["config"];
   colSpan?: 1 | 2 | 3 | 4;
 }) {
-  const chartData = config.data.map((d) => ({ name: d.label, ...d }));
+  const { dataset, quarters, growth_pct, metric } = widgetConfig;
+  const { data: chart, error, loading } = useDataset<ChartDataset>(dataset, {
+    quarters,
+    growth_pct,
+    metric,
+  });
   const height = CHART_HEIGHT[colSpan] ?? 280;
+
+  if (error || loading || !chart) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{widgetConfig.title ?? "Chart"}</CardTitle>
+          {error && (
+            <CardDescription className="text-destructive">
+              Could not draw this chart. {error}
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div
+            className="animate-pulse rounded bg-muted"
+            style={{ height: error ? 0 : height }}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const config = {
+    ...chart,
+    title: widgetConfig.title ?? chart.title,
+    subtitle: widgetConfig.subtitle,
+    chartType: widgetConfig.chartType ?? chart.chartType,
+    formatValues: chart.formatValues,
+  };
+  const chartData = config.data.map((d) => ({ name: d.label, ...d }));
 
   const commonProps = {
     data: chartData,

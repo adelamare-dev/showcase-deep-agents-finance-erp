@@ -14,7 +14,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 // Widgets that embed their own data points are not accepted: every figure
-// must come from the agent service at render time.
+// must come from the agent service at render time. A custom chart must name
+// its dataset.
 function isValidWidget(value: unknown): value is DashboardWidget {
   if (!isRecord(value)) return false;
   if (typeof value.id !== "string" || typeof value.type !== "string") {
@@ -22,6 +23,11 @@ function isValidWidget(value: unknown): value is DashboardWidget {
   }
   if (value.config !== undefined) {
     if (!isRecord(value.config) || "data" in value.config) return false;
+  }
+  // A chart saved before charts were filled from the catalog has no dataset.
+  if (value.type === "custom-chart") {
+    const config = value.config;
+    if (!isRecord(config) || typeof config.dataset !== "string") return false;
   }
   return true;
 }

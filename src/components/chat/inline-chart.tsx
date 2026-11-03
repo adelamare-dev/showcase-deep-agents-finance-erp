@@ -1,5 +1,6 @@
 "use client";
 
+import { ToolCallStatus } from "@copilotkit/react-core/v2";
 import {
   AreaChart,
   Area,
@@ -14,30 +15,56 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-
-type ChartArgs = {
-  title: string;
-  type: "area" | "bar" | "line";
-  data: { label: string; value: number; value2?: number }[];
-  series: { key: string; color: string; label: string }[];
-};
+import { useDataset } from "@/hooks/use-dataset";
+import type { ChartDataset, DatasetParams } from "@/lib/erp-api";
 
 type Props = {
-  args: ChartArgs | Partial<ChartArgs>;
+  args: {
+    dataset?: string;
+    quarters?: number;
+    growth_pct?: number;
+    metric?: DatasetParams["metric"];
+    chartType?: string;
+  };
   status: string;
 };
 
-export function InlineChatChart({ args, status }: Props) {
-  const { title, type, data, series } = args as ChartArgs;
+function Frame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="my-2 animate-in fade-in slide-in-from-bottom-2 rounded-xl border border-border bg-card p-4 duration-300 ease-out">
+      {children}
+    </div>
+  );
+}
 
-  if (status === "inProgress" || !data || !series) {
+export function InlineChatChart({ args, status }: Props) {
+  const { dataset, quarters, growth_pct, metric } = args;
+  const { data: chart, error, loading } = useDataset<ChartDataset>(
+    dataset,
+    { quarters, growth_pct, metric },
+    status === ToolCallStatus.Complete,
+  );
+
+  if (error) {
     return (
-      <div className="my-2 animate-in fade-in slide-in-from-bottom-2 rounded-xl border border-border bg-card p-4 duration-300 ease-out">
-        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-        <div className="mt-3 h-[180px] animate-pulse rounded bg-muted" />
-      </div>
+      <Frame>
+        <p className="text-sm text-destructive">Could not draw this chart.</p>
+        <p className="mt-1 text-xs text-muted-foreground">{error}</p>
+      </Frame>
     );
   }
+
+  if (loading || !chart) {
+    return (
+      <Frame>
+        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+        <div className="mt-3 h-[180px] animate-pulse rounded bg-muted" />
+      </Frame>
+    );
+  }
+
+  const { title, data, series } = chart;
+  const type = args.chartType ?? chart.chartType;
 
   const chartData = data.map((d) => ({ name: d.label, ...d }));
 
@@ -114,11 +141,11 @@ export function InlineChatChart({ args, status }: Props) {
   };
 
   return (
-    <div className="my-2 animate-in fade-in slide-in-from-bottom-2 rounded-xl border border-border bg-card p-4 duration-300 ease-out">
+    <Frame>
       <p className="mb-3 text-sm font-semibold text-foreground">{title}</p>
       <ResponsiveContainer width="100%" height={200}>
         {renderChart()}
       </ResponsiveContainer>
-    </div>
+    </Frame>
   );
 }

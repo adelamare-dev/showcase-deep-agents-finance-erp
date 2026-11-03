@@ -94,7 +94,8 @@ Browser (:3000)
   |     |
   |     v
   |  ERP store (in memory) — every figure the agent quotes and the pages show;
-  |  served to the browser at /api/erp/snapshot
+  |  served to the browser at /api/erp/snapshot, and as charts and cards
+  |  by the dataset catalog at /api/erp/datasets/{id}
   |
 ```
 

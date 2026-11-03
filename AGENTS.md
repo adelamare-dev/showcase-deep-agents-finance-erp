@@ -7,9 +7,9 @@
 
 Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` showcase: no upstream resync is planned. Public demo repo (LinkedIn, meetings), run locally, later the base of a private repo. Success means an orchestration that is **visible, human-controlled and exact on the numbers**, not an absence of failures.
 
-**Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads everything from `GET /api/erp/snapshot`. Postgres is archived in `templates/postgres/` and wired to nothing.
+**Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads the records from `GET /api/erp/snapshot` and every chart or card the model asks for from the dataset catalog (`agent/erp_datasets.py`, `GET /api/erp/datasets/{id}`): the model names a dataset and bounded parameters, the code fills in the figures. Postgres is archived in `templates/postgres/` and wired to nothing.
 
-**Not done yet.** The dataset catalog, live subagent steps in the chat, supplier approval, a reset control, failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
+**Not done yet.** Live subagent steps in the chat, supplier approval, a reset control, failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
 
 `SETUP/` (spec, plan, evidence) is deliberately **outside the repo** and gitignored: cite nothing from it in code, commits, README or UI.
 
@@ -22,7 +22,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 | Chat, UI tools, agent context | `src/components/layout/shell.tsx` + `src/hooks/use-*.tsx` |
 | Snapshot client and context | `src/lib/erp-api.ts`, `src/context/erp-context.tsx` |
 | Agent FastAPI (`:8123`), graph | `agent/main.py`, `agent/agent.py` |
-| Data: seed, store, routes | `agent/erp_seed.py`, `agent/erp_store.py`, `agent/erp_api.py` |
+| Data: seed, store, routes | `agent/erp_seed.py`, `agent/erp_store.py`, `agent/erp_datasets.py`, `agent/erp_api.py` |
 | Prompts, tools, subagents, models | `agent/prompts.py`, `agent/tools.py`, `agent/frontend_tools.py`, `agent/isolated_subagents.py`, `agent/models.py` |
 | Browser scenarios (Playwright plugin) | `e2e/` (see `e2e/README.md`) |
 | Postgres archive (not wired) | `templates/postgres/` |
@@ -42,7 +42,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 
 ## Repo rules
 
-- **One source of data.** The agent owns it (`ErpStore`); the web reads it through `GET /api/erp/snapshot`. **No displayed figure** (card, chart, approval) may come from the model: it picks an identifier, the code fills in the numbers. See the pitfall on `render_chat_visual` and `custom_chart` for where this is not yet true.
+- **One source of data.** The agent owns it (`ErpStore`); the web reads it through `GET /api/erp/snapshot`. **No displayed figure** (card, chart, approval) may come from the model: it picks an identifier, the code fills in the numbers.
 - **No spec or plan identifier** (plan step labels, work-item numbers) in code, names, comments or printed messages.
 - **Dated model ids**, never `-latest`. `MISTRAL_API_KEY` is never printed, logged or committed.
 - **Dates are relative to today**, never hard-coded.
@@ -59,7 +59,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 
 ## Pitfalls
 
-- **Figures still come from the model in two places.** `render_chat_visual` and `custom_chart` (a widget of `update_dashboard`) receive their data from the model's arguments, not from the store, until the dataset catalog lands. Do not present them as exact. The save path already refuses a dashboard carrying inline figures.
+- **A saved `custom-chart` without a `dataset` is ignored on read** (old format); a dashboard carrying inline figures is refused on save.
 - **`request_approval` changes no data.** Approving a payment or a reorder only returns the answer to the model; no invoice or stock record is updated.
 - **`useRenderTool` requires `parameters`** in `@copilotkit/react-core` 1.80.0: each front-end tool declares a permissive `zod` schema of the fields it reads. The live browser scenario rendered the research, cash and approval cards.
 - **No `instructions` prop on `CopilotSidebar`** in 1.80.0. Instructions go through `useAgentContext` (`shell.tsx`), like the KPIs and the dashboard layout.

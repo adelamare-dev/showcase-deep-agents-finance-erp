@@ -14,7 +14,7 @@ FastAPI + LangGraph service that exposes the `finance_erp_agent` graph over AG-U
 ## Conventions
 
 - `load_dotenv()` at the top of the module, **before** any import that reads the environment (`main.py`, `agent.py`).
-- One domain module per role: `erp_seed.py` (starting data set, dates as day offsets) and `erp_store.py` (`ErpStore`, `get_store()`) for data; `erp_api.py` (`/api/erp/*` routes); `tools.py` (read tools and forecast calculations, no data of its own, `research_tools` / `projections_tools`); `frontend_tools.py` (UI `ui_tools` + human-in-the-loop `hitl_tools`); `isolated_subagents.py` (`do_research` / `do_projections`).
+- One domain module per role: `erp_seed.py` (starting data set, dates as day offsets) and `erp_store.py` (`ErpStore`, `get_store()`) for data; `erp_datasets.py` (dataset catalog and the forecast calculations); `erp_calendar.py` (quarter labels, a leaf module); `erp_api.py` (`/api/erp/*` routes); `tools.py` (thin read tools over the store and the catalog calculations, no data of its own, `research_tools` / `projections_tools`); `frontend_tools.py` (UI `ui_tools` + human-in-the-loop `hitl_tools`); `isolated_subagents.py` (`do_research` / `do_projections`).
 - A `@tool` docstring is the description the model sees: keep it in English, and know that changing it changes the agent's behaviour.
 - Prompts are upper-case constants in `prompts.py`; no spec or plan identifier in any text sent to the model.
 
@@ -23,7 +23,8 @@ FastAPI + LangGraph service that exposes the `finance_erp_agent` graph over AG-U
 - Modules import **flat** (`from tools import research_tools`): they resolve only when the process starts with `agent/` as the working directory. Run `uv run ...` from `agent/`, never from the root.
 - `agent/` is covered by neither ESLint nor tsconfig: `pnpm lint` and `pnpm build` say nothing about this folder.
 - **Single source of data.** Every figure comes from `get_store()`: a process-wide singleton, not the FastAPI lifespan, because tools run outside requests and in threads; a `threading.Lock` guards `reset` and the reads. Amounts are **whole dollars (`int`)**, so sums are exact and `assets == liabilities + equity` is tested with `==`. Derived values (totals, KPIs, aging, the `overdue` status, quarter labels) are computed at read time. Tests pass a fixed `as_of` (year end, 29 February, quarter start) through the `store` fixture.
-- **Known gap.** `render_chat_visual` and the `custom_chart` widget still take their data from the model's arguments (see `frontend_tools.py`), and `request_approval` only returns the user's answer: it updates no record in the store.
+- **Dataset catalog.** `render_chat_visual` and the `custom_chart` widget take a dataset identifier and bounded parameters (`quarters` 1-8, `growth_pct` -50 to 50, `metric`), never figures; `build_dataset` raises `ValueError` outside those bounds. `erp_datasets.py` must not import `erp_store` (the store imports it for `revenueScenarios`): the store is passed in, and quarter labels come from `erp_calendar.py`. The forecast tools and the charts share the same functions.
+- **Known gap.** `request_approval` only returns the user's answer: it updates no record in the store.
 - CORS is limited to `FRONTEND_ORIGIN` (default `http://localhost:3000`), methods `GET` and `POST`. A page opened on `127.0.0.1:3000` is refused.
 - `agent/.env` holds `MISTRAL_API_KEY` and is not readable by agents. To check it is set, print only `bool(os.environ.get("MISTRAL_API_KEY"))`.
 - Subagents run in a `ThreadPoolExecutor` **by design**: LangChain callbacks do not cross the thread boundary, which keeps internal events out of the chat. Do not replace them with `subagents=[...]`.

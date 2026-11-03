@@ -50,3 +50,56 @@ export async function fetchSnapshot(): Promise<ErpSnapshot> {
   }
   return (await res.json()) as ErpSnapshot;
 }
+
+// A chart of the dataset catalog: one column per series, named `value`,
+// `value2`, `value3`, ... and described by `series`.
+export type ChartRow = { label: string; [key: string]: string | number };
+
+export type ChartDataset = {
+  title: string;
+  chartType: "area" | "bar" | "line";
+  data: ChartRow[];
+  series: { key: string; color: string; label: string }[];
+  formatValues: "currency" | "number" | "percent";
+};
+
+export type CashPositionDataset = {
+  title: string;
+  accounts: { name: string; balance: number }[];
+  totalCash: number;
+  totalLiabilities: number;
+  netPosition: number;
+};
+
+export type DatasetParams = {
+  quarters?: number;
+  growth_pct?: number;
+  metric?: "revenue" | "profit" | "cash_flow";
+};
+
+// Builds the chart or card from the store at request time, so every figure it
+// shows comes from the agent service.
+export async function fetchDataset<T extends ChartDataset | CashPositionDataset>(
+  id: string,
+  params: DatasetParams = {},
+): Promise<T> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.set(key, String(value));
+  }
+  const suffix = query.size ? `?${query}` : "";
+  const res = await fetch(
+    `${ERP_API_URL}/api/erp/datasets/${encodeURIComponent(id)}${suffix}`,
+    { cache: "no-store" },
+  );
+  if (res.status === 404) {
+    throw new Error(`"${id}" is not a known dataset.`);
+  }
+  if (res.status === 422) {
+    throw new Error("The chart parameters are out of range.");
+  }
+  if (!res.ok) {
+    throw new Error(`The data service answered ${res.status}`);
+  }
+  return (await res.json()) as T;
+}

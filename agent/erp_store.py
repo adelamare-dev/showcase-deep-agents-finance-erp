@@ -16,35 +16,11 @@ import threading
 from datetime import date
 
 import erp_seed as sd
+from erp_calendar import quarter_label, quarter_of, shift_quarter
+from erp_datasets import FORECAST_QUARTERS, revenue_scenarios
 
 MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 CASH_CODE_PREFIX = "10"
-
-
-def quarter_of(day: date) -> tuple[int, int]:
-    """Return (year, quarter 1-4) of a date."""
-    return day.year, (day.month - 1) // 3 + 1
-
-
-def shift_quarter(year: int, quarter: int, by: int) -> tuple[int, int]:
-    index = year * 4 + (quarter - 1) + by
-    return index // 4, index % 4 + 1
-
-
-def quarter_label(day: date, by: int = 0) -> str:
-    """Label of the quarter `by` quarters away from the one containing `day`."""
-    year, quarter = shift_quarter(*quarter_of(day), by)
-    return f"Q{quarter} {year}"
-
-
-# Quarterly growth assumed by each forecast scenario. The projections start from
-# the last actual quarter and are never stored.
-FORECAST_SCENARIOS = [
-    ("Optimistic", "#22c55e", 0.10),
-    ("Base", "#3b82f6", 0.05),
-    ("Conservative", "#ef4444", 0.02),
-]
-FORECAST_QUARTERS = 4
 
 
 def _usd(amount: int) -> str:
@@ -190,6 +166,12 @@ class ErpStore:
         with self._lock:
             return self._totals(self._data)
 
+    def cash_accounts(self) -> list[dict]:
+        """The cash accounts (codes 10xx) whose balances add up to `totals()["cash"]`."""
+        with self._lock:
+            accounts = self._accounts(self._data)
+        return [a for a in accounts if a["code"].startswith(CASH_CODE_PREFIX)]
+
     def snapshot(self) -> dict:
         """Every dataset in the camelCase shape of `src/types/erp.ts`, plus `totals`."""
         with self._lock:
@@ -238,20 +220,7 @@ class ErpStore:
         ]
 
         previous, latest = quarterly[-2], quarterly[-1]
-        scenarios = [
-            {
-                "label": label,
-                "color": color,
-                "values": [
-                    {
-                        "quarter": quarter_label(as_of, k),
-                        "value": round(latest["revenue"] * (1 + growth) ** k),
-                    }
-                    for k in range(1, FORECAST_QUARTERS + 1)
-                ],
-            }
-            for label, color, growth in FORECAST_SCENARIOS
-        ]
+        scenarios = revenue_scenarios(latest["revenue"], as_of, FORECAST_QUARTERS)
         # Receivables, cash and payables have no history to compare with: their change is 0.
         kpi_rows = [
             ("Total Revenue", _usd(totals["revenue"]), _change(latest["revenue"], previous["revenue"]), "dollar-sign"),

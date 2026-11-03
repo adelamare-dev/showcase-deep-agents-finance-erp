@@ -55,6 +55,25 @@ async (page, h) => {
     });
   });
 
+  await h.test("A chart saved without a dataset is ignored, one naming a dataset is kept", async () => {
+    const chart = (id, config) => ({ id, type: "custom-chart", colSpan: 2, order: 0, config });
+    const stored = {
+      [KEY]: JSON.stringify([
+        dashboard("old-chart", "Chart Without Dataset", [
+          chart("c1", { title: "Old", chartType: "bar", series: [{ key: "value", color: "#000", label: "x" }] }),
+        ]),
+        dashboard("new-chart", "Chart From Catalog", [chart("c2", { dataset: "ar_aging" })]),
+      ]),
+    };
+    return await withPage(seed, stored, async (p, errors) => {
+      const text = await gallery(p);
+      assertTemplates(text);
+      h.assert(!text.includes("Chart Without Dataset"), "the chart saved in the old format is dropped");
+      h.assert(text.includes("Chart From Catalog"), "the chart naming a dataset is kept");
+      h.assertEqual(errors, [], "no page error");
+    });
+  });
+
   await h.test("Corrupted JSON in storage does not break startup", async () => {
     return await withPage(seed, { [KEY]: "{not json" }, async (p, errors) => {
       assertTemplates(await gallery(p));

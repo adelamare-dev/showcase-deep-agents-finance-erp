@@ -46,15 +46,18 @@ export type OutstandingInvoicesWidget = BaseWidget & {
   config: { statuses?: ("pending" | "overdue")[] };
 };
 
+// Filled from the dataset catalog at render time: the config names a dataset
+// and its parameters, and never carries figures.
 export type CustomChartWidget = BaseWidget & {
   type: "custom-chart";
   config: {
-    title: string;
+    dataset: string;
+    title?: string;
     subtitle?: string;
-    chartType: "area" | "bar" | "line";
-    data: { label: string; value: number; value2?: number; value3?: number }[];
-    series: { key: string; color: string; label: string }[];
-    formatValues?: "currency" | "number" | "percent";
+    chartType?: "area" | "bar" | "line";
+    quarters?: number;
+    growth_pct?: number;
+    metric?: "revenue" | "profit" | "cash_flow";
   };
 };
 

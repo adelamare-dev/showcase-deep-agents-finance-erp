@@ -63,6 +63,9 @@ function DashboardUpdater({
         const config = w.config ?? {};
 
         if (internalType === "custom-chart") {
+          // A chart is filled from the catalog: one without a dataset, or
+          // carrying its own figures, cannot be drawn from the store.
+          if (typeof config.dataset !== "string" || "data" in config) continue;
           const id = `custom-chart-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
           addWidget({
             id,

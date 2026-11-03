@@ -94,9 +94,9 @@ const TOOL_CONFIG: Record<
   render_chat_visual: {
     icon: BarChart3,
     getDisplayText: (args) =>
-      args.type === "cash_position"
+      args.dataset === "cash_position"
         ? "Showing cash position"
-        : `Chart: ${(args.title as string) || "..."}`,
+        : `Chart: ${((args.dataset as string) || "...").replace(/_/g, " ")}`,
   },
   request_approval: {
     icon: ShieldCheck,

@@ -2,26 +2,32 @@
 
 import { DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { ToolCallStatus } from "@copilotkit/react-core/v2";
-
-type AccountRow = {
-  name: string;
-  balance: number;
-};
-
-type Args = {
-  accounts: AccountRow[];
-  totalCash: number;
-  totalLiabilities: number;
-  netPosition: number;
-};
+import { useDataset } from "@/hooks/use-dataset";
+import type { CashPositionDataset } from "@/lib/erp-api";
 
 type Props = {
-  args: Args | Partial<Args>;
   status: string;
 };
 
-export function CashPositionCard({ args, status }: Props) {
-  if (status === "inProgress" || !args.accounts) {
+export function CashPositionCard({ status }: Props) {
+  const { data, error, loading } = useDataset<CashPositionDataset>(
+    "cash_position",
+    {},
+    status === ToolCallStatus.Complete,
+  );
+
+  if (error) {
+    return (
+      <div className="my-2 animate-in fade-in slide-in-from-bottom-2 rounded-2xl border border-border bg-card p-5 duration-300 ease-out">
+        <p className="text-sm text-destructive">
+          Could not load the cash position.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  if (loading || !data) {
     return (
       <div className="my-2 animate-in fade-in slide-in-from-bottom-2 rounded-2xl border border-border bg-card p-5 duration-300 ease-out">
         <div className="flex items-center gap-2 text-muted-foreground">
@@ -32,7 +38,7 @@ export function CashPositionCard({ args, status }: Props) {
     );
   }
 
-  const { accounts, totalCash, totalLiabilities, netPosition } = args as Args;
+  const { accounts, totalCash, totalLiabilities, netPosition } = data;
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("en-US", {
@@ -50,7 +56,7 @@ export function CashPositionCard({ args, status }: Props) {
           <DollarSign className="h-4 w-4 text-primary" />
         </div>
         <p className="text-sm font-semibold text-foreground">
-          Cash Position Summary
+          {data.title}
         </p>
       </div>
 

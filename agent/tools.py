@@ -10,9 +10,10 @@ import json
 
 from langchain_core.tools import tool
 
-from erp_store import get_store, quarter_label
+import erp_datasets
+from erp_store import get_store
 
-MAX_FORECAST_QUARTERS = 8
+MAX_FORECAST_QUARTERS = erp_datasets.MAX_QUARTERS
 
 
 def _snapshot() -> dict:
@@ -220,50 +221,11 @@ def analyze_cash_flow(months: int = 3) -> str:
 def forecast_revenue(quarters: int = 4) -> str:
     """Forecast revenue for upcoming quarters based on historical growth trends."""
     snap = _snapshot()
-    as_of = get_store().as_of
-    quarterly = snap["quarterlyRevenue"]
-    # Compute average QoQ growth rate from last 4 quarters
-    recent = quarterly[-4:]
-    growth_rates = []
-    for i in range(1, len(recent)):
-        prev = recent[i - 1]["revenue"]
-        curr = recent[i]["revenue"]
-        growth_rates.append((curr - prev) / prev)
+    outlook = erp_datasets.revenue_outlook(snap, get_store().as_of, quarters)
+    avg_growth, volatility = outlook["avg_growth"], outlook["volatility"]
+    projections = outlook["projections"]
 
-    avg_growth = sum(growth_rates) / len(growth_rates) if growth_rates else 0
-    # Growth rate volatility for confidence
-    if len(growth_rates) > 1:
-        mean = avg_growth
-        variance = sum((r - mean) ** 2 for r in growth_rates) / len(growth_rates)
-        volatility = variance**0.5
-    else:
-        volatility = 0.1
-
-    # Project forward
-    last_rev = quarterly[-1]["revenue"]
-    quarters = max(1, min(quarters, MAX_FORECAST_QUARTERS))
-    projections = []
-    current = last_rev
-    for i in range(quarters):
-        current = int(current * (1 + avg_growth))
-        confidence = "High" if i == 0 else "Medium" if i < 3 else "Low"
-        if volatility > 0.08:
-            confidence = "Medium" if i == 0 else "Low"
-        projections.append(
-            {
-                "quarter": quarter_label(as_of, i + 1),
-                "projected": current,
-                "confidence": confidence,
-            }
-        )
-
-    total = sum(p["projected"] for p in projections)
-    trailing_total = sum(q["revenue"] for q in quarterly[-4:])
-    yoy_change = (
-        ((total - trailing_total) / trailing_total * 100) if trailing_total else 0
-    )
-
-    lines = [f"REVENUE FORECAST — Next {quarters} Quarters\n"]
+    lines = [f"REVENUE FORECAST — Next {len(projections)} Quarters\n"]
     lines.append(
         f"Methodology: Average QoQ growth rate of {avg_growth * 100:.1f}% "
         f"computed from last 4 quarters (volatility: {volatility * 100:.1f}%)\n"
@@ -275,12 +237,12 @@ def forecast_revenue(quarters: int = 4) -> str:
             f"{p['quarter']:12s}| ${p['projected']:>9,.0f} | {p['confidence']}"
         )
 
-    lines.append(f"\nProjected Total: ${total:,.0f} ({yoy_change:+.1f}% vs the last 4 quarters)")
+    lines.append(f"\nProjected Total: ${outlook['total']:,.0f} ({outlook['change_pct']:+.1f}% vs the last 4 quarters)")
     lines.append(f"\nKey Assumptions:")
     lines.append(
         f"  • Based on {avg_growth * 100:.1f}% average QoQ growth from recent quarters"
     )
-    lines.append(f"  • Last quarter revenue: ${last_rev:,.0f}")
+    lines.append(f"  • Last quarter revenue: ${outlook['last_revenue']:,.0f}")
     drafts = [i for i in snap["invoices"] if i["status"] == "draft"]
     if drafts:
         pipeline = ", ".join(f"{i['client']} (${i['amount']:,.0f})" for i in drafts)
@@ -351,29 +313,8 @@ def query_monthly_expenses(category: str | None = None) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Projection tools (compute forecasts from historical data)
+# Projection tools (the calculations live in erp_datasets, shared with the charts)
 # ---------------------------------------------------------------------------
-
-
-def _compute_growth_rates(values: list[float]) -> list[float]:
-    """Compute period-over-period growth rates."""
-    rates = []
-    for i in range(1, len(values)):
-        if values[i - 1] != 0:
-            rates.append((values[i] - values[i - 1]) / abs(values[i - 1]))
-    return rates
-
-
-def _project_forward(
-    last_value: float, avg_growth: float, periods: int, optimistic_mult: float = 1.0
-) -> list[float]:
-    """Project values forward using compound growth."""
-    result = []
-    current = last_value
-    for _ in range(periods):
-        current = current * (1 + avg_growth * optimistic_mult)
-        result.append(round(current))
-    return result
 
 
 @tool
@@ -386,80 +327,7 @@ def compute_revenue_forecast(quarters: int = 4, method: str = "linear") -> str:
 
     Returns JSON with projected quarterly revenue, growth rate used, and confidence metrics.
     """
-    as_of = get_store().as_of
-    data = _snapshot()["quarterlyRevenue"]
-    revenues = [q["revenue"] for q in data]
-    expenses = [q["expenses"] for q in data]
-
-    if method == "seasonal" and len(data) >= 8:
-        # Use YoY growth for corresponding quarters
-        horizon = max(1, min(quarters, MAX_FORECAST_QUARTERS))
-        projections = []
-        for i in range(horizon):
-            # Same calendar quarter, one year before the quarter being projected
-            hist_idx = 4 + i % 4
-            base_idx = hist_idx - 4
-            yoy_growth = (data[hist_idx]["revenue"] - data[base_idx]["revenue"]) / data[
-                base_idx
-            ]["revenue"]
-            projected_rev = int(data[hist_idx]["revenue"] * (1 + yoy_growth))
-            projected_exp = int(data[hist_idx]["expenses"] * (1 + yoy_growth * 0.7))
-            projections.append(
-                {
-                    "quarter": quarter_label(as_of, i + 1),
-                    "revenue": projected_rev,
-                    "expenses": projected_exp,
-                    "profit": projected_rev - projected_exp,
-                    "yoy_growth_pct": round(yoy_growth * 100, 1),
-                }
-            )
-    else:
-        # Linear: average QoQ growth
-        growth_rates = _compute_growth_rates(revenues)
-        avg_growth = (
-            sum(growth_rates[-4:]) / min(4, len(growth_rates)) if growth_rates else 0
-        )
-        exp_growth_rates = _compute_growth_rates(expenses)
-        avg_exp_growth = (
-            sum(exp_growth_rates[-4:]) / min(4, len(exp_growth_rates))
-            if exp_growth_rates
-            else 0
-        )
-
-        horizon = max(1, min(quarters, MAX_FORECAST_QUARTERS))
-        projected_rev = _project_forward(revenues[-1], avg_growth, horizon)
-        projected_exp = _project_forward(expenses[-1], avg_exp_growth, horizon)
-
-        projections = []
-        for i in range(horizon):
-            projections.append(
-                {
-                    "quarter": quarter_label(as_of, i + 1),
-                    "revenue": projected_rev[i],
-                    "expenses": projected_exp[i],
-                    "profit": projected_rev[i] - projected_exp[i],
-                    "qoq_growth_pct": round(avg_growth * 100, 1),
-                }
-            )
-
-    # Confidence metrics
-    recent_growth = _compute_growth_rates(revenues[-4:])
-    if len(recent_growth) > 1:
-        mean_g = sum(recent_growth) / len(recent_growth)
-        std_g = (
-            sum((r - mean_g) ** 2 for r in recent_growth) / len(recent_growth)
-        ) ** 0.5
-    else:
-        mean_g = recent_growth[0] if recent_growth else 0
-        std_g = 0
-
-    result = {
-        "method": method,
-        "historical_quarters_used": len(data),
-        "avg_quarterly_growth_pct": round(mean_g * 100, 1),
-        "growth_volatility_pct": round(std_g * 100, 1),
-        "projections": projections,
-    }
+    result = erp_datasets.project_revenue(_snapshot(), get_store().as_of, quarters, method)
     return json.dumps(result, indent=2)
 
 
@@ -467,50 +335,12 @@ def compute_revenue_forecast(quarters: int = 4, method: str = "linear") -> str:
 def compute_cash_flow_forecast(quarters: int = 4) -> str:
     """Project cash flow components (operating, investing, financing) for future quarters.
 
+    Args:
+        quarters: Number of quarters to project (1-8).
+
     Returns JSON with projected quarterly cash flow by component.
     """
-    as_of = get_store().as_of
-    snap = _snapshot()
-    cash_flow = snap["cashFlowData"]
-    operating = [q["operating"] for q in cash_flow]
-    investing = [q["investing"] for q in cash_flow]
-    financing = [q["financing"] for q in cash_flow]
-
-    op_growth = _compute_growth_rates(operating)
-    avg_op = sum(op_growth[-4:]) / min(4, len(op_growth)) if op_growth else 0
-
-    # For investing/financing, use average absolute values (they're typically negative)
-    avg_inv = sum(investing[-4:]) / 4
-    avg_fin = sum(financing[-4:]) / 4
-
-    proj_op = _project_forward(operating[-1], avg_op, min(quarters, 4))
-
-    projections = []
-    for i in range(min(quarters, 4)):
-        inv = round(avg_inv * (1 + 0.05 * i))  # slight increase in investment
-        fin = round(avg_fin)
-        net = proj_op[i] + inv + fin
-        projections.append(
-            {
-                "quarter": quarter_label(as_of, i + 1),
-                "operating": proj_op[i],
-                "investing": inv,
-                "financing": fin,
-                "net": net,
-            }
-        )
-
-    cash_balance = snap["totals"]["cash"]
-    cumulative = cash_balance
-    for p in projections:
-        cumulative += p["net"]
-        p["projected_cash_balance"] = cumulative
-
-    result = {
-        "current_cash": cash_balance,
-        "operating_growth_pct": round(avg_op * 100, 1),
-        "projections": projections,
-    }
+    result = erp_datasets.project_cash_flow(_snapshot(), get_store().as_of, quarters)
     return json.dumps(result, indent=2)
 
 
@@ -525,43 +355,10 @@ def run_scenario_analysis(metric: str = "revenue", quarters: int = 4) -> str:
     Returns JSON with three scenarios (optimistic, base, conservative) each containing
     quarterly projections.
     """
-    as_of = get_store().as_of
-    snap = _snapshot()
-    quarters = max(1, min(quarters, MAX_FORECAST_QUARTERS))
-
-    if metric == "revenue":
-        values = [q["revenue"] for q in snap["quarterlyRevenue"]]
-    elif metric == "profit":
-        values = [q["profit"] for q in snap["quarterlyRevenue"]]
-    elif metric == "cash_flow":
-        values = [q["net"] for q in snap["cashFlowData"]]
-    else:
-        return json.dumps(
-            {"error": f"Unknown metric: {metric}. Use revenue, profit, or cash_flow."}
-        )
-
-    growth_rates = _compute_growth_rates(values)
-    avg_growth = (
-        sum(growth_rates[-4:]) / min(4, len(growth_rates)) if growth_rates else 0
-    )
-    last_val = values[-1]
-
-    scenarios = {}
-    for name, mult in [("optimistic", 1.5), ("base", 1.0), ("conservative", 0.5)]:
-        projected = _project_forward(
-            last_val, avg_growth, quarters, optimistic_mult=mult
-        )
-        scenarios[name] = [
-            {"quarter": quarter_label(as_of, i + 1), "value": projected[i]}
-            for i in range(quarters)
-        ]
-
-    result = {
-        "metric": metric,
-        "base_growth_rate_pct": round(avg_growth * 100, 1),
-        "last_actual_value": last_val,
-        "scenarios": scenarios,
-    }
+    try:
+        result = erp_datasets.scenario_analysis(_snapshot(), get_store().as_of, metric, quarters)
+    except ValueError as exc:
+        return json.dumps({"error": str(exc)})
     return json.dumps(result, indent=2)
 
 
@@ -574,70 +371,10 @@ def compute_trend_analysis(metric: str = "revenue") -> str:
 
     Returns JSON with QoQ growth rates, YoY comparisons, and trend summary.
     """
-    snap = _snapshot()
-    if metric in ("revenue", "expenses", "profit"):
-        data = snap["quarterlyRevenue"]
-        values = [q[metric] for q in data]
-        labels = [q["quarter"] for q in data]
-    elif metric == "operating_cash_flow":
-        data = snap["cashFlowData"]
-        values = [q["operating"] for q in data]
-        labels = [q["quarter"] for q in data]
-    elif metric == "net_cash_flow":
-        data = snap["cashFlowData"]
-        values = [q["net"] for q in data]
-        labels = [q["quarter"] for q in data]
-    else:
-        return json.dumps({"error": f"Unknown metric: {metric}"})
-
-    growth_rates = _compute_growth_rates(values)
-
-    # QoQ detail
-    qoq = []
-    for i in range(1, len(values)):
-        qoq.append(
-            {
-                "from": labels[i - 1],
-                "to": labels[i],
-                "value": values[i],
-                "growth_pct": round(growth_rates[i - 1] * 100, 1),
-            }
-        )
-
-    # YoY comparisons (Q1 vs Q1, etc.)
-    yoy = []
-    if len(values) >= 8:
-        for i in range(4):
-            prev_yr = values[i]
-            curr_yr = values[i + 4]
-            change = ((curr_yr - prev_yr) / abs(prev_yr) * 100) if prev_yr else 0
-            yoy.append(
-                {
-                    "quarter_pair": f"{labels[i]} → {labels[i + 4]}",
-                    "previous": prev_yr,
-                    "current": curr_yr,
-                    "yoy_change_pct": round(change, 1),
-                }
-            )
-
-    avg_growth = sum(growth_rates) / len(growth_rates) if growth_rates else 0
-    recent_avg = (
-        sum(growth_rates[-4:]) / min(4, len(growth_rates)) if growth_rates else 0
-    )
-    accelerating = recent_avg > avg_growth
-
-    result = {
-        "metric": metric,
-        "periods": len(values),
-        "min": min(values),
-        "max": max(values),
-        "latest": values[-1],
-        "overall_avg_growth_pct": round(avg_growth * 100, 1),
-        "recent_avg_growth_pct": round(recent_avg * 100, 1),
-        "trend": "accelerating" if accelerating else "decelerating",
-        "qoq_detail": qoq,
-        "yoy_comparisons": yoy,
-    }
+    try:
+        result = erp_datasets.trend_analysis(_snapshot(), metric)
+    except ValueError as exc:
+        return json.dumps({"error": str(exc)})
     return json.dumps(result, indent=2)
 
 

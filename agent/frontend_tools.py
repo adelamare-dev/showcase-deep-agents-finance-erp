@@ -1,4 +1,4 @@
-"""Frontend tool stubs (7 tools: 6 UI renderers and 1 human-in-the-loop).
+"""Frontend tools (7 tools: 6 UI renderers and 1 human-in-the-loop).
 
 These tools are registered at agent creation time so the model can call them
 via function calling. The AG-UI adapter streams ToolCall events, which the
@@ -8,9 +8,14 @@ Rendering tools return a simple confirmation string.
 HITL tools use copilotkit_interrupt() to pause the graph for user approval.
 """
 
+import json
 from typing import Optional
+
 from langchain_core.tools import tool
 from copilotkit.langgraph import copilotkit_interrupt
+
+from erp_datasets import DATASET_IDS, build_dataset
+from erp_store import get_store
 
 
 # ---------------------------------------------------------------------------
@@ -20,34 +25,36 @@ from copilotkit.langgraph import copilotkit_interrupt
 
 @tool
 def render_chat_visual(
-    type: str,
-    title: str,
-    data: list,
-    series: list,
-    totalCash: Optional[float] = None,
-    totalLiabilities: Optional[float] = None,
-    netPosition: Optional[float] = None,
-    accounts: Optional[list] = None,
+    dataset: str,
+    quarters: int = 4,
+    growth_pct: float = 0,
+    metric: str = "revenue",
     chartType: Optional[str] = None,
 ) -> str:
-    """Render a visual component inline in the chat.
+    """Render a chart or the cash position card inline in the chat, filled from the ERP data.
+
+    You choose a dataset; the figures are supplied by the system, never by you.
 
     Args:
-        type: Visual type — 'chart' for an interactive chart, 'cash_position' for a cash summary card.
-        title: Title displayed on the visual.
-        data: Data points. For charts: each has label (str), value (number), optional value2 (number).
-              For cash_position: ignored (use accounts instead).
-        series: Series config for charts. Each has key ('value' or 'value2'), color (hex), label.
-                For cash_position: ignored.
-        totalCash: (cash_position only) Total cash and cash equivalents.
-        totalLiabilities: (cash_position only) Total liabilities.
-        netPosition: (cash_position only) Net position (totalCash - totalLiabilities).
-        accounts: (cash_position only) Cash and asset accounts. Each has name (str) and balance (number).
-        chartType: (chart only) Chart subtype — 'area' for trends, 'bar' for comparisons, 'line' for trajectories. Default: 'area'.
+        dataset: One of 'cash_position' (cash summary card), 'revenue_by_quarter',
+            'cash_flow_by_quarter', 'expense_breakdown', 'ar_aging', 'budget_variance',
+            'revenue_forecast', 'cash_flow_forecast', 'scenario_analysis'.
+        quarters: Quarters shown, 1-8: the last N for history, the next N for forecasts. Default 4.
+        growth_pct: Forecasts only. Percentage points added to the growth rate, -50 to 50. Default 0.
+        metric: scenario_analysis only: 'revenue', 'profit' or 'cash_flow'. Default 'revenue'.
+        chartType: Optional override: 'area' for trends, 'bar' for comparisons, 'line' for trajectories.
     """
-    if type == "cash_position":
-        return f"Cash position card rendered. Net: ${netPosition or 0:,.0f}"
-    return f"Chart '{title}' rendered."
+    try:
+        built = build_dataset(
+            get_store(), dataset, quarters=quarters, growth_pct=growth_pct, metric=metric
+        )
+    except ValueError as exc:
+        return f"Cannot render: {exc}"
+    if dataset == "cash_position":
+        figures = {k: built[k] for k in ("accounts", "totalCash", "totalLiabilities", "netPosition")}
+    else:
+        figures = {"series": [s["label"] for s in built["series"]], "rows": built["data"]}
+    return f"Rendered '{built['title']}'. Figures: {json.dumps(figures)}"
 
 
 # ---------------------------------------------------------------------------
@@ -138,10 +145,23 @@ def update_dashboard(widgets: list) -> str:
               * expense_breakdown: { categories?: string[] }
               * transactions: { limit?: int }
               * invoices: { statuses?: ['pending', 'overdue'] }
-              * custom_chart: { title: str, subtitle?: str, chartType: 'area'|'bar'|'line',
-                  data: [{label, value, value2?, value3?}], series: [{key, color, label}],
-                  formatValues?: 'currency'|'number'|'percent' }
+              * custom_chart: { dataset: str, title?: str, subtitle?: str,
+                  chartType?: 'area'|'bar'|'line', quarters?: int 1-8,
+                  growth_pct?: float -50 to 50, metric?: 'revenue'|'profit'|'cash_flow' }.
+                The dataset is one of the render_chat_visual datasets except 'cash_position'.
+                Never send figures: the chart is filled from the ERP data.
     """
+    problems = []
+    for w in widgets:
+        if w.get("type") != "custom_chart":
+            continue
+        config = w.get("config") or {}
+        if config.get("dataset") not in DATASET_IDS or config.get("dataset") == "cash_position":
+            problems.append("custom_chart needs a dataset from the catalog")
+        if "data" in config:
+            problems.append("custom_chart must not carry figures")
+    if problems:
+        return f"Dashboard not updated: {'; '.join(sorted(set(problems)))}."
     types = [w.get("type", "widget") for w in widgets]
     return f"Dashboard updated: {', '.join(types)}"
 
