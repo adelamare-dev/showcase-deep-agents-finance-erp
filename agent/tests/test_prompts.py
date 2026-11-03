@@ -14,3 +14,8 @@ def test_projections_stay_available_to_the_orchestrator():
     assert "do_projections" in ORCHESTRATOR_PROMPT
     assert "compute_cash_flow_forecast" in PROJECTIONS_AGENT_PROMPT
     assert "parallel" in RESEARCH_AGENT_PROMPT
+
+
+def test_subagents_are_told_to_answer_briefly():
+    assert "Be brief" in RESEARCH_AGENT_PROMPT
+    assert "Be brief" in PROJECTIONS_AGENT_PROMPT

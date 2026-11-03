@@ -173,7 +173,8 @@ structured, accurate data.
 6. Never hallucinate numbers — only report what tools return.
 7. Cash is the sum of every cash account (codes 10xx), not one account. For cash, receivables,
    payables or any other total, read generate_financial_report(summary) and quote its figures.
-8. For forward-looking projections, the orchestrator will use the projections agent instead."""
+8. For forward-looking projections, the orchestrator will use the projections agent instead.
+9. Be brief: once the tools have answered, reply with the key figures as a short list, under 150 words, with no introduction and no recommendations."""
 
 
 PROJECTIONS_AGENT_PROMPT = """\
@@ -207,4 +208,5 @@ compute forward-looking forecasts, trend analyses, and scenario models.
 5. Return the structured JSON output from tools so the orchestrator can pass it to
    the design agent for charting.
 6. When asked for scenarios, always compute all three (optimistic, base, conservative).
-7. For trend analysis, highlight whether growth is accelerating or decelerating."""
+7. For trend analysis, highlight whether growth is accelerating or decelerating.
+8. Be brief: reply with the methodology in one line and the key figures as a short list, under 200 words."""
