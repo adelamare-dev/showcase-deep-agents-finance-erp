@@ -104,18 +104,26 @@ async def _run_subagent(
             )
         )
 
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        result = await loop.run_in_executor(
-            executor,
-            _stream_subagent,
-            query,
-            system_prompt,
-            agent_tools,
-            on_tool_call,
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            result = await loop.run_in_executor(
+                executor,
+                _stream_subagent,
+                query,
+                system_prompt,
+                agent_tools,
+                on_tool_call,
+            )
+    finally:
+        # The thread is done, raised or not: every send is registered. Finish
+        # them before the card receives its result. A progress event that
+        # fails is only logged, so it cannot discard a finished answer.
+        outcomes = await asyncio.gather(
+            *(asyncio.wrap_future(f) for f in sends), return_exceptions=True
         )
-    # The thread is done: every send is registered. Finish them before the
-    # card receives its result.
-    await asyncio.gather(*(asyncio.wrap_future(f) for f in sends))
+        for outcome in outcomes:
+            if isinstance(outcome, BaseException):
+                logger.warning("subagent_step event failed: %r", outcome)
     return result
 
 
