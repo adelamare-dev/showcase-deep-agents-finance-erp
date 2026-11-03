@@ -116,7 +116,8 @@ def test_unknown_bill_returns_an_error_to_the_model_without_interrupt(shared_sto
 def test_paid_bill_returns_an_error_to_the_model_without_interrupt(shared_store, interrupt_spy):
     paid = next(b for b in shared_store.snapshot()["bills"] if b["status"] == "paid")
     result = call(type="supplier_payment", bill_ids=[paid["id"]])
-    assert paid["number"] in result and "Already paid" in result
+    assert paid["number"] in result and result.startswith("Already paid")
+    assert "Not sent for approval" not in result
     assert interrupt_spy.calls == []
 
 
@@ -146,7 +147,7 @@ def test_reexecution_after_resume_does_not_pay_twice(shared_store, interrupt_spy
     after_first = shared_store.totals()
     # The graph runs the tool body again; the bills are settled, so it stops at the preview.
     again = call(type="supplier_payment", bill_ids=ids)
-    assert "Already paid" in again
+    assert again.startswith("Already paid") and "Not sent for approval" not in again
     assert shared_store.totals() == after_first
     assert len(custom_events) == 1
 
@@ -188,7 +189,8 @@ def test_a_replayed_run_after_a_graph_resume_pays_once(shared_store, custom_even
     # A retry runs the node body again on the same thread: it stops at the preview.
     replayed = graph.invoke({}, thread)
     assert "__interrupt__" not in replayed
-    assert "Already paid" in replayed["result"]
+    assert replayed["result"].startswith("Already paid")
+    assert "Not sent for approval" not in replayed["result"]
     assert shared_store.totals()["cash"] == cash_before - total
     assert len(custom_events) == 1
 
@@ -250,3 +252,32 @@ def test_the_event_reaches_the_event_stream(shared_store, interrupt_spy):
     ]
     assert len(events) == 1
     assert {c["metric"] for c in events[0]["data"]["changes"]} == {"Cash", "Accounts Payable"}
+
+
+@pytest.mark.parametrize(
+    "bad_bill_ids",
+    ["bill-001", ["bill-001", 7], [None]],
+    ids=["bare string", "non-string element", "null element"],
+)
+def test_malformed_bill_ids_reach_the_model_as_a_tool_message(shared_store, interrupt_spy, custom_events, bad_bill_ids):
+    """Through the real tool node: a readable error message, a finished run, no card."""
+    from langchain.agents import create_agent
+    from langchain_core.messages import HumanMessage, ToolMessage
+
+    from tests.fakes import ScriptedToolCaller
+
+    model = ScriptedToolCaller(
+        script=[("request_approval", {"type": "supplier_payment", "bill_ids": bad_bill_ids})]
+    )
+    agent = create_agent(model=model, tools=[request_approval])
+    cash = shared_store.totals()["cash"]
+
+    result = agent.invoke({"messages": [HumanMessage(content="pay")]})
+
+    assert "__interrupt__" not in result
+    (tool_message,) = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    assert tool_message.status == "error" or "bill_ids" in tool_message.content
+    assert "bill_ids" in tool_message.content
+    assert interrupt_spy.calls == []
+    assert custom_events == []
+    assert shared_store.totals()["cash"] == cash

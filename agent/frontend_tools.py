@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 from copilotkit.langgraph import copilotkit_interrupt
 
 from erp_datasets import DATASET_IDS, build_dataset
-from erp_store import ErpError, get_store
+from erp_store import AlreadyPaid, ErpError, get_store
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +156,8 @@ def request_approval(
                 "estimatedTotal": preview["estimatedTotal"],
                 "supplier": preview["supplier"],
             }
+    except AlreadyPaid as exc:
+        return f"{exc} These bills are already settled, so there is nothing to approve and nothing was changed."
     except ErpError as exc:
         return f"Not sent for approval: {exc}"
 
