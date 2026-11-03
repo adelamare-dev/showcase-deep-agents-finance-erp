@@ -27,3 +27,7 @@ def test_the_orchestrator_may_only_quote_figures_as_returned():
 
 def test_a_dashboard_comment_carries_no_dollar_amount():
     assert "no dollar amount and no percentage at all" in ORCHESTRATOR_PROMPT
+
+
+def test_paying_suppliers_always_ends_with_an_approval_request():
+    assert "never a substitute" in ORCHESTRATOR_PROMPT
