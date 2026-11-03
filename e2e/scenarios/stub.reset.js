@@ -140,12 +140,14 @@ async (page, h) => {
     }
     const before = await lastCount();
     const panelOpen = async () => (await byId("copilot-sidebar").boundingBox()).x < 1280;
-    await byId("copilot-chat-toggle").dispatchEvent("click");
+    // While the panel is open the toggle sits under it (panel z-1200, toggle z-1100),
+    // so the visible close button is the control a mouse can click.
+    await byId("copilot-close-button").click();
     for (let i = 0; i < 20 && (await panelOpen()); i++) await page.waitForTimeout(250);
     h.assert(!(await panelOpen()), "the chat panel is closed");
 
     await h.clickReset();
-    await byId("copilot-chat-toggle").dispatchEvent("click");
+    await byId("copilot-chat-toggle").click();
     for (let i = 0; i < 20 && !(await panelOpen()); i++) await page.waitForTimeout(250);
     await page.waitForTimeout(600);
     h.assertEqual(await chatCount(), 0, "the reopened chat is empty");
