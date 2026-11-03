@@ -124,6 +124,7 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
       if (clearTimer.current) clearTimeout(clearTimer.current);
+      setHighlights({});
     };
   }, [agent, refresh]);
 
