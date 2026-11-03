@@ -30,6 +30,20 @@ async (page, h) => {
     return { ms };
   });
 
+  await h.test("A 429 without Retry-After is retried once after the default wait", async () => {
+    await fresh();
+    await h.stubScript([{ status: 429, message: "" }, { text: "Recovered with no header." }]);
+    const started = Date.now();
+    await h.sendPrompt("Status please");
+    await h.waitForRunEnd();
+    const ms = Date.now() - started;
+    h.assertEqual(await banner.count(), 0, "no failure notice is shown");
+    h.assert((await lastReply()).includes("Recovered with no header."), "the answer is in the chat");
+    h.assertEqual(await sentToModel(), 2, "the model was asked twice: the refused call and its retry");
+    h.assert(ms >= 2000, "the default wait of 2 s was observed (" + ms + " ms)");
+    return { ms };
+  });
+
   await h.test("A persistent 429 shows a clear message and Retry", async () => {
     await fresh();
     await h.stubScript([

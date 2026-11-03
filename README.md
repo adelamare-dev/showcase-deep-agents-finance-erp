@@ -73,7 +73,7 @@ Start the servers (`pnpm demo`; live scenarios need a real `MISTRAL_API_KEY` in 
 
 ## When something fails
 
-A failed answer (rate limit, model service error, agent not reachable) is shown above the chat input in plain words, with a **Retry** that runs the assistant again on the same conversation without adding a message. A short model rate limit (`Retry-After` of 8 s or less) is retried once automatically. If the figures cannot be reloaded, the page keeps the old ones and says they may be out of date, with a Retry. The agent refuses to start without `MISTRAL_API_KEY` and names `agent/.env`.
+A failed answer (rate limit, model service error, agent not reachable) is shown above the chat input in plain words, with a **Retry** that runs the assistant again on the same conversation without adding a message. A model rate limit is retried once automatically per model call, after the `Retry-After` delay when it is 8 s or less, or after 2 s when Mistral sends none. If the figures cannot be reloaded, the page keeps the old ones and says they may be out of date, with a Retry. The agent refuses to start without `MISTRAL_API_KEY` and names `agent/.env`.
 
 ## Replaying the demo
 

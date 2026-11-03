@@ -17,13 +17,15 @@ Each call makes one attempt. LangChain's `max_retries` counts attempts, so
 HTTP status errors such as 429 or 5xx never are. A call that is going to fail
 should fail fast so the user is told, instead of watching a spinner.
 
-The one exception is a 429 that arrives before the first streamed chunk and
-carries a `Retry-After` of at most `RATE_LIMIT_MAX_WAIT_S` seconds: the free
-tier limits requests per second, so such a call is held for that long and sent
-once more (`RATE_LIMIT_MAX_RETRIES`). Any other status, a longer wait or a
-missing header fails at once, and nothing is retried once a chunk has been
-received, since the caller has already seen part of the answer. Both clients
-share this behaviour through `_RateLimitRetryMistral`.
+The one exception is a 429 that arrives before the first streamed chunk. The
+call is held and sent once more (`RATE_LIMIT_MAX_RETRIES`): for the
+`Retry-After` seconds when the header is a number of at most
+`RATE_LIMIT_MAX_WAIT_S`, or for `RATE_LIMIT_DEFAULT_WAIT_S` when the header is
+absent or not a number (Mistral's 429 carries none). A longer, negative or
+non-finite wait and any other status fail at once, and nothing is retried once
+a chunk has been received, since the caller has already seen part of the
+answer. The added delay is bounded: one retry per model call, at most 8 s.
+Both clients share this behaviour through `_RateLimitRetryMistral`.
 
 Two kinds of client exist. `orchestrator_chat_model` builds the client of the
 main graph, which re-chunks streamed tool calls so the chat can show a step
@@ -57,9 +59,11 @@ MAX_RETRIES = 1
 
 # A 429 is retried this many times, and only when Mistral asks for a wait of at
 # most this many seconds. The cap keeps the added delay small against the
-# dashboard time budget.
+# dashboard time budget. Mistral's 429 usually carries no `Retry-After`, so a
+# missing or unusable header waits the default instead.
 RATE_LIMIT_MAX_RETRIES = 1
 RATE_LIMIT_MAX_WAIT_S = 8
+RATE_LIMIT_DEFAULT_WAIT_S = 2
 
 logger = logging.getLogger(__name__)
 
@@ -73,17 +77,18 @@ SUBAGENT_RECURSION_LIMIT = 25
 def rate_limit_wait(exc: BaseException) -> float | None:
     """Seconds to wait before retrying `exc`, or None if it must not be retried.
 
-    Only a 429 with a numeric `Retry-After` of at most `RATE_LIMIT_MAX_WAIT_S`
-    qualifies. A date-form header or a missing one cannot be trusted to be
-    short, so the call fails and the user is told.
+    Only a 429 qualifies. A `Retry-After` that is a number of seconds from 0 to
+    `RATE_LIMIT_MAX_WAIT_S` is honoured. A header that is absent or not a
+    number (including an HTTP date) gets `RATE_LIMIT_DEFAULT_WAIT_S`. A number
+    above the cap, negative or not finite fails, and the user is told.
     """
     if not isinstance(exc, httpx.HTTPStatusError) or exc.response.status_code != 429:
         return None
     try:
         wait = float(exc.response.headers.get("Retry-After", ""))
     except ValueError:
-        return None
-    if wait < 0 or wait > RATE_LIMIT_MAX_WAIT_S:
+        return float(RATE_LIMIT_DEFAULT_WAIT_S)
+    if not 0 <= wait <= RATE_LIMIT_MAX_WAIT_S:
         return None
     return wait
 

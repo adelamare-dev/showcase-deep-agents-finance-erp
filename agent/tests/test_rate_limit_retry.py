@@ -171,14 +171,42 @@ async def test_retry_after_above_the_cap_fails_fast(mistral_transport, build):
     assert transport.sleeps == []
 
 
-@pytest.mark.parametrize("retry_after", [None, "Wed, 21 Oct 2026 07:28:00 GMT", "-1"])
+@pytest.mark.parametrize(
+    "retry_after", [None, "", "Wed, 21 Oct 2026 07:28:00 GMT", "soon"]
+)
+@pytest.mark.parametrize("build", CLIENTS)
 @aio
-async def test_missing_or_unusable_retry_after_fails_fast(mistral_transport, retry_after):
+async def test_missing_or_non_numeric_retry_after_waits_the_default(
+    mistral_transport, build, retry_after
+):
+    client = build()
+    transport = mistral_transport(client, _error(429, retry_after), _stream_ok("ok"))
+    assert await _collect(client) == "ok"
+    assert transport.requests == 2
+    assert transport.sleeps == [float(models.RATE_LIMIT_DEFAULT_WAIT_S)]
+
+
+@pytest.mark.parametrize("retry_after", ["-1", "nan", "inf"])
+@aio
+async def test_negative_or_non_finite_retry_after_fails_fast(
+    mistral_transport, retry_after
+):
     client = orchestrator_chat_model()
     transport = mistral_transport(client, _error(429, retry_after), _stream_ok())
     with pytest.raises(httpx.HTTPStatusError):
         await _collect(client)
     assert transport.requests == 1
+    assert transport.sleeps == []
+
+
+@aio
+async def test_a_missing_header_gets_one_retry_only(mistral_transport):
+    client = orchestrator_chat_model()
+    transport = mistral_transport(client, _error(429), _error(429))
+    with pytest.raises(httpx.HTTPStatusError):
+        await _collect(client)
+    assert transport.requests == 2
+    assert transport.sleeps == [float(models.RATE_LIMIT_DEFAULT_WAIT_S)]
 
 
 @aio

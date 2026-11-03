@@ -43,7 +43,7 @@ A scenario scripts the model with `h.stubScript([...])`. Each model call takes t
 | `{ text }` | a streamed text answer |
 | `{ toolCall: { name, args } }` | a streamed tool call; `args` is an object |
 | `{ text, toolCall }` | both, text first |
-| `{ status: 429, retryAfter: 2, message }` | an HTTP error with an optional `Retry-After` (seconds) |
+| `{ status: 429, retryAfter: 2, message }` | an HTTP error with an optional `Retry-After` (seconds); without it the agent waits 2 s before its one retry |
 | any answer step with `hold: true` | the stream stays open after its first chunk until `h.stubRelease()` |
 
 ### Scenarios about failures
