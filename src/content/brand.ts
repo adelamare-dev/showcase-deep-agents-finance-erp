@@ -2,7 +2,7 @@
 // fictional; no real brand name appears anywhere in the app.
 export const brand = {
   product: "FinanceOS",
-  company: "Meridian Supply Co.",
+  company: "Larkspur Analytics",
   userInitials: "JD",
   logoSrc: "/icon.svg",
 } as const;

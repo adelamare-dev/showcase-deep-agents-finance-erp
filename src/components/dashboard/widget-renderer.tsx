@@ -21,10 +21,12 @@ import type { Transaction, Invoice, Bill } from "@/types/erp";
 import type { DashboardWidget } from "@/types/dashboard";
 
 const COL_SPAN_CLASS: Record<number, string> = {
-  1: "col-span-1 md:col-span-1 xl:col-span-1",
-  2: "col-span-1 md:col-span-1 xl:col-span-2",
-  3: "col-span-1 md:col-span-2 xl:col-span-3",
-  4: "col-span-1 md:col-span-2 xl:col-span-4",
+  // With the chat open, 1280px leaves about 720px for the page: widgets stay
+  // one per row until the viewport is wide enough for the four-column grid.
+  1: "col-span-1 2xl:col-span-1",
+  2: "col-span-1 2xl:col-span-2",
+  3: "col-span-1 2xl:col-span-3",
+  4: "col-span-1 2xl:col-span-4",
 };
 
 export function colSpanClass(span: number) {

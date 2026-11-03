@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
+import { isKpiFavourable } from "@/lib/kpi";
 import type { KPI } from "@/types/erp";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -28,6 +29,7 @@ const iconMap: Record<string, React.ElementType> = {
 export function KPICard({ kpi }: { kpi: KPI }) {
   const Icon = iconMap[kpi.icon] || DollarSign;
   const isPositive = kpi.trend === "up";
+  const isFavourable = isKpiFavourable(kpi);
   const isFlat = kpi.trend === "flat";
   const delta = useErp().highlights[kpi.label];
   const highlighted = delta !== undefined;
@@ -51,7 +53,7 @@ export function KPICard({ kpi }: { kpi: KPI }) {
             <div
               className={cn(
                 "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-                isPositive
+                isFavourable
                   ? "bg-emerald-50 text-emerald-600"
                   : "bg-red-50 text-red-600",
               )}

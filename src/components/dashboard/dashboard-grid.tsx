@@ -94,7 +94,7 @@ export function DashboardGrid() {
     <div>
       <DashboardToolbar />
       <div className="space-y-8 p-8">
-        <div className="grid grid-cols-1 gap-6 transition-all duration-300 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-6 transition-all duration-300 2xl:grid-cols-4">
           {sorted.map((widget) => (
             <div
               key={widget.id}

@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useErp } from "@/context/erp-context";
+import { isKpiFavourable } from "@/lib/kpi";
 import type { MetricCardsWidget } from "@/types/dashboard";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -46,6 +47,7 @@ export function MetricCards({
       {filtered.map((kpi) => {
         const Icon = iconMap[kpi.icon] || DollarSign;
         const isPositive = kpi.trend === "up";
+        const isFavourable = isKpiFavourable(kpi);
         const isFlat = kpi.trend === "flat";
 
         return (
@@ -63,7 +65,7 @@ export function MetricCards({
                   <div
                     className={cn(
                       "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
-                      isPositive
+                      isFavourable
                         ? "bg-emerald-50 text-emerald-600"
                         : "bg-red-50 text-red-600",
                     )}

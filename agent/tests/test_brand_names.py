@@ -38,6 +38,14 @@ def test_no_blocklisted_brand_in_source():
     assert hits == []
 
 
+def test_company_name_matches_the_store():
+    from erp_seed import COMPANY
+
+    match = re.search(r'company:\s*"([^"]+)"', BRAND_FILE.read_text(encoding="utf-8"))
+    assert match, "no company in the brand module"
+    assert match.group(1) == COMPANY
+
+
 def test_user_initials_only_in_brand_module():
     pattern = re.compile(r"\bJD\b")
     hits = [
