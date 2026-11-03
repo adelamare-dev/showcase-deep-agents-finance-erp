@@ -8,9 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { useAgent } from "@copilotkit/react-core/v2";
+import {
+  useAgent,
+  useCopilotChatConfiguration,
+} from "@copilotkit/react-core/v2";
 import { Button } from "@/components/ui/button";
-import { fetchSnapshot, type ErpSnapshot } from "@/lib/erp-api";
+import { useDashboard } from "@/context/dashboard-context";
+import { fetchSnapshot, resetErpData, type ErpSnapshot } from "@/lib/erp-api";
+import { forgetToolCalls } from "@/lib/handled-tool-calls";
+import { clearSubagentSteps } from "@/lib/subagent-steps";
 
 // Custom event the agent sends once an approved action has changed the books.
 export const ERP_DATA_CHANGED_EVENT = "erp_data_changed";
@@ -20,6 +26,10 @@ export const HIGHLIGHT_MS = 3000;
 
 type ErpContextValue = ErpSnapshot & {
   refresh: () => Promise<void>;
+  // Puts the demo back to its starting point: books, dashboards, saved layouts,
+  // subagent steps and conversation. Rejects, changing nothing, when the agent
+  // cannot reset its books.
+  resetDemo: () => Promise<void>;
   // Signed change by KPI label, cleared HIGHLIGHT_MS after the last change.
   highlights: Record<string, number>;
 };
@@ -73,6 +83,21 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     setSnapshot(await fetchSnapshot());
   }, []);
+
+  const { resetDashboards } = useDashboard();
+  const startNewThread = useCopilotChatConfiguration()?.startNewThread;
+
+  // The books are reset first: if the agent refuses, the screen is untouched.
+  const resetDemo = useCallback(async () => {
+    await resetErpData();
+    clearSubagentSteps();
+    forgetToolCalls();
+    if (clearTimer.current) clearTimeout(clearTimer.current);
+    setHighlights({});
+    await resetDashboards();
+    startNewThread?.();
+    await refresh();
+  }, [refresh, resetDashboards, startNewThread]);
 
   // The agent reports each change to the books; the figures are reloaded first
   // so the highlight lands on the new values. The reload at the end of every
@@ -129,7 +154,7 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ErpContext.Provider value={{ ...snapshot, refresh, highlights }}>
+    <ErpContext.Provider value={{ ...snapshot, refresh, resetDemo, highlights }}>
       {children}
     </ErpContext.Provider>
   );

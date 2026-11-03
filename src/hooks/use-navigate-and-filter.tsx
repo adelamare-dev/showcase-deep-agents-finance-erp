@@ -5,6 +5,7 @@ import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { CompletedToolCard } from "@/components/chat/tool-card";
+import { claimToolCall } from "@/lib/handled-tool-calls";
 
 const routes: Record<string, string> = {
   dashboard: "/",
@@ -13,9 +14,6 @@ const routes: Record<string, string> = {
   inventory: "/inventory",
   hr: "/hr",
 };
-
-// Module-level dedup set — survives component remounts (issue #04)
-const processedKeys = new Set<string>();
 
 function Navigator({
   page,
@@ -34,8 +32,7 @@ function Navigator({
     if (status !== ToolCallStatus.Complete || !page) return;
 
     const key = `navigate_and_filter-${page}-${filter || ""}`;
-    if (processedKeys.has(key)) return;
-    processedKeys.add(key);
+    if (!claimToolCall(key)) return;
 
     queueMicrotask(() => {
       const base = routes[page] ?? "/";

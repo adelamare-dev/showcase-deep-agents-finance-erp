@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UseAgentUpdate, useAgent } from "@copilotkit/react-core/v2";
 import {
   LayoutDashboard,
   LayoutGrid,
@@ -13,6 +15,7 @@ import {
   Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useErp } from "@/context/erp-context";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -60,11 +63,97 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto">
-        <button className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-          <Settings className="h-5 w-5" />
-        </button>
-      </div>
+      <SettingsMenu />
     </aside>
+  );
+}
+
+// The one entry puts the demo back to its starting point. It stays disabled
+// while the agent is running: a reset in the middle of a run would let the
+// run write to books that were just restored.
+function SettingsMenu() {
+  const { resetDemo } = useErp();
+  const { agent } = useAgent({
+    agentId: "finance_erp_agent",
+    updates: [UseAgentUpdate.OnRunStatusChanged],
+  });
+  const [open, setOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent) {
+        if (event.key === "Escape") setOpen(false);
+      } else if (!root.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+
+  const reset = async () => {
+    setResetting(true);
+    setError(null);
+    try {
+      await resetDemo();
+      setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The demo could not be reset.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const busy = agent.isRunning || resetting;
+
+  return (
+    <div ref={root} className="relative mt-auto">
+      <button
+        type="button"
+        aria-label="Settings"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <Settings className="h-5 w-5" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Settings"
+          className="absolute bottom-0 left-full ml-3 w-56 rounded-xl border border-border bg-card p-1 shadow-lg"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            aria-label="Reset demo data"
+            disabled={busy}
+            onClick={reset}
+            className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent"
+          >
+            Reset demo data
+          </button>
+          {agent.isRunning && (
+            <p className="px-3 pb-2 text-xs text-muted-foreground">
+              Available when the assistant has finished.
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="px-3 pb-2 text-xs text-red-600">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

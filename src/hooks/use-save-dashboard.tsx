@@ -5,9 +5,8 @@ import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
 import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
+import { claimToolCall } from "@/lib/handled-tool-calls";
 
-const processedSaveKeys = new Set<string>();
-const processedLoadKeys = new Set<string>();
 
 function SaveHandler({
   name,
@@ -24,8 +23,7 @@ function SaveHandler({
   useEffect(() => {
     if (status !== ToolCallStatus.Complete) return;
     const key = `save-${name}`;
-    if (processedSaveKeys.has(key)) return;
-    processedSaveKeys.add(key);
+    if (!claimToolCall(key)) return;
     queueMicrotask(() => {
       saveCurrent(name).catch((e: unknown) => {
         setError(e instanceof Error ? e.message : "The dashboard was not saved.");
@@ -70,8 +68,7 @@ function LoadHandler({
   useEffect(() => {
     if (status !== ToolCallStatus.Complete) return;
     const key = `load-${name}`;
-    if (processedLoadKeys.has(key)) return;
-    processedLoadKeys.add(key);
+    if (!claimToolCall(key)) return;
     queueMicrotask(() => {
       loadSavedByName(name);
     });

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
 import { isChartDatasetId } from "@/lib/erp-api";
+import { claimToolCall } from "@/lib/handled-tool-calls";
 
 /** Map agent widget type names to internal WidgetType values. */
 const TYPE_MAP: Record<string, string> = {
@@ -32,9 +33,6 @@ interface WidgetSpec {
   config?: Record<string, unknown>;
 }
 
-// Module-level dedup set — survives component remounts (issue #04)
-const processedKeys = new Set<string>();
-
 function DashboardUpdater({
   widgets,
   status,
@@ -50,8 +48,7 @@ function DashboardUpdater({
     if (status !== ToolCallStatus.Complete || !widgets?.length) return;
 
     const key = `update_dashboard-${JSON.stringify(widgets)}`;
-    if (processedKeys.has(key)) return;
-    processedKeys.add(key);
+    if (!claimToolCall(key)) return;
 
     queueMicrotask(() => {
       for (const w of widgets) {

@@ -5,15 +5,13 @@ import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
 import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
+import { claimToolCall } from "@/lib/handled-tool-calls";
 
 interface ReorderUpdate {
   widgetId: string;
   colSpan?: number;
   order?: number;
 }
-
-// Module-level dedup set — survives component remounts (issue #04)
-const processedKeys = new Set<string>();
 
 function DashboardManager({
   action,
@@ -35,8 +33,7 @@ function DashboardManager({
     if (status !== ToolCallStatus.Complete) return;
 
     const key = `manage_dashboard-${action}-${widgetId || ""}-${JSON.stringify(updates || [])}`;
-    if (processedKeys.has(key)) return;
-    processedKeys.add(key);
+    if (!claimToolCall(key)) return;
 
     queueMicrotask(() => {
       if (action === "reset") {

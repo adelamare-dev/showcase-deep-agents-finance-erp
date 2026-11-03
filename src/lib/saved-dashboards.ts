@@ -118,3 +118,12 @@ export async function findSavedDashboardByName(
   const lower = name.toLowerCase();
   return dashboards.find((d) => d.name.toLowerCase().includes(lower)) ?? null;
 }
+
+// Forgets every dashboard saved in this browser; the built-in templates stay.
+export function clearSavedDashboards(): void {
+  try {
+    window.localStorage.removeItem(LOCAL_KEY);
+  } catch {
+    // Storage unavailable: nothing was saved.
+  }
+}

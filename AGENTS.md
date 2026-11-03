@@ -7,9 +7,9 @@
 
 Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` showcase: no upstream resync is planned. Public demo repo (LinkedIn, meetings), run locally, later the base of a private repo. Success means an orchestration that is **visible, human-controlled and exact on the numbers**, not an absence of failures.
 
-**Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads the records from `GET /api/erp/snapshot` and every chart or card the model asks for from the dataset catalog (`agent/erp_datasets.py`, `GET /api/erp/datasets/{id}`): the model names a dataset and bounded parameters, the code fills in the figures. Approving a supplier payment or a reorder in the chat really changes the store (see the repo rules); `POST /api/erp/reset` restores the seed. Postgres is archived in `templates/postgres/` and wired to nothing.
+**Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads the records from `GET /api/erp/snapshot` and every chart or card the model asks for from the dataset catalog (`agent/erp_datasets.py`, `GET /api/erp/datasets/{id}`): the model names a dataset and bounded parameters, the code fills in the figures. Approving a supplier payment or a reorder in the chat really changes the store (see the repo rules); `POST /api/erp/reset` restores the seed, and the Settings icon's **Reset demo data** (`useErp().resetDemo`) calls it, then clears the dashboard, the saved dashboards, the subagent steps and opens a new thread; it is disabled while a run is in progress. Postgres is archived in `templates/postgres/` and wired to nothing.
 
-**Not done yet.** A reset control in the UI, failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
+**Not done yet.** Failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
 
 `SETUP/` (spec, plan, evidence) is deliberately **outside the repo** and gitignored: cite nothing from it in code, commits, README or UI.
 
@@ -25,6 +25,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 | Data: seed, store, routes | `agent/erp_seed.py`, `agent/erp_store.py`, `agent/erp_datasets.py`, `agent/erp_api.py` |
 | Prompts, tools, subagents, models | `agent/prompts.py`, `agent/tools.py`, `agent/frontend_tools.py`, `agent/isolated_subagents.py`, `agent/models.py` |
 | Browser scenarios (Playwright plugin) | `e2e/` (see `e2e/README.md`) |
+| Mistral stub and its stack launcher | `e2e/fixtures/` (scripted answers and HTTP errors, no credit spent) |
 | Postgres archive (not wired) | `templates/postgres/` |
 
 ## Commands
@@ -71,6 +72,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 - **CORS allows only `FRONTEND_ORIGIN`**, default `http://localhost:3000`. Opening the app on `http://127.0.0.1:3000` makes the snapshot request fail. Use `localhost`, or set `FRONTEND_ORIGIN`.
 - **`agent/.env` is not readable by agents** (workstation policy). Never try; check for the key with a script that prints only `bool(os.environ.get("MISTRAL_API_KEY"))`.
 - **Background servers start from Git Bash** with `nohup ... > log 2>&1 &`, never `Start-Process`, which opens a visible console window on the user's desktop. Check ports 3000 and 8123 are free first, stop what you started, and verify the ports are free again.
+- **Tool-call effects are applied once per key** (`src/lib/handled-tool-calls.ts`, keyed by tool name and arguments, not by call id). A reset forgets the keys; any new frontend tool that applies a side effect must claim its key there, or a replayed demo will skip it.
 - **E2E has no `@playwright/test`, by explicit decision.** Scenarios run through the Playwright plugin (`browser_run_code_unsafe`). A scenario is one single expression with no `import`. Run `pnpm e2e:build` first; the built files live in `.playwright-mcp/` (gitignored).
 
 ## Verification

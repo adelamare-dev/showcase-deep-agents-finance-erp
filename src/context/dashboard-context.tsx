@@ -16,6 +16,7 @@ import {
   deleteSavedDashboard,
   loadSavedDashboard,
   findSavedDashboardByName,
+  clearSavedDashboards,
 } from "@/lib/saved-dashboards";
 
 const DEFAULT_WIDGETS: DashboardWidget[] = [
@@ -69,6 +70,8 @@ interface DashboardContextValue {
   ) => { existed: boolean; id: string };
   setWidgets: (widgets: DashboardWidget[]) => void;
   resetToDefault: () => void;
+  // Default layout and no dashboard saved in this browser.
+  resetDashboards: () => Promise<void>;
   // Save/load
   savedDashboards: SavedDashboard[];
   currentDashboardName: string | null;
@@ -162,6 +165,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setCurrentDashboardName(null);
   }, []);
 
+  const resetDashboards = useCallback(async () => {
+    clearSavedDashboards();
+    setWidgetsState(DEFAULT_WIDGETS);
+    setCurrentDashboardName(null);
+    await refreshSaved();
+  }, [refreshSaved]);
+
   const saveCurrent = useCallback(
     async (name: string) => {
       const entry = await saveDashboardApi(name, widgetsRef.current);
@@ -209,6 +219,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         upsertWidget,
         setWidgets,
         resetToDefault,
+        resetDashboards,
         savedDashboards,
         currentDashboardName,
         saveCurrent,
