@@ -70,21 +70,25 @@ export function DashboardCustomChart({
   });
   const height = CHART_HEIGHT[colSpan] ?? 280;
 
-  if (error || loading || !chart) {
+  // A dataset that is not a chart (for instance the cash card) has no rows.
+  const unusable = !!chart && !Array.isArray(chart.data);
+  const message = unusable ? "This dataset is not a chart." : error;
+
+  if (message || loading || !chart || unusable) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>{widgetConfig.title ?? "Chart"}</CardTitle>
-          {error && (
+          {message && (
             <CardDescription className="text-destructive">
-              Could not draw this chart. {error}
+              Could not draw this chart. {message}
             </CardDescription>
           )}
         </CardHeader>
         <CardContent>
           <div
             className="animate-pulse rounded bg-muted"
-            style={{ height: error ? 0 : height }}
+            style={{ height: message ? 0 : height }}
           />
         </CardContent>
       </Card>

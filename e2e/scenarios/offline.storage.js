@@ -74,6 +74,24 @@ async (page, h) => {
     });
   });
 
+  await h.test("A chart naming the cash card as its dataset is ignored", async () => {
+    const stored = {
+      [KEY]: JSON.stringify([
+        dashboard("cash-chart", "Chart On Cash Card", [
+          { id: "c3", type: "custom-chart", colSpan: 2, order: 0, config: { dataset: "cash_position" } },
+        ]),
+        dashboard("ok", "Still Valid Layout", [widget("w", {})]),
+      ]),
+    };
+    return await withPage(seed, stored, async (p, errors) => {
+      const text = await gallery(p);
+      assertTemplates(text);
+      h.assert(!text.includes("Chart On Cash Card"), "the chart on the cash card is dropped");
+      h.assert(text.includes("Still Valid Layout"), "the valid entry is kept");
+      h.assertEqual(errors, [], "no page error");
+    });
+  });
+
   await h.test("Corrupted JSON in storage does not break startup", async () => {
     return await withPage(seed, { [KEY]: "{not json" }, async (p, errors) => {
       assertTemplates(await gallery(p));

@@ -5,6 +5,7 @@ import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
 import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
+import { isChartDatasetId } from "@/lib/erp-api";
 
 /** Map agent widget type names to internal WidgetType values. */
 const TYPE_MAP: Record<string, string> = {
@@ -65,7 +66,7 @@ function DashboardUpdater({
         if (internalType === "custom-chart") {
           // A chart is filled from the catalog: one without a dataset, or
           // carrying its own figures, cannot be drawn from the store.
-          if (typeof config.dataset !== "string" || "data" in config) continue;
+          if (!isChartDatasetId(config.dataset) || "data" in config) continue;
           const id = `custom-chart-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
           addWidget({
             id,

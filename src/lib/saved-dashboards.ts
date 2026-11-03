@@ -1,4 +1,5 @@
 import { DASHBOARD_TEMPLATES } from "@/content/dashboard-templates";
+import { isChartDatasetId } from "@/lib/erp-api";
 import type { DashboardWidget, SavedDashboard } from "@/types/dashboard";
 
 // Versioned so a change of format never reads an older entry as a current one.
@@ -15,7 +16,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 // Widgets that embed their own data points are not accepted: every figure
 // must come from the agent service at render time. A custom chart must name
-// its dataset.
+// a chart dataset.
 function isValidWidget(value: unknown): value is DashboardWidget {
   if (!isRecord(value)) return false;
   if (typeof value.id !== "string" || typeof value.type !== "string") {
@@ -27,7 +28,7 @@ function isValidWidget(value: unknown): value is DashboardWidget {
   // A chart saved before charts were filled from the catalog has no dataset.
   if (value.type === "custom-chart") {
     const config = value.config;
-    if (!isRecord(config) || typeof config.dataset !== "string") return false;
+    if (!isRecord(config) || !isChartDatasetId(config.dataset)) return false;
   }
   return true;
 }

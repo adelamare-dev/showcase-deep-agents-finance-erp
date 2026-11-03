@@ -55,6 +55,26 @@ export async function fetchSnapshot(): Promise<ErpSnapshot> {
 // `value2`, `value3`, ... and described by `series`.
 export type ChartRow = { label: string; [key: string]: string | number };
 
+// Datasets that return a chart. `cash_position` is a card, not a chart, so a
+// custom chart may not name it. Keep in step with the catalog in the agent.
+export const CHART_DATASET_IDS = [
+  "revenue_by_quarter",
+  "cash_flow_by_quarter",
+  "expense_breakdown",
+  "ar_aging",
+  "budget_variance",
+  "revenue_forecast",
+  "cash_flow_forecast",
+  "scenario_analysis",
+] as const;
+
+export function isChartDatasetId(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    (CHART_DATASET_IDS as readonly string[]).includes(value)
+  );
+}
+
 export type ChartDataset = {
   title: string;
   chartType: "area" | "bar" | "line";

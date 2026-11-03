@@ -63,7 +63,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 - **`request_approval` changes no data.** Approving a payment or a reorder only returns the answer to the model; no invoice or stock record is updated.
 - **`useRenderTool` requires `parameters`** in `@copilotkit/react-core` 1.80.0: each front-end tool declares a permissive `zod` schema of the fields it reads. The live browser scenario rendered the research, cash and approval cards.
 - **No `instructions` prop on `CopilotSidebar`** in 1.80.0. Instructions go through `useAgentContext` (`shell.tsx`), like the KPIs and the dashboard layout.
-- **`pnpm lint` is red, and was before the migration**: 6 errors and 4 warnings in `src/`. Errors: `use-update-dashboard.tsx` (5 x `no-explicit-any`) and `cash-waterfall-chart.tsx` (variable reassigned after render). Warnings: `cash-position-card.tsx`, `dashboard-grid.tsx`, `shell.tsx` (2). Not a regression; fix before the final handover. Add none.
+- **`pnpm lint` is red, and was before the migration**: 6 errors and 3 warnings in `src/`. Errors: `use-update-dashboard.tsx` (5 x `no-explicit-any`) and `cash-waterfall-chart.tsx` (variable reassigned after render). Warnings: `dashboard-grid.tsx`, `shell.tsx` (2). Not a regression; fix before the final handover. Add none.
 - **`@copilotkit/*` stays on 1.80.0**: 1.83.0 is refused by `minimumReleaseAge`. Do not force the bump or loosen the cooldown.
 - **Windows `MAX_PATH`**: a clone that is too deep breaks `agent/.venv` past 260 characters. Keep the path short.
 - **Subagents run in isolated threads** (`isolated_subagents.py`) on purpose: it keeps internal events out of the parent stream. Do not "simplify" to `subagents=[...]`.
