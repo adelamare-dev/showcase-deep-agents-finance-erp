@@ -23,3 +23,7 @@ def test_subagents_are_told_to_answer_briefly():
 
 def test_the_orchestrator_may_only_quote_figures_as_returned():
     assert "Never compute a total, average, difference" in ORCHESTRATOR_PROMPT
+
+
+def test_a_dashboard_comment_carries_no_dollar_amount():
+    assert "with no dollar amount at all" in ORCHESTRATOR_PROMPT
