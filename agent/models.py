@@ -290,5 +290,6 @@ def subagent_chat_model() -> ChatMistralAI:
         model_name=SUBAGENT_MODEL,
         temperature=0,
         max_retries=MAX_RETRIES,
-        timeout=REQUEST_TIMEOUT_S,        callbacks=[_TokenUsageLog(SUBAGENT_MODEL)],
+        timeout=REQUEST_TIMEOUT_S,
+        callbacks=[_TokenUsageLog(SUBAGENT_MODEL)],
     )

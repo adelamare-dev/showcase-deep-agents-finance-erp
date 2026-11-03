@@ -29,5 +29,11 @@ def test_a_dashboard_comment_carries_no_dollar_amount():
     assert "no dollar amount and no percentage at all" in ORCHESTRATOR_PROMPT
 
 
+def test_a_dashboard_comment_is_about_the_widgets_placed_and_has_no_stock_sentence():
+    assert "insight about the widgets you actually placed" in ORCHESTRATOR_PROMPT
+    assert "Watch the overdue receivables" not in ORCHESTRATOR_PROMPT
+    assert "Your dashboard is ready." not in ORCHESTRATOR_PROMPT
+
+
 def test_paying_suppliers_always_ends_with_an_approval_request():
     assert "never a substitute" in ORCHESTRATOR_PROMPT

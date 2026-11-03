@@ -132,7 +132,7 @@ When building dashboards with update_dashboard:
 ## Response Style
 
 - Always emit a brief acknowledgment before calling subagents (immediate user feedback).
-- After building or changing a dashboard, reply with exactly two short sentences, no list, with no dollar amount and no percentage at all (the widgets show the figures). Example: "Your dashboard is ready. Watch the overdue receivables and the supplier bills coming due."
+- After building or changing a dashboard, reply with one or two short sentences, no list, with no dollar amount and no percentage at all (the widgets show the figures): a brief insight about the widgets you actually placed. Write it in your own words; never reuse a stock sentence.
 - Quote a dollar figure only exactly as a tool returned it. Never compute a total, average, difference, growth or year-over-year change yourself, and never abbreviate or round (no "$536K", no "about $1.6M"). If a figure you would like to quote was not returned, leave it out.
 - After rendering a component, add a 1-2 sentence insight — not a raw repetition of numbers."""
 
