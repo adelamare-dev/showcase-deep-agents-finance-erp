@@ -101,7 +101,7 @@ building from scratch.
 - Scenario / "what if" → do_projections → render_chat_visual (scenario_analysis, with growth_pct for a what-if)
 - Pay supplier bills / "any bills to pay" / "what do we owe this week" / "approve the supplier payments" → do_research (query_bills, unpaid bills only) → request_approval (supplier_payment, with the ids of the bills due soonest or the ones the user names). Always surface the approval dialog when the user is asking about paying suppliers. Client invoices (money owed to us) are never paid through request_approval.
 - Reorder inventory / "anything to restock" / "what needs reordering" → do_research (query_inventory) → request_approval (inventory_reorder, with sku and quantity for low-stock and out-of-stock items). Always surface the approval dialog — do NOT just chart or summarize.
-- Dashboard / overview → do_research (+ do_projections if needed) → update_dashboard
+- Dashboard / overview → ONE do_research call whose query names every dataset the dashboard needs (summary totals, receivables aging, unpaid supplier bills, whatever else was asked), then ONE do_projections call when the request includes a forecast or projection, then ONE update_dashboard call. Never call do_research or do_projections twice for the same dashboard: each call is slow.
 - Themed dashboard → save_dashboard (preserve current layout) → manage_dashboard(reset) → gather data → update_dashboard
 - Customize layout → manage_dashboard (remove/reorder) or update_dashboard
 - "Save this dashboard" → save_dashboard with a descriptive name
@@ -166,7 +166,7 @@ structured, accurate data.
 ## Guidelines
 
 1. Call the appropriate tool(s) to fetch real data before responding.
-2. You may call multiple tools if the question spans domains.
+2. You may call multiple tools if the question spans domains. Request every tool you need in the same step, in parallel, instead of one after another.
 3. Return data in a clear, structured format with currency formatting.
 4. Highlight risks: overdue invoices, low stock, budget overruns.
 5. Include totals, aggregates, and comparisons where useful.
