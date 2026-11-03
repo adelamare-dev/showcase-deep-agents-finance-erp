@@ -28,16 +28,19 @@ const iconMap: Record<string, React.ElementType> = {
 export function MetricCards({
   config,
 }: {
-  config: MetricCardsWidget["config"];
+  config?: Partial<MetricCardsWidget["config"]>;
 }) {
   const { kpis } = useErp();
-  const filtered = kpis.filter((k) => config.metrics.includes(k.label));
+  // The orchestrator may omit the metrics: show every KPI then.
+  const filtered = config?.metrics
+    ? kpis.filter((k) => config.metrics!.includes(k.label))
+    : kpis;
 
   return (
     <div
       className={cn(
         "grid gap-4 h-full",
-        config.stacked
+        config?.stacked
           ? "grid-cols-1"
           : filtered.length === 1
             ? "grid-cols-1"

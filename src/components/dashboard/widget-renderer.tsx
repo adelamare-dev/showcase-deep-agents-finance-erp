@@ -33,7 +33,11 @@ export function colSpanClass(span: number) {
   return COL_SPAN_CLASS[span] || COL_SPAN_CLASS[2];
 }
 
-export function WidgetRenderer({ widget }: { widget: DashboardWidget }) {
+export function WidgetRenderer({ widget: stored }: { widget: DashboardWidget }) {
+  // A widget saved or sent without a config renders with its defaults.
+  const widget = stored.config
+    ? stored
+    : ({ ...stored, config: {} } as DashboardWidget);
   switch (widget.type) {
     case "kpi-cards":
       return <KpiCardsSection config={widget.config} />;

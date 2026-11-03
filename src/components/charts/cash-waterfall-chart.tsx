@@ -45,10 +45,9 @@ function WaterfallChart({
   const data = cashFlowData.slice(-quarters);
 
   // Build waterfall data: each bar floats from a running base
-  let runningNet = 0;
-  const waterfallData = data.map((d) => {
-    const base = runningNet;
-    runningNet += d.net;
+  const waterfallData = data.map((d, i) => {
+    const base = data.slice(0, i).reduce((total, q) => total + q.net, 0);
+    const runningNet = base + d.net;
     return {
       name: d.quarter,
       // Stacked segments from the base

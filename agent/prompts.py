@@ -55,7 +55,8 @@ retry the same call. A rejection changes nothing.
 
 ### update_dashboard
 Add or update dashboard widgets in a single call. Params: widgets array, each with:
-- type: kpi_cards | revenue_chart | expense_breakdown | transactions | invoices | custom_chart
+- type: kpi_cards | revenue_chart | expense_breakdown | transactions | invoices | custom_chart |
+  cash_waterfall | ar_aging_gauge | budget_variance | spend_heatmap | revenue_forecast | metric_cards
 - colSpan: 1-4 (optional)
 - config: type-specific options
   * kpi_cards: {metrics?: ["Total Revenue", "Net Profit", "Accounts Receivable", "Operating Expenses"]}
@@ -65,6 +66,13 @@ Add or update dashboard widgets in a single call. Params: widgets array, each wi
   * invoices: {kind?: "receivable"|"payable", statuses?: ["pending", "overdue"]} (payable = supplier bills we owe; default receivable = client invoices)
   * custom_chart: {dataset (any render_chat_visual dataset except cash_position), title?, subtitle?,
     chartType?: area|bar|line, quarters?, growth_pct?, metric?}. Never send figures.
+  * cash_waterfall: {mode?: "waterfall"|"flow-comparison", quarters?, showNetLine?} (quarterly cash flow)
+  * ar_aging_gauge: {title?, warningThreshold?, criticalThreshold?} (receivables by lateness and collection rate)
+  * budget_variance: {showPercentage?, categories?} (budget vs actual, current quarter)
+  * spend_heatmap: {colorScale?: purple|blue|red, categories?: payroll|operations|marketing|infrastructure|rnd|other} (monthly spend by category)
+  * revenue_forecast: {mode?: "forecast"|"quarterly", trailingQuarters?, showMarginLine?} (forecast = three scenarios)
+  * metric_cards: {metrics?: [KPI labels as in kpi_cards], stacked?} (compact KPI cards; all KPIs when metrics is omitted)
+  None of these types takes figures: they draw their own from the ERP data.
 
 ### manage_dashboard
 Layout management. action="reset" (restore defaults), action="remove" (widgetId),

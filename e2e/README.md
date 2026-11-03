@@ -86,3 +86,5 @@ The result is `{ complete, seconds, runSeconds, missing, mismatches, compared, w
 - Group related checks as named cases with `h.test(name, fn)`; every case runs and failures are collected.
 - Compare displayed figures with `h.snapshot()` (`GET /api/erp/snapshot`, served by the agent), never with hard-coded values.
 - Validated at 1280x720; `h.open` sets it.
+
+`offline.widgets.js` loads a saved dashboard holding all twelve widget types, with a full config, an empty one and none, through the gallery's Load button and the versioned saved-dashboards storage key. It needs no model, only `pnpm demo` (or `pnpm start` and `pnpm start:agent` with a fake key), and fails on any empty widget, console error or page error.

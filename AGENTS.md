@@ -13,7 +13,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 
 **First screen.** The chat is open on load with the reference suggestion ("Cash Flow Dashboard") first; the header holds only the fictional avatar (not a control) and the sidebar only routes plus Settings. No visible control is without an effect.
 
-**Not done yet.** Extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
+**Not done yet.** The reference series. The orchestrator can place all twelve widget types (`update_dashboard`); the app is a working base, not the finished demo.
 
 `SETUP/` (spec, plan, evidence) is deliberately **outside the repo** and gitignored: cite nothing from it in code, commits, README or UI.
 
@@ -67,13 +67,13 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 ## Pitfalls
 
 - **A saved `custom-chart` without a `dataset` is ignored on read** (old format); a dashboard carrying inline figures is refused on save.
+- **`update_dashboard` widgets carry options, never figures.** `use-update-dashboard.tsx` drops `scenarios` and `comparisonData` from a config (and the tool refuses them); a widget with no config renders with its defaults (`WidgetRenderer` normalises it). A new widget type goes in `TYPE_MAP`, `DEFAULT_COLSPAN`, the tool docstring and the prompt.
 - **`request_approval` applies the decision on the server, once.** The tool takes identifiers only (`bill_ids`, or `items` as sku and quantity), previews through the store, calls `copilotkit_interrupt` and mutates only after an explicit `approved: true`; LangGraph re-runs the tool body on resume, so nothing may be written before the interrupt. Paying is idempotent (a paid bill is skipped), a rejection changes nothing, and the tool then sends the custom event `erp_data_changed` (`{changes: [{metric, delta}]}`), which `ErpProvider` turns into a reload and a 3 s highlight on the KPI cards. A reorder only sets `onOrder` on the items: no account moves.
 - **A failed run is told once, in one place.** `RunErrorBanner` subscribes to `onRunErrorEvent` (error sent by the agent) and `onRunFailed` (request failed) and never shows the raw text, which can carry the provider URL. Retry calls `copilotkit.runAgent({ agent })` on the messages already in the thread: no message is added, and tool effects stay once per key, so a call carried out before the failure is not carried out again (and one the failed run never reached is carried out on the retry). The only retry on the model side is one 429 per model call (`agent/models.py`), after the `Retry-After` seconds when they are at most 8, or after 2 s when the header is missing or not a number (Mistral's 429 carries none); everything else fails at once. There is no run-wide wait budget, so a turn with several limited calls can add up to 8 s each.
 - **Brand and wording live in `src/content/`.** The product name, company, user initials and logo come from `brand.ts`; suggestions, titles and nav labels from `ui-text.ts`. `agent/tests/test_brand_names.py` fails when a blocklisted company name or a hard-coded "JD" appears elsewhere in `src/` or `agent/`. A KPI with no history (`trend: "flat"`) shows no change badge.
 - **With the chat open by default, its panel covers the chat toggle at 1280x720**; the panel header's Close button is the visible control, and the toggle reappears once closed.
 - **`useRenderTool` requires `parameters`** in `@copilotkit/react-core` 1.80.0: each front-end tool declares a permissive `zod` schema of the fields it reads. The live browser scenario rendered the research, cash and approval cards.
 - **No `instructions` prop on `CopilotSidebar`** in 1.80.0. Instructions go through `useAgentContext` (`shell.tsx`), like the KPIs and the dashboard layout.
-- **`pnpm lint` is red, and was before the migration**: 6 errors and 3 warnings in `src/`. Errors: `use-update-dashboard.tsx` (5 x `no-explicit-any`) and `cash-waterfall-chart.tsx` (variable reassigned after render). Warnings: `dashboard-grid.tsx`, `shell.tsx` (2). Not a regression; fix before the final handover. Add none.
 - **`@copilotkit/*` stays on 1.80.0**: 1.83.0 is refused by `minimumReleaseAge`. Do not force the bump or loosen the cooldown.
 - **Windows `MAX_PATH`**: a clone that is too deep breaks `agent/.venv` past 260 characters. Keep the path short.
 - **Subagents run in isolated threads** (`isolated_subagents.py`) on purpose: it keeps internal events out of the parent stream. Do not "simplify" to `subagents=[...]`. The one thing that crosses is a `subagent_step` custom event per subagent tool call, dispatched from the parent's loop and stored by `src/lib/subagent-steps.ts` under the card's tool call id; the card lists them live.
@@ -88,7 +88,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 
 Default level: **standard**.
 
-- Web: `pnpm build` (type check on) and `pnpm lint`; compare with the known baseline above, add no error.
+- Web: `pnpm build` (type check on) and `pnpm lint`; lint is at 0 errors and 3 warnings (`dashboard-grid.tsx`, `shell.tsx` x2): add none.
 - Agent, offline: `pnpm test:agent` (no network call expected).
 - End to end: `pnpm demo`, then `GET http://127.0.0.1:8123/health` and `http://localhost:3000`.
 - Every live measurement compares with values **read from the store at test time**, never hard-coded. A 429 is not a code failure: wait out the window, replay, note it.

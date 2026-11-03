@@ -36,3 +36,17 @@ def test_render_chat_visual_reports_the_catalog_figures(store, monkeypatch):
     assert str(store.totals()["cash"]) in out
     assert render_chat_visual.invoke({"dataset": "nope"}).startswith("Cannot render")
     assert render_chat_visual.invoke({"dataset": "ar_aging", "quarters": 99}).startswith("Cannot render")
+
+
+def test_update_dashboard_names_every_widget_type_and_refuses_figures_in_them():
+    types = [
+        "kpi_cards", "revenue_chart", "expense_breakdown", "transactions", "invoices", "custom_chart",
+        "cash_waterfall", "ar_aging_gauge", "budget_variance", "spend_heatmap", "revenue_forecast", "metric_cards",
+    ]
+    for name in types:
+        assert name in update_dashboard.description
+    assert update_dashboard.invoke({"widgets": [{"type": "metric_cards"}]}) == "Dashboard updated: metric_cards"
+    own_scenarios = {"type": "revenue_forecast", "config": {"scenarios": [{"label": "Base", "values": []}]}}
+    assert update_dashboard.invoke({"widgets": [own_scenarios]}).startswith("Dashboard not updated")
+    own_flows = {"type": "cash_waterfall", "config": {"comparisonData": []}}
+    assert update_dashboard.invoke({"widgets": [own_flows]}).startswith("Dashboard not updated")

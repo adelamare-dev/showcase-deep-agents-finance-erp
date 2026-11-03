@@ -202,7 +202,8 @@ def update_dashboard(widgets: list) -> str:
     Args:
         widgets: Array of widget configs. Each widget has:
             - type (str): Widget type — 'kpi_cards', 'revenue_chart', 'expense_breakdown',
-              'transactions', 'invoices', or 'custom_chart'.
+              'transactions', 'invoices', 'custom_chart', 'cash_waterfall', 'ar_aging_gauge',
+              'budget_variance', 'spend_heatmap', 'revenue_forecast' or 'metric_cards'.
             - colSpan (int, optional): Grid column span 1-4. Defaults vary by type.
             - config (dict, optional): Type-specific configuration:
               * kpi_cards: { metrics?: string[] } — KPI labels to show.
@@ -216,12 +217,26 @@ def update_dashboard(widgets: list) -> str:
                   growth_pct?: float -50 to 50, metric?: 'revenue'|'profit'|'cash_flow' }.
                 The dataset is one of the render_chat_visual datasets except 'cash_position'.
                 Never send figures: the chart is filled from the ERP data.
+              * cash_waterfall: { mode?: 'waterfall'|'flow-comparison', quarters?: int, showNetLine?: bool,
+                  title?: str, subtitle?: str } (quarterly cash flow; 'waterfall' builds up the net position)
+              * ar_aging_gauge: { title?: str, warningThreshold?: float 0-1, criticalThreshold?: float 0-1 }
+                (receivables by lateness with the collection rate)
+              * budget_variance: { title?: str, subtitle?: str, showPercentage?: bool, categories?: string[] }
+              * spend_heatmap: { title?: str, subtitle?: str, colorScale?: 'purple'|'blue'|'red',
+                  categories?: ['payroll'|'operations'|'marketing'|'infrastructure'|'rnd'|'other'] }
+              * revenue_forecast: { mode?: 'forecast'|'quarterly', title?: str, subtitle?: str,
+                  trailingQuarters?: int, showMarginLine?: bool } ('forecast' is the three scenarios)
+              * metric_cards: { metrics?: string[], stacked?: bool } — the same KPI labels as kpi_cards,
+                shown as compact cards (all of them when metrics is omitted).
+                None of these takes figures: never send scenarios or comparisonData.
     """
     problems = []
     for w in widgets:
-        if w.get("type") != "custom_chart":
-            continue
         config = w.get("config") or {}
+        if w.get("type") != "custom_chart":
+            if "scenarios" in config or "comparisonData" in config:
+                problems.append("widgets must not carry figures")
+            continue
         if config.get("dataset") not in DATASET_IDS or config.get("dataset") == "cash_position":
             problems.append("custom_chart needs a dataset from the catalog")
         if "data" in config:
