@@ -233,9 +233,9 @@ def update_dashboard(widgets: list) -> str:
     problems = []
     for w in widgets:
         config = w.get("config") or {}
+        if "scenarios" in config or "comparisonData" in config:
+            problems.append("widgets must not carry figures")
         if w.get("type") != "custom_chart":
-            if "scenarios" in config or "comparisonData" in config:
-                problems.append("widgets must not carry figures")
             continue
         if config.get("dataset") not in DATASET_IDS or config.get("dataset") == "cash_position":
             problems.append("custom_chart needs a dataset from the catalog")

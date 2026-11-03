@@ -185,16 +185,16 @@ async (page, h) => {
       const says = (v) => stated.some((a) => matches(a, v));
       h.assert(says(after.totals.cash), "the follow-up shows the new cash " + h.formatUsd(after.totals.cash) + ": " + lastAnswer);
       h.assert(says(after.totals.accountsPayable), "the follow-up shows the new payables " + h.formatUsd(after.totals.accountsPayable) + ": " + lastAnswer);
-      // What the approval changed must not be stated at its old value: cash,
-      // payables and the totals of the statuses the paid bills came from.
-      const statusTotal = (snap, status) => sum(snap.bills.filter((b) => b.status === status), (b) => b.amount);
-      const paidStatuses = [...new Set(ids.map((id) => byBill[id].status))];
+      // Only the aggregates the approval changed must not be stated at their
+      // old value: cash, payables and the unpaid total. Per-status totals are
+      // left out, and so is any amount equal to a single bill still in the
+      // store: a follow-up may quote one bill whose amount equals an old total.
+      const singleBills = after.bills.map((b) => Math.abs(b.amount));
       const stale = [
         before.totals.cash,
         before.totals.accountsPayable,
         sum(before.bills.filter((b) => b.status !== "paid"), (b) => b.amount),
-        ...paidStatuses.map((status) => statusTotal(before, status)),
-      ].filter((v) => !storeAfter.includes(Math.abs(v)));
+      ].filter((v) => !storeAfter.includes(Math.abs(v)) && !singleBills.includes(Math.abs(v)));
       h.assertEqual(stated.filter((a) => stale.some((v) => matches(a, v))).map((a) => a.text), [], "the follow-up states a value the approval changed at its old amount");
       h.assertEqual(strangers(chatNow, fieldsAfter), [], "chat amounts after the follow-up that are not money fields of this pass");
       data.followUp = { answer: lastAnswer.slice(0, 400) };

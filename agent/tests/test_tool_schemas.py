@@ -50,3 +50,9 @@ def test_update_dashboard_names_every_widget_type_and_refuses_figures_in_them():
     assert update_dashboard.invoke({"widgets": [own_scenarios]}).startswith("Dashboard not updated")
     own_flows = {"type": "cash_waterfall", "config": {"comparisonData": []}}
     assert update_dashboard.invoke({"widgets": [own_flows]}).startswith("Dashboard not updated")
+
+
+def test_update_dashboard_refuses_figures_on_a_custom_chart_too():
+    for key in ("scenarios", "comparisonData"):
+        chart = {"type": "custom_chart", "config": {"dataset": "revenue_forecast", key: []}}
+        assert update_dashboard.invoke({"widgets": [chart]}).startswith("Dashboard not updated")

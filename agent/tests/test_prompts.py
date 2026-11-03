@@ -37,3 +37,16 @@ def test_a_dashboard_comment_is_about_the_widgets_placed_and_has_no_stock_senten
 
 def test_paying_suppliers_always_ends_with_an_approval_request():
     assert "never a substitute" in ORCHESTRATOR_PROMPT
+
+
+def test_a_request_listing_its_widgets_is_built_not_loaded_from_a_template():
+    lines = ORCHESTRATOR_PROMPT.splitlines()
+    build = next(i for i, line in enumerate(lines) if line.startswith("- Dashboard / overview"))
+    themed = next(i for i, line in enumerate(lines) if line.startswith("- Themed dashboard"))
+    templates = next(i for i, line in enumerate(lines) if line.startswith("- Map natural-language intent"))
+    # The widget-list rule comes first and forbids the template and save/reset routes.
+    assert build < themed and build < templates
+    assert "lists the widgets it wants" in lines[build]
+    assert "never answer it with load_dashboard, save_dashboard or manage_dashboard" in lines[build]
+    assert "lists no widgets" in lines[themed]
+    assert "without listing the widgets" in lines[templates]

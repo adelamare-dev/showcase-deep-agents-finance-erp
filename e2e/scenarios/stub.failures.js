@@ -201,6 +201,17 @@ async (page, h) => {
     await byId("erp-stale-notice").waitFor({ state: "detached", timeout: 10000 });
   });
 
+  await h.test("Reset demo data clears the failure notice, so Retry cannot run on the new thread", async () => {
+    await fresh();
+    await h.stubScript([{ status: 500, message: "" }]);
+    await h.sendPrompt("Status please");
+    await h.expectVisible(banner, 30000);
+    await h.clickReset();
+    await banner.waitFor({ state: "detached", timeout: 5000 });
+    h.assertEqual(await banner.count(), 0, "the failure notice is gone after the reset");
+    h.assertEqual(await userMessages(), 0, "the new thread is empty");
+  });
+
   await h.test("An unknown route shows the not-found page", async () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(h.WEB_URL + "/this-page-does-not-exist");
