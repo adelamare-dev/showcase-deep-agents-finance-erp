@@ -44,11 +44,12 @@ from typing import Any
 import httpx
 from langchain_core.callbacks import (
     AsyncCallbackManagerForLLMRun,
+    BaseCallbackHandler,
     CallbackManagerForLLMRun,
 )
 from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.messages.tool import tool_call_chunk
-from langchain_core.outputs import ChatGenerationChunk, ChatResult
+from langchain_core.outputs import ChatGenerationChunk, ChatResult, LLMResult
 from langchain_mistralai import ChatMistralAI
 
 ORCHESTRATOR_MODEL = "ministral-14b-2512"
@@ -66,6 +67,8 @@ RATE_LIMIT_MAX_WAIT_S = 8
 RATE_LIMIT_DEFAULT_WAIT_S = 2
 
 logger = logging.getLogger(__name__)
+# Usage lines go to the server's own logger, which prints at INFO.
+usage_logger = logging.getLogger("uvicorn.error")
 
 # LangGraph supersteps allowed per turn. The orchestrator makes a model call and
 # a tool call per step, so it needs more room than a subagent, which only loops
@@ -91,6 +94,26 @@ def rate_limit_wait(exc: BaseException) -> float | None:
     if not 0 <= wait <= RATE_LIMIT_MAX_WAIT_S:
         return None
     return wait
+
+
+class _TokenUsageLog(BaseCallbackHandler):
+    """Logs one line per finished model call: model id and token counts, no content."""
+
+    def __init__(self, model: str) -> None:
+        self.model = model
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        for generations in response.generations:
+            for generation in generations:
+                usage = getattr(getattr(generation, "message", None), "usage_metadata", None)
+                if usage:
+                    usage_logger.info(
+                        "model_usage model=%s input=%d output=%d total=%d",
+                        self.model,
+                        usage.get("input_tokens", 0),
+                        usage.get("output_tokens", 0),
+                        usage.get("total_tokens", 0),
+                    )
 
 
 def _log_retry(wait: float) -> None:
@@ -257,6 +280,7 @@ def orchestrator_chat_model() -> ChatMistralAI:
         max_retries=MAX_RETRIES,
         timeout=REQUEST_TIMEOUT_S,
         model_kwargs={"parallel_tool_calls": False},
+        callbacks=[_TokenUsageLog(ORCHESTRATOR_MODEL)],
     )
 
 
@@ -266,5 +290,5 @@ def subagent_chat_model() -> ChatMistralAI:
         model_name=SUBAGENT_MODEL,
         temperature=0,
         max_retries=MAX_RETRIES,
-        timeout=REQUEST_TIMEOUT_S,
+        timeout=REQUEST_TIMEOUT_S,        callbacks=[_TokenUsageLog(SUBAGENT_MODEL)],
     )

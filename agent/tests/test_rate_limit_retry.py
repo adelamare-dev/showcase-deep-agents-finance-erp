@@ -264,3 +264,35 @@ def test_library_retry_does_not_cover_status_errors():
     assert not issubclass(httpx.HTTPStatusError, (httpx.RequestError, httpx.StreamError))
     for client in (orchestrator_chat_model(), subagent_chat_model()):
         assert client.max_retries == models.MAX_RETRIES == 1
+
+
+def _stream_with_usage() -> httpx.Response:
+    last = _chunk("", "stop")
+    last["usage"] = {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18}
+    return httpx.Response(
+        200,
+        content=_sse(_chunk("hello"), last),
+        headers={"Content-Type": "text/event-stream"},
+    )
+
+
+@pytest.mark.parametrize("build", CLIENTS)
+@aio
+async def test_streamed_call_logs_token_usage_only(mistral_transport, build, caplog):
+    client = build()
+    mistral_transport(client, _stream_with_usage())
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        assert await _collect(client) == "hello"
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("model_usage")]
+    assert lines == [f"model_usage model={client.model} input=11 output=7 total=18"]
+
+
+@pytest.mark.parametrize("build", CLIENTS)
+@aio
+async def test_whole_call_logs_token_usage_once(mistral_transport, build, caplog):
+    client = build()
+    mistral_transport(client, httpx.Response(200, json=_whole("whole")))
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        await client.ainvoke(ASK)
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("model_usage")]
+    assert lines == [f"model_usage model={client.model} input=1 output=1 total=2"]
