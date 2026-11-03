@@ -53,6 +53,7 @@ export function MetricCards({
         return (
           <Card
             key={kpi.label}
+            data-testid={`kpi-${kpi.label}`}
             className="flex flex-col justify-center"
             size="sm"
           >

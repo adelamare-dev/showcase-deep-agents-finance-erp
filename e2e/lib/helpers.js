@@ -123,6 +123,157 @@
     return ids;
   };
 
+  // ---- The reference dashboard segment -------------------------------------
+  // The wanted elements and the widgets that may show each one (see README).
+  const PROJECTION_DATASETS = ["cash_flow_forecast", "cash_flow_by_quarter"];
+
+  const scanDashboard = () =>
+    page.evaluate(() => {
+      const widgets = [...document.querySelectorAll("[data-widget-type]")]
+        .filter((el) => !el.classList.contains("widget-exit"))
+        .map((el) => ({
+          type: el.dataset.widgetType,
+          dataset: el.dataset.widgetDataset || null,
+          charted: !!el.querySelector(".recharts-wrapper"),
+          text: el.innerText,
+          rows: [...el.querySelectorAll("tbody tr")].map((tr) =>
+            [...tr.querySelectorAll("td")].map((td) => td.innerText.trim()),
+          ),
+        }));
+      const kpis = {};
+      for (const el of document.querySelectorAll("[data-testid^='kpi-']")) {
+        kpis[el.dataset.testid.slice(4)] = el.innerText;
+      }
+      return { widgets, kpis };
+    });
+
+  // Which of the five asked-for elements the scan shows, and in which widget.
+  const classifyDashboard = (scan) => {
+    const found = {
+      cashKpi: scan.kpis["Cash"] !== undefined ? "kpi Cash" : null,
+      payableKpi: scan.kpis["Accounts Payable"] !== undefined ? "kpi Accounts Payable" : null,
+      arAging: null,
+      billsDue: null,
+      cashProjection: null,
+    };
+    for (const w of scan.widgets) {
+      if (w.type === "ar-aging-gauge") found.arAging ??= w;
+      else if (w.type === "custom-chart" && w.dataset === "ar_aging" && w.charted) found.arAging ??= w;
+      else if (w.type === "outstanding-invoices" && w.text.includes("Outstanding Bills")) found.billsDue ??= w;
+      else if (w.type === "custom-chart" && PROJECTION_DATASETS.includes(w.dataset) && w.charted) {
+        found.cashProjection ??= w;
+      } else if (w.type === "cash-waterfall" && w.text.includes("cumulative net cash flow")) {
+        found.cashProjection ??= w;
+      }
+    }
+    const missing = Object.keys(found).filter((k) => !found[k]);
+    const label = (w) => (typeof w === "string" ? w : w.dataset ? `${w.type}:${w.dataset}` : w.type);
+    return { missing, shown: Object.fromEntries(Object.entries(found).map(([k, w]) => [k, w && label(w)])), found };
+  };
+
+  // Clicks the hero suggestion and times the dashboard it builds. Compares the
+  // displayed figures with the snapshot and with the catalog routes, both read
+  // during the run. Returns what it saw; the caller decides what must hold.
+  const runDashboardSegment = async (target = page, timeout = 150000) => {
+    await open("/");
+    const catalog = [];
+    const onResponse = async (res) => {
+      if (!res.url().includes("/api/erp/datasets/")) return;
+      try {
+        catalog.push({ url: res.url(), status: res.status(), body: res.ok() ? await res.json() : null });
+      } catch {
+        // A response that cannot be read is simply not compared.
+      }
+    };
+    target.on("response", onResponse);
+    const result = { complete: false, seconds: null, runSeconds: null, missing: [], mismatches: [], compared: [], widgets: [], notices: [] };
+    try {
+      const hero = target.locator("[data-testid='copilot-sidebar'] button", { hasText: /^Cash Flow Dashboard$/ });
+      await expectVisible(hero, 15000);
+      const started = Date.now();
+      await hero.first().click();
+
+      let shown = null;
+      while (Date.now() - started < timeout) {
+        const { missing, shown: now } = classifyDashboard(await scanDashboard());
+        if (!missing.length) {
+          result.seconds = Math.round((Date.now() - started) / 100) / 10;
+          shown = now;
+          break;
+        }
+        await target.waitForTimeout(500);
+      }
+      await waitForRunEnd(Math.max(10000, timeout - (Date.now() - started)));
+      result.runSeconds = Math.round((Date.now() - started) / 100) / 10;
+      await target.waitForTimeout(800);
+
+      const scan = await scanDashboard();
+      const { missing, shown: finalShown, found } = classifyDashboard(scan);
+      result.missing = missing;
+      result.complete = !missing.length;
+      result.widgets = scan.widgets.map((w) => (w.dataset ? `${w.type}:${w.dataset}` : w.type));
+      result.shown = shown ?? finalShown;
+      result.notices = (await chatText()).split("\n").filter((l) => /429|rate.?limit|too many requests|went wrong|failed/i.test(l));
+
+      // Figures, against the store as it is now.
+      const snap = await snapshot();
+      const check = (cond, msg) => {
+        result.compared.push(msg);
+        if (!cond) result.mismatches.push(msg);
+      };
+      const usd = (n) => formatUsd(Math.round(n));
+      for (const [key, label] of [["cashKpi", "Cash"], ["payableKpi", "Accounts Payable"]]) {
+        if (!found[key]) continue;
+        const kpi = snap.kpis.find((k) => k.label === label);
+        check(scan.kpis[label].includes(kpi.value), `${label} card shows ${kpi.value}`);
+      }
+      const checkCatalog = (w, ids) => {
+        const seen = catalog.filter((r) => ids.some((id) => new URL(r.url).pathname.endsWith("/datasets/" + id)) && r.body);
+        check(seen.length > 0, `${w.dataset}: a catalog response was seen`);
+        return seen;
+      };
+      const ar = found.arAging;
+      if (ar && ar.type === "ar-aging-gauge") {
+        const a = snap.arAging;
+        check(ar.text.includes(`${Math.round(a.collectionRate * 100)}%`), `AR gauge shows ${Math.round(a.collectionRate * 100)}%`);
+        for (const key of ["total", "current", "thirtyDay", "sixtyDay", "ninetyPlus"]) {
+          check(ar.text.includes(usd(a[key])), `AR gauge shows ${key} ${usd(a[key])}`);
+        }
+      }
+      const bills = found.billsDue;
+      if (bills) {
+        const statuses = new Set(bills.rows.map((r) => (r[3] || "").toLowerCase()));
+        const wanted = snap.bills.filter((b) => statuses.has(b.status)).map((b) => b.number).sort();
+        const shownNumbers = bills.rows.map((r) => r[0].split("\n")[0].trim()).sort();
+        check(bills.rows.length > 0, "the bills widget lists rows");
+        check(JSON.stringify(shownNumbers) === JSON.stringify(wanted), `bills listed ${shownNumbers.join(",")} equal the store's ${[...statuses].join("/")} bills`);
+        for (const row of bills.rows) {
+          const bill = snap.bills.find((b) => b.number === row[0].split("\n")[0].trim());
+          check(!!bill && row[1] === usd(bill.amount) && row[0].includes(bill.supplier), `bill row ${row[0].split("\n")[0]} matches the store`);
+        }
+      }
+      for (const w of [ar, found.cashProjection]) {
+        if (w && w.type === "custom-chart") {
+          for (const r of checkCatalog(w, [w.dataset])) {
+            const u = new URL(r.url);
+            const again = await (await target.request.get(ERP_URL + u.pathname + u.search)).json();
+            check(JSON.stringify(again) === JSON.stringify(r.body), `${w.dataset} response equals the store's answer to ${u.search || "the same request"}`);
+          }
+        }
+      }
+      const proj = found.cashProjection;
+      if (proj && proj.type === "cash-waterfall") {
+        const nets = snap.cashFlowData.map((d) => d.net);
+        const cumulative = [];
+        for (let q = 1; q <= nets.length; q++) cumulative.push(usd(nets.slice(-q).reduce((t, n) => t + n, 0)));
+        check(cumulative.some((c) => proj.text.includes(c)), "waterfall cumulative net equals a trailing sum of the store's cash flow");
+      }
+    } finally {
+      target.off("response", onResponse);
+    }
+    return result;
+  };
+
   const test = async (name, fn) => {
     const started = Date.now();
     try {
@@ -147,7 +298,7 @@
     assert, assertEqual, expectVisible, byId,
     STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
-    moneyIn, formatUsd, test, run,
+    moneyIn, formatUsd, scanDashboard, classifyDashboard, runDashboardSegment, test, run,
   };
   return h;
 }

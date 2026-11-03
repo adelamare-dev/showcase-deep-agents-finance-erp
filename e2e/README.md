@@ -65,10 +65,23 @@ Without `--allow-agent-exit` the launcher brings the whole stack down when the a
 
 `h.stubReset()` empties the queue and the request log; `h.stubRequests()` lists what the agent sent. A scripted `request_approval` takes bill ids read from `h.snapshot()` (`h.payableBillIds`), never hard-coded ones.
 
+## The reference dashboard segment
+
+`h.runDashboardSegment()` clicks the "Cash Flow Dashboard" suggestion and times the dashboard the orchestrator builds. The seconds run from the click to the first scan showing all five elements asked for by the suggestion; they are recorded, not enforced. Each element is accepted from any widget that shows it (widgets carry `data-widget-type`, and a custom chart `data-widget-dataset`):
+
+| Asked for | Accepted widget | Figures compared |
+|---|---|---|
+| Cash and Accounts Payable KPIs | KPI cards or metric cards (`kpi-Cash`, `kpi-Accounts Payable`) | the card text contains the snapshot KPI value |
+| AR aging | the AR aging gauge, or a custom chart on `ar_aging` | gauge: collection rate and bucket amounts from the snapshot; chart: the catalog response seen during the run equals the route's answer when read again |
+| Supplier bills due | the bills widget (`outstanding-invoices` in payable mode, titled "Outstanding Bills") | listed bill numbers equal the snapshot bills in the displayed statuses; each row's amount and supplier match |
+| Quarterly cash projection | a custom chart on `cash_flow_forecast` or `cash_flow_by_quarter`, or the cash waterfall in waterfall mode | chart: same catalog comparison; waterfall: its cumulative net equals a trailing sum of the snapshot cash flow |
+
+The result is `{ complete, seconds, runSeconds, missing, mismatches, compared, widgets, shown, notices }`; the caller decides what must hold. Start from `h.resetDemo()` so repeated runs are independent.
+
 ## Rules for a scenario file
 
 - One single expression, no `import`, no `require`, no trailing `;`: the tool runs it in a VM without modules. `build.mjs` rejects a file that is not one expression.
-- Everything comes from `h`: `open`, `visit`, `resetDemo`, `sendPrompt`, `waitForRunEnd`, `chatText`, `snapshot`, `moneyIn`, `formatUsd`, `test`, `assert`, `assertEqual`, `expectVisible`, `byId`, and for the stub `stubScript`, `stubRelease`, `stubReset`, `stubRequests`, `payableBillIds`, `openSettings`, `clickReset`.
+- Everything comes from `h`: `open`, `visit`, `resetDemo`, `sendPrompt`, `waitForRunEnd`, `chatText`, `snapshot`, `moneyIn`, `formatUsd`, `test`, `assert`, `assertEqual`, `expectVisible`, `byId`, and for the stub `stubScript`, `stubRelease`, `stubReset`, `stubRequests`, `payableBillIds`, `openSettings`, `clickReset`, and `runDashboardSegment`.
 - `h.resetDemo()` resets through the API and reloads the page; `h.clickReset()` uses the Settings control, which is what a scenario about the control must do.
 - Group related checks as named cases with `h.test(name, fn)`; every case runs and failures are collected.
 - Compare displayed figures with `h.snapshot()` (`GET /api/erp/snapshot`, served by the agent), never with hard-coded values.

@@ -98,6 +98,10 @@ export function DashboardGrid() {
           {sorted.map((widget) => (
             <div
               key={widget.id}
+              data-widget-type={widget.type}
+              data-widget-dataset={
+                widget.type === "custom-chart" ? widget.config.dataset : undefined
+              }
               className={`${colSpanClass(widget.colSpan)} ${
                 widget.phase === "entering"
                   ? "widget-enter"
