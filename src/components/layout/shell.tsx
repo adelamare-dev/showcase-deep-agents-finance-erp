@@ -2,6 +2,7 @@
 
 import {
   CopilotChatAssistantMessage,
+  CopilotChatInput,
   CopilotSidebar,
   CopilotSidebarView,
   useAgentContext,
@@ -14,6 +15,7 @@ import {
 import { useEffect } from "react";
 import type React from "react";
 import { ToolCard } from "@/components/chat/tool-card";
+import { RunErrorBanner } from "@/components/chat/run-error-banner";
 import { cn } from "@/lib/utils";
 import { SUBAGENT_STEP_EVENT, recordSubagentStep } from "@/lib/subagent-steps";
 import { useRenderChatVisual } from "@/hooks/use-render-chat-visual";
@@ -122,6 +124,18 @@ function HoverToolbarAssistantMessage(
       className={cn(className, "group")}
       toolbar="opacity-0 group-hover:opacity-100 transition-opacity"
     />
+  );
+}
+
+// The chat input with the failure notice of the last run above it.
+function InputWithRunError(
+  props: React.ComponentProps<typeof CopilotChatInput>,
+) {
+  return (
+    <div>
+      <RunErrorBanner />
+      <CopilotChatInput {...props} />
+    </div>
   );
 }
 
@@ -281,6 +295,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         agentId="finance_erp_agent"
         defaultOpen={false}
         welcomeScreen={FinanceSidebarWelcomeScreen}
+        input={InputWithRunError as unknown as typeof CopilotChatInput}
         messageView={{
           assistantMessage:
             HoverToolbarAssistantMessage as unknown as typeof CopilotChatAssistantMessage,

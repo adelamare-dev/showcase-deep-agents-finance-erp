@@ -5,6 +5,10 @@
 //   node e2e/fixtures/stack.mjs [--logs <dir>]   start; stays in the foreground
 //   node e2e/fixtures/stack.mjs stop             stop what a running start launched
 //
+// By default the whole stack comes down as soon as one server exits. With
+// `--allow-agent-exit` the stack keeps the stub and the web app up when the
+// agent exits, which is how a scenario about a missing agent is played.
+//
 // Run `start` in the background (`nohup node e2e/fixtures/stack.mjs ... &`). It
 // prints "stack ready" once the three servers answer. Ports: stub 8790 (override
 // with STUB_PORT, and keep STUB_URL in e2e/lib/helpers.js in step), agent 8123,
@@ -18,6 +22,7 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const pidFile = join(root, ".playwright-mcp", "stack.pid");
 const STUB_PORT = Number(process.env.STUB_PORT ?? 8790);
+const allowAgentExit = process.argv.includes("--allow-agent-exit");
 const logFlag = process.argv.indexOf("--logs");
 const logDir = logFlag > 0 ? process.argv[logFlag + 1] : join(root, ".playwright-mcp", "stack-logs");
 
@@ -68,6 +73,7 @@ const start = (name, command, args, options = {}) => {
   children.push(child);
   child.on("exit", (code) => {
     console.error(`${name} exited with code ${code}`);
+    if (name === "agent" && allowAgentExit && !stopping) return;
     shutdown(1);
   });
 };

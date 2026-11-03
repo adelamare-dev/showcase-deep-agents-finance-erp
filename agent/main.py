@@ -6,6 +6,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+MISSING_KEY_MESSAGE = (
+    "MISTRAL_API_KEY is missing: copy agent/.env.example to agent/.env and set it."
+)
+
+
+def require_api_key() -> None:
+    """Stop the process at startup when the Mistral key is absent or blank.
+
+    Without it every chat turn would fail later with a provider error; the
+    operator should be told at the start, naming the file to fill in.
+    """
+    if not os.environ.get("MISTRAL_API_KEY", "").strip():
+        raise SystemExit(MISSING_KEY_MESSAGE)
+
+
+require_api_key()
+
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from copilotkit import LangGraphAGUIAgent
 from copilotkit.langgraph import copilotkit_customize_config

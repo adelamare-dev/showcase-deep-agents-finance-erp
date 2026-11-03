@@ -46,6 +46,23 @@ A scenario scripts the model with `h.stubScript([...])`. Each model call takes t
 | `{ status: 429, retryAfter: 2, message }` | an HTTP error with an optional `Retry-After` (seconds) |
 | any answer step with `hold: true` | the stream stays open after its first chunk until `h.stubRelease()` |
 
+### Scenarios about failures
+
+`stub.failures.js` plays scripted 429 and 500 answers and blocked snapshot requests on the plain stub stack. `stub.agent-down.js` needs the agent stopped, which a scenario cannot do, so the runner plays it three times and the file reads which step it is in:
+
+```
+nohup node e2e/fixtures/stack.mjs --allow-agent-exit --logs <dir> > <dir>/stack.out 2>&1 &
+# 1. run stub.agent-down.js        -> loads the app (arm)
+#    stop only the agent: taskkill /PID <pid listening on 8123> /T /F
+# 2. run stub.agent-down.js        -> the agent is down: chat notice, stale figures, error screen
+#    start the agent again by hand, with the stack's environment, from agent/:
+#    MISTRAL_BASE_URL=http://127.0.0.1:8790/v1 MISTRAL_API_KEY=stub-key uv run uvicorn main:app --host 127.0.0.1 --port 8123
+# 3. run stub.agent-down.js        -> Retry on the error screen loads the data
+node e2e/fixtures/stack.mjs stop   # then stop the hand-started agent and check 8123 is free
+```
+
+Without `--allow-agent-exit` the launcher brings the whole stack down when the agent exits.
+
 `h.stubReset()` empties the queue and the request log; `h.stubRequests()` lists what the agent sent. A scripted `request_approval` takes bill ids read from `h.snapshot()` (`h.payableBillIds`), never hard-coded ones.
 
 ## Rules for a scenario file

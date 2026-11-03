@@ -17,6 +17,14 @@ Each call makes one attempt. LangChain's `max_retries` counts attempts, so
 HTTP status errors such as 429 or 5xx never are. A call that is going to fail
 should fail fast so the user is told, instead of watching a spinner.
 
+The one exception is a 429 that arrives before the first streamed chunk and
+carries a `Retry-After` of at most `RATE_LIMIT_MAX_WAIT_S` seconds: the free
+tier limits requests per second, so such a call is held for that long and sent
+once more (`RATE_LIMIT_MAX_RETRIES`). Any other status, a longer wait or a
+missing header fails at once, and nothing is retried once a chunk has been
+received, since the caller has already seen part of the answer. Both clients
+share this behaviour through `_RateLimitRetryMistral`.
+
 Two kinds of client exist. `orchestrator_chat_model` builds the client of the
 main graph, which re-chunks streamed tool calls so the chat can show a step
 while the tool runs. `subagent_chat_model` builds a plain client for the
@@ -25,13 +33,20 @@ thread-isolated subagents.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import asyncio
+import logging
+import time
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-from langchain_core.callbacks import AsyncCallbackManagerForLLMRun
+import httpx
+from langchain_core.callbacks import (
+    AsyncCallbackManagerForLLMRun,
+    CallbackManagerForLLMRun,
+)
 from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.messages.tool import tool_call_chunk
-from langchain_core.outputs import ChatGenerationChunk
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_mistralai import ChatMistralAI
 
 ORCHESTRATOR_MODEL = "ministral-14b-2512"
@@ -40,6 +55,14 @@ SUBAGENT_MODEL = "ministral-14b-2512"
 REQUEST_TIMEOUT_S = 45
 MAX_RETRIES = 1
 
+# A 429 is retried this many times, and only when Mistral asks for a wait of at
+# most this many seconds. The cap keeps the added delay small against the
+# dashboard time budget.
+RATE_LIMIT_MAX_RETRIES = 1
+RATE_LIMIT_MAX_WAIT_S = 8
+
+logger = logging.getLogger(__name__)
+
 # LangGraph supersteps allowed per turn. The orchestrator makes a model call and
 # a tool call per step, so it needs more room than a subagent, which only loops
 # over data tools.
@@ -47,7 +70,114 @@ ORCHESTRATOR_RECURSION_LIMIT = 100
 SUBAGENT_RECURSION_LIMIT = 25
 
 
-class _StreamingToolCallMistral(ChatMistralAI):
+def rate_limit_wait(exc: BaseException) -> float | None:
+    """Seconds to wait before retrying `exc`, or None if it must not be retried.
+
+    Only a 429 with a numeric `Retry-After` of at most `RATE_LIMIT_MAX_WAIT_S`
+    qualifies. A date-form header or a missing one cannot be trusted to be
+    short, so the call fails and the user is told.
+    """
+    if not isinstance(exc, httpx.HTTPStatusError) or exc.response.status_code != 429:
+        return None
+    try:
+        wait = float(exc.response.headers.get("Retry-After", ""))
+    except ValueError:
+        return None
+    if wait < 0 or wait > RATE_LIMIT_MAX_WAIT_S:
+        return None
+    return wait
+
+
+def _log_retry(wait: float) -> None:
+    logger.warning("Mistral answered 429: retrying once after %.1f s", wait)
+
+
+class _RateLimitRetryMistral(ChatMistralAI):
+    """`ChatMistralAI` that retries a short 429 once, before any chunk arrived.
+
+    The library raises `httpx.HTTPStatusError` for a rejected request on the
+    first read of the stream (or on the call itself when not streaming), and
+    its own retry never covers status errors, so the two layers do not stack.
+    """
+
+    async def _astream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[ChatGenerationChunk]:
+        retries = 0
+        while True:
+            received = False
+            try:
+                async for gen in super()._astream(
+                    messages, stop, run_manager=run_manager, **kwargs
+                ):
+                    received = True
+                    yield gen
+                return
+            except httpx.HTTPStatusError as exc:
+                wait = None if received else rate_limit_wait(exc)
+                if wait is None or retries >= RATE_LIMIT_MAX_RETRIES:
+                    raise
+                retries += 1
+                _log_retry(wait)
+                await asyncio.sleep(wait)
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        retries = 0
+        while True:
+            received = False
+            try:
+                for gen in super()._stream(
+                    messages, stop, run_manager=run_manager, **kwargs
+                ):
+                    received = True
+                    yield gen
+                return
+            except httpx.HTTPStatusError as exc:
+                wait = None if received else rate_limit_wait(exc)
+                if wait is None or retries >= RATE_LIMIT_MAX_RETRIES:
+                    raise
+                retries += 1
+                _log_retry(wait)
+                time.sleep(wait)
+
+    async def _agenerate(self, *args: Any, **kwargs: Any) -> ChatResult:
+        retries = 0
+        while True:
+            try:
+                return await super()._agenerate(*args, **kwargs)
+            except httpx.HTTPStatusError as exc:
+                wait = rate_limit_wait(exc)
+                if wait is None or retries >= RATE_LIMIT_MAX_RETRIES:
+                    raise
+                retries += 1
+                _log_retry(wait)
+                await asyncio.sleep(wait)
+
+    def _generate(self, *args: Any, **kwargs: Any) -> ChatResult:
+        retries = 0
+        while True:
+            try:
+                return super()._generate(*args, **kwargs)
+            except httpx.HTTPStatusError as exc:
+                wait = rate_limit_wait(exc)
+                if wait is None or retries >= RATE_LIMIT_MAX_RETRIES:
+                    raise
+                retries += 1
+                _log_retry(wait)
+                time.sleep(wait)
+
+
+class _StreamingToolCallMistral(_RateLimitRetryMistral):
     """`ChatMistralAI` that streams a tool call as start, args, end.
 
     Mistral delivers a tool call whole, in a single streamed chunk that also
@@ -127,7 +257,7 @@ def orchestrator_chat_model() -> ChatMistralAI:
 
 def subagent_chat_model() -> ChatMistralAI:
     """Build the plain client used inside the thread-isolated subagents."""
-    return ChatMistralAI(
+    return _RateLimitRetryMistral(
         model_name=SUBAGENT_MODEL,
         temperature=0,
         max_retries=MAX_RETRIES,

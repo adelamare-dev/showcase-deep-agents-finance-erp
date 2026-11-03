@@ -58,6 +58,9 @@ function readChanges(value: unknown): Record<string, number> {
 export function ErpProvider({ children }: { children: React.ReactNode }) {
   const [snapshot, setSnapshot] = useState<ErpSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // True once a reload failed while data is on screen: the figures may be old.
+  const [stale, setStale] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [highlights, setHighlights] = useState<Record<string, number>>({});
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bumped by the retry button to run the initial load again.
@@ -79,10 +82,29 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
     };
   }, [attempt]);
 
-  // Re-reads the store after a change. A failure is left to the caller.
+  // Re-reads the store after a change. A failure keeps the old figures, flags
+  // them as possibly old (the notice offers a retry) and is also left to the
+  // caller.
   const refresh = useCallback(async () => {
-    setSnapshot(await fetchSnapshot());
+    try {
+      setSnapshot(await fetchSnapshot());
+      setStale(false);
+    } catch (e) {
+      setStale(true);
+      throw e;
+    }
   }, []);
+
+  const retryRefresh = useCallback(async () => {
+    setRetrying(true);
+    try {
+      await refresh();
+    } catch {
+      // The notice stays on screen.
+    } finally {
+      setRetrying(false);
+    }
+  }, [refresh]);
 
   const { resetDashboards } = useDashboard();
   const startNewThread = useCopilotChatConfiguration()?.startNewThread;
@@ -156,6 +178,26 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ErpContext.Provider value={{ ...snapshot, refresh, resetDemo, highlights }}>
+      {stale && (
+        <div
+          role="alert"
+          data-testid="erp-stale-notice"
+          className="fixed left-1/2 top-3 z-[1300] flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-destructive/30 bg-background px-4 py-2 text-sm shadow-md"
+        >
+          <span>
+            The data service did not answer. The figures shown may be out of date.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="erp-stale-retry"
+            disabled={retrying}
+            onClick={() => void retryRefresh()}
+          >
+            Retry
+          </Button>
+        </div>
+      )}
       {children}
     </ErpContext.Provider>
   );

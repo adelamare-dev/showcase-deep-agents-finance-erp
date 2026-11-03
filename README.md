@@ -71,6 +71,10 @@ pnpm e2e:build      # assembles helpers + each scenario into .playwright-mcp/sce
 
 Start the servers (`pnpm demo`; live scenarios need a real `MISTRAL_API_KEY` in `agent/.env`), then run a built file with the plugin's `browser_run_code_unsafe` tool and `filename: ".playwright-mcp/scenarios/live.agent.js"`. A scenario passes when the tool returns `passed` with an empty `failed` list. Scenarios that need a scripted model (`stub.*`) run on a local stand-in for the Mistral API and cost no credits: `node e2e/fixtures/stack.mjs` starts it with the agent and the web app (Windows only: it stops processes with `taskkill`). See `e2e/README.md`.
 
+## When something fails
+
+A failed answer (rate limit, model service error, agent not reachable) is shown above the chat input in plain words, with a **Retry** that runs the assistant again on the same conversation without adding a message. A short model rate limit (`Retry-After` of 8 s or less) is retried once automatically. If the figures cannot be reloaded, the page keeps the old ones and says they may be out of date, with a Retry. The agent refuses to start without `MISTRAL_API_KEY` and names `agent/.env`.
+
 ## Replaying the demo
 
 The Settings icon at the bottom of the left bar has one entry, **Reset demo data**. It restores the seeded books, the default dashboard, the dashboards saved in the browser and the subagent steps, and opens a fresh conversation. It is disabled while the assistant is answering. A pending approval card disappears on reset, because the reset opens a new conversation. Restarting the agent also restores the books.
