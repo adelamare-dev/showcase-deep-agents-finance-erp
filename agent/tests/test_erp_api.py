@@ -55,3 +55,14 @@ def test_dataset_route_answers_422_out_of_bounds(monkeypatch):
     for query in ("quarters=0", "quarters=9", "growth_pct=51", "growth_pct=-51", "metric=headcount", "quarters=x"):
         response = client.get(f"/api/erp/datasets/revenue_forecast?{query}")
         assert response.status_code == 422, query
+
+
+def test_reset_route_restores_the_initial_data(monkeypatch):
+    client, store = _dataset_client(monkeypatch)
+    initial = store.snapshot()
+    bill = next(b for b in initial["bills"] if b["status"] != "paid")
+    store.pay_bills([bill["id"]])
+    assert store.snapshot() != initial
+    response = client.post("/api/erp/reset")
+    assert response.status_code == 200
+    assert store.snapshot() == initial

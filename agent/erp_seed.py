@@ -67,6 +67,8 @@ BUDGETS = {
     "Other": 20000,
 }
 
+# Cash accounts carry codes starting with this prefix.
+CASH_CODE_PREFIX = "10"
 CASH_ACCOUNTS = [("1000", "Cash: Operating Account", 612000), ("1010", "Cash: Savings Reserve", 480000)]
 FIXED_ASSETS = 890000
 SHORT_TERM_LOANS = 150000
@@ -213,6 +215,7 @@ def seed(as_of: date) -> dict:
             "reorderLevel": reorder,
             "unitCost": cost,
             "location": location,
+            "onOrder": 0,
         }
         for n, (sku, name, category, quantity, reorder, cost, location) in enumerate(_INVENTORY, 1)
     ]

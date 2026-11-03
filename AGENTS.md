@@ -7,9 +7,9 @@
 
 Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` showcase: no upstream resync is planned. Public demo repo (LinkedIn, meetings), run locally, later the base of a private repo. Success means an orchestration that is **visible, human-controlled and exact on the numbers**, not an absence of failures.
 
-**Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads the records from `GET /api/erp/snapshot` and every chart or card the model asks for from the dataset catalog (`agent/erp_datasets.py`, `GET /api/erp/datasets/{id}`): the model names a dataset and bounded parameters, the code fills in the figures. Postgres is archived in `templates/postgres/` and wired to nothing.
+**Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads the records from `GET /api/erp/snapshot` and every chart or card the model asks for from the dataset catalog (`agent/erp_datasets.py`, `GET /api/erp/datasets/{id}`): the model names a dataset and bounded parameters, the code fills in the figures. Approving a supplier payment or a reorder in the chat really changes the store (see the repo rules); `POST /api/erp/reset` restores the seed. Postgres is archived in `templates/postgres/` and wired to nothing.
 
-**Not done yet.** Supplier approval, a reset control, failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
+**Not done yet.** A reset control in the UI, failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
 
 `SETUP/` (spec, plan, evidence) is deliberately **outside the repo** and gitignored: cite nothing from it in code, commits, README or UI.
 
@@ -60,7 +60,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 ## Pitfalls
 
 - **A saved `custom-chart` without a `dataset` is ignored on read** (old format); a dashboard carrying inline figures is refused on save.
-- **`request_approval` changes no data.** Approving a payment or a reorder only returns the answer to the model; no invoice or stock record is updated.
+- **`request_approval` applies the decision on the server, once.** The tool takes identifiers only (`bill_ids`, or `items` as sku and quantity), previews through the store, calls `copilotkit_interrupt` and mutates only after an explicit `approved: true`; LangGraph re-runs the tool body on resume, so nothing may be written before the interrupt. Paying is idempotent (a paid bill is skipped), a rejection changes nothing, and the tool then sends the custom event `erp_data_changed` (`{changes: [{metric, delta}]}`), which `ErpProvider` turns into a reload and a 3 s highlight on the KPI cards. A reorder only sets `onOrder` on the items: no account moves.
 - **`useRenderTool` requires `parameters`** in `@copilotkit/react-core` 1.80.0: each front-end tool declares a permissive `zod` schema of the fields it reads. The live browser scenario rendered the research, cash and approval cards.
 - **No `instructions` prop on `CopilotSidebar`** in 1.80.0. Instructions go through `useAgentContext` (`shell.tsx`), like the KPIs and the dashboard layout.
 - **`pnpm lint` is red, and was before the migration**: 6 errors and 3 warnings in `src/`. Errors: `use-update-dashboard.tsx` (5 x `no-explicit-any`) and `cash-waterfall-chart.tsx` (variable reassigned after render). Warnings: `dashboard-grid.tsx`, `shell.tsx` (2). Not a regression; fix before the final handover. Add none.

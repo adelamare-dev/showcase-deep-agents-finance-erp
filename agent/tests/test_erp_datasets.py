@@ -131,3 +131,14 @@ def test_unknown_dataset_and_metric_are_rejected(store):
         build_dataset(store, "payroll_secrets")
     with pytest.raises(ValueError, match="metric"):
         build_dataset(store, "scenario_analysis", metric="headcount")
+
+
+def test_cash_position_is_built_from_one_snapshot(store, monkeypatch):
+    # Accounts and totals must come from the same read: a second read of the
+    # store could see a payment the first one did not.
+    def refuse(*args, **kwargs):
+        raise AssertionError("cash_position must not read the store a second time")
+
+    monkeypatch.setattr(store, "cash_accounts", refuse)
+    built = build_dataset(store, "cash_position")
+    assert sum(a["balance"] for a in built["accounts"]) == built["totalCash"]

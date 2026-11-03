@@ -10,7 +10,7 @@ A finance ERP showcase powered by CopilotKit deep agents. An AI assistant can an
 - 12 dashboard widget types with 4 pre-built templates (Executive Summary, Cash Flow Risk, Cost Control, Revenue Overview)
 - Dashboard gallery (`/dashboards`) for browsing, loading, saving, and deleting layouts (saved layouts live in the browser's `localStorage` under a versioned key; dashboards saved under an older version are ignored)
 - Multi-agent orchestration: orchestrator + research subagent (14 tools) + projections subagent (6 tools)
-- Human-in-the-loop approval for invoice payments and inventory reorders
+- Human-in-the-loop approval that really pays supplier bills and marks reorders as on order, with the change highlighted on screen
 
 ## Prerequisites
 

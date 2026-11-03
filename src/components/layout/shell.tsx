@@ -42,7 +42,7 @@ const demoSuggestions = [
   },
   {
     title: "Approve Payments",
-    message: "Process payment for all overdue invoices",
+    message: "Approve the supplier payments due this week",
   },
   {
     title: "Reorder Inventory",
@@ -72,7 +72,7 @@ const baseFollowUpSuggestions = [
   },
   {
     title: "Approve Payments",
-    message: "Process payment for all overdue invoices",
+    message: "Approve the supplier payments due this week",
   },
 ];
 
@@ -268,7 +268,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   // Consolidated frontend tools (5 hooks replacing 14)
   useRenderChatVisual(); // Inline chart + cash position card
   useNavigateAndFilter(); // SPA navigation
-  useRequestApproval(); // HITL: invoice payment + inventory reorder
+  useRequestApproval(); // HITL: supplier payment + inventory reorder
   useUpdateDashboard(); // Add/update dashboard widgets (batch)
   useManageDashboard(); // Reset/remove/reorder dashboard
   useSaveDashboard(); // Save/load dashboard configurations

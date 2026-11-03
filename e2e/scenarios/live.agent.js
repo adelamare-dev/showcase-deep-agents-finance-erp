@@ -7,6 +7,8 @@ async (page, h) => {
   const approveButton = () =>
     page.getByTestId("copilot-message-list").getByRole("button", { name: "Approve Payment", exact: true });
 
+  await h.resetDemo();
+
   await h.test("Cash Position shows a research card then the cash card", async () => {
     await h.open("/");
     await page.locator("button", { hasText: /^Cash Position$/ }).click();
@@ -18,9 +20,9 @@ async (page, h) => {
     return { amounts: h.moneyIn(text) };
   });
 
-  await h.test("Overdue payment: approval card, Approve, the graph resumes", async () => {
+  await h.test("Supplier payment: approval card, Approve, the graph resumes", async () => {
     await h.open("/");
-    await h.sendPrompt("Process payment for all overdue invoices");
+    await h.sendPrompt("Approve the supplier payments due this week");
     await h.expectVisible(approveButton(), 90000);
     const messages = page.getByTestId("copilot-assistant-message");
     const countBefore = await messages.count();

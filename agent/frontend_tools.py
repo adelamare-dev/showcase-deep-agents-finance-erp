@@ -9,13 +9,25 @@ HITL tools use copilotkit_interrupt() to pause the graph for user approval.
 """
 
 import json
-from typing import Optional
+import logging
+from typing import Literal, Optional, TypedDict
 
+from langchain_core.callbacks.manager import dispatch_custom_event
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from copilotkit.langgraph import copilotkit_interrupt
 
 from erp_datasets import DATASET_IDS, build_dataset
-from erp_store import get_store
+from erp_store import ErpError, get_store
+
+logger = logging.getLogger(__name__)
+
+# Sent after an approved action changed the books; the web app reloads its data.
+ERP_DATA_CHANGED_EVENT = "erp_data_changed"
+
+
+def _usd(amount: int) -> str:
+    return f"${amount:,}"
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +80,7 @@ def navigate_and_filter(page: str, filter: Optional[str] = None) -> str:
 
     Args:
         page: Page to navigate to — dashboard, invoices, accounts, inventory, or hr.
-        filter: Optional filter. Invoices: paid|pending|overdue|draft. Inventory: in-stock|low-stock|out-of-stock.
+        filter: Optional filter. Client invoices: paid|pending|overdue|draft. Supplier bills: supplier, or supplier-paid|supplier-pending|supplier-overdue. Inventory: in-stock|low-stock|out-of-stock.
     """
     msg = f"Navigated to {page}"
     if filter:
@@ -81,48 +93,99 @@ def navigate_and_filter(page: str, filter: Optional[str] = None) -> str:
 # ---------------------------------------------------------------------------
 
 
+class ReorderLine(TypedDict):
+    sku: str
+    quantity: int
+
+
+def _was_approved(response: object) -> bool:
+    """True only for an explicit `approved: true`; anything unreadable counts as a refusal."""
+    if isinstance(response, str):
+        try:
+            response = json.loads(response)
+        except ValueError:
+            return False
+    return isinstance(response, dict) and response.get("approved") is True
+
+
+def _announce_change(changes: list[dict], config: RunnableConfig) -> None:
+    """Tell the web app the books changed. The change is already applied, so a failed send is only logged."""
+    try:
+        dispatch_custom_event(ERP_DATA_CHANGED_EVENT, {"changes": changes}, config=config)
+    except Exception:
+        logger.warning("could not send %s", ERP_DATA_CHANGED_EVENT, exc_info=True)
+
+
 @tool
 def request_approval(
-    type: str,
-    invoices: Optional[list] = None,
-    totalAmount: Optional[float] = None,
+    type: Literal["supplier_payment", "inventory_reorder"],
+    bill_ids: Optional[list[str]] = None,
+    items: Optional[list[ReorderLine]] = None,
     action: Optional[str] = None,
-    items: Optional[list] = None,
-    estimatedTotal: Optional[float] = None,
-    supplier: Optional[str] = None,
+    *,
+    config: RunnableConfig,
 ) -> str:
-    """Request human approval for a financial action. MANDATORY before processing payments or reorders.
+    """Ask the user to approve a supplier payment or an inventory reorder, and carry it out if approved.
+
+    MANDATORY before paying bills or reordering stock. You pass identifiers only: the
+    system loads the records, computes the total, shows the card and applies the decision.
+    The user approves or rejects the whole batch. Find the bill ids with query_bills first.
 
     Args:
-        type: Approval type — 'invoice_payment' or 'inventory_reorder'.
-        invoices: (invoice_payment only) Invoices to approve. Each has number, client, amount, dueDate.
-        totalAmount: (invoice_payment only) Sum of all invoice amounts.
-        action: (invoice_payment only) Description, e.g. 'Process payment for 3 overdue invoices'.
-        items: (inventory_reorder only) Items to reorder. Each has sku, name, currentQty, reorderQty, unitCost.
-        estimatedTotal: (inventory_reorder only) Total estimated cost of the purchase order.
-        supplier: (inventory_reorder only) Supplier name, if known.
+        type: 'supplier_payment' to pay supplier bills, or 'inventory_reorder' to reorder stock.
+        bill_ids: (supplier_payment only) Ids of the unpaid supplier bills, e.g. 'bill-001'.
+        items: (inventory_reorder only) Items to reorder. Each has sku and quantity.
+        action: Optional one-line description shown on the card.
     """
-    if type == "invoice_payment":
-        answer, _ = copilotkit_interrupt(
-            action="request_approval",
-            args={
-                "type": "invoice_payment",
-                "invoices": invoices,
-                "totalAmount": totalAmount,
-                "action": action,
-            },
-        )
-    else:
-        answer, _ = copilotkit_interrupt(
-            action="request_approval",
-            args={
-                "type": "inventory_reorder",
-                "items": items,
-                "estimatedTotal": estimatedTotal,
-                "supplier": supplier or "",
-            },
-        )
-    return answer
+    store = get_store()
+    try:
+        if type == "supplier_payment":
+            preview = store.preview_bill_payment(bill_ids or [])
+            card = {
+                "type": type,
+                "bills": preview["bills"],
+                "totalAmount": preview["totalAmount"],
+                "action": action or f"Pay {len(preview['bills'])} supplier bill(s)",
+            }
+        else:
+            lines = [dict(line) for line in items or []]
+            preview = store.preview_reorder(lines)
+            card = {
+                "type": type,
+                "items": preview["items"],
+                "estimatedTotal": preview["estimatedTotal"],
+                "supplier": preview["supplier"],
+            }
+    except ErpError as exc:
+        return f"Not sent for approval: {exc}"
+
+    # The graph re-runs this body on resume, so nothing is written before the
+    # interrupt returns.
+    _, response = copilotkit_interrupt(action="request_approval", args=card)
+    if not _was_approved(response):
+        return "Rejected by the user. Nothing was changed."
+
+    try:
+        if type == "supplier_payment":
+            done = store.pay_bills(bill_ids or [])
+            if not done["paidBillIds"]:
+                return "Approved, but these bills were already paid. Nothing more was applied."
+            summary = (
+                f"Approved. Paid {len(done['paidBillIds'])} bill(s) totalling {_usd(done['totalPaid'])}; "
+                "cash and accounts payable each fell by that amount."
+            )
+        else:
+            done = store.reorder(lines)
+            if not done["orderedSkus"]:
+                return "Approved, but these items were already on order. Nothing more was applied."
+            summary = (
+                f"Approved. Placed an order for {len(done['orderedSkus'])} item(s), estimated "
+                f"{_usd(preview['estimatedTotal'])}. Items are marked on order; cash and payables are unchanged."
+            )
+    except ErpError as exc:
+        return f"Approved, but not applied: {exc}"
+    _announce_change(done["changes"], config)
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +207,8 @@ def update_dashboard(widgets: list) -> str:
               * revenue_chart: { showProfit?: bool, showExpenses?: bool }
               * expense_breakdown: { categories?: string[] }
               * transactions: { limit?: int }
-              * invoices: { statuses?: ['pending', 'overdue'] }
+              * invoices: { kind?: 'receivable'|'payable', statuses?: ['pending', 'overdue'] }
+                ('payable' lists the supplier bills we owe; the default lists client invoices.)
               * custom_chart: { dataset: str, title?: str, subtitle?: str,
                   chartType?: 'area'|'bar'|'line', quarters?: int 1-8,
                   growth_pct?: float -50 to 50, metric?: 'revenue'|'profit'|'cash_flow' }.

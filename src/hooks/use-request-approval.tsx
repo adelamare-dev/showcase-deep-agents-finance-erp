@@ -6,17 +6,15 @@ import {
   useRenderTool,
 } from "@copilotkit/react-core/v2";
 import { z } from "zod";
-import { InvoiceApprovalCard } from "@/components/chat/invoice-approval-card";
+import {
+  BillApprovalCard,
+  type BillRow,
+} from "@/components/chat/bill-approval-card";
 import { InventoryReorderCard } from "@/components/chat/inventory-reorder-card";
 
 type ApprovalArgs = {
-  type: "invoice_payment" | "inventory_reorder";
-  invoices?: Array<{
-    number: string;
-    client: string;
-    amount: number;
-    dueDate: string;
-  }>;
+  type: "supplier_payment" | "inventory_reorder";
+  bills?: BillRow[];
   totalAmount?: number;
   action?: string;
   items?: Array<{
@@ -86,47 +84,26 @@ export function useRequestApproval() {
       };
 
       if (args.type === "inventory_reorder") {
-        const formatCurrency = (n: number) =>
-          new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "USD",
-          }).format(n);
-        const items = args.items ?? [];
-        const estimatedTotal = args.estimatedTotal ?? 0;
         return (
           <InventoryReorderCard
             status={ToolCallStatus.Executing}
             args={{
-              items,
-              estimatedTotal,
+              items: args.items ?? [],
+              estimatedTotal: args.estimatedTotal ?? 0,
               supplier: args.supplier,
             }}
-            respond={async (result) => {
-              if (result === undefined || result === null) {
-                await respond({
-                  approved: false,
-                  message: "Reorder skipped by user",
-                });
-              } else {
-                await respond(result);
-              }
-            }}
+            respond={respond}
             result={undefined}
           />
         );
-        void formatCurrency;
       }
 
-      // Default: invoice_payment
-      const invoices = args.invoices ?? [];
-      const totalAmount = args.totalAmount ?? 0;
-      const action = args.action ?? "Process payment";
       return (
-        <InvoiceApprovalCard
-          status={ToolCallStatus.Executing}
-          args={{ invoices, totalAmount, action }}
+        <BillApprovalCard
+          bills={args.bills ?? []}
+          totalAmount={args.totalAmount ?? 0}
+          action={args.action ?? "Pay supplier bills"}
           respond={respond}
-          result={undefined}
         />
       );
     },

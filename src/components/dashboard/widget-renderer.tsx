@@ -17,7 +17,7 @@ import { useErp } from "@/context/erp-context";
 import { formatCurrency } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import type { Transaction, Invoice } from "@/types/erp";
+import type { Transaction, Invoice, Bill } from "@/types/erp";
 import type { DashboardWidget } from "@/types/dashboard";
 
 const COL_SPAN_CLASS: Record<number, string> = {
@@ -135,21 +135,28 @@ function RecentTransactionsSection({ config }: { config: { limit?: number } }) {
 function OutstandingInvoicesSection({
   config,
 }: {
-  config: { statuses?: ("pending" | "overdue")[] };
+  config: {
+    kind?: "receivable" | "payable";
+    statuses?: ("pending" | "overdue")[];
+  };
 }) {
-  const { invoices } = useErp();
+  const { invoices, bills } = useErp();
+  const payable = config.kind === "payable";
   const statuses = config.statuses ?? ["pending", "overdue"];
-  const filtered = invoices.filter((inv) =>
-    statuses.includes(inv.status as "pending" | "overdue"),
-  );
+  const open = (status: string) =>
+    statuses.includes(status as "pending" | "overdue");
+  const filtered = invoices.filter((inv) => open(inv.status));
+  const dueBills = bills.filter((bill) => open(bill.status));
 
   return (
     <Card>
       <CardHeader className="border-b">
         <div className="flex items-center justify-between">
-          <CardTitle>Outstanding Invoices</CardTitle>
+          <CardTitle>
+            {payable ? "Outstanding Bills" : "Outstanding Invoices"}
+          </CardTitle>
           <Link
-            href="/invoices"
+            href={payable ? "/invoices?filter=supplier" : "/invoices"}
             className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
           >
             View all <ArrowRight className="h-3 w-3" />
@@ -157,6 +164,42 @@ function OutstandingInvoicesSection({
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        {payable ? (
+          <DataTable<Bill>
+            keyExtractor={(row) => row.id}
+            columns={[
+              {
+                header: "Bill",
+                accessor: (row) => (
+                  <div>
+                    <p className="font-medium text-foreground">{row.number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {row.supplier}
+                    </p>
+                  </div>
+                ),
+              },
+              {
+                header: "Amount",
+                accessor: (row) => (
+                  <span className="text-foreground">
+                    {formatCurrency(row.amount)}
+                  </span>
+                ),
+              },
+              {
+                header: "Due",
+                accessor: "dueDate",
+                className: "text-muted-foreground",
+              },
+              {
+                header: "Status",
+                accessor: (row) => <StatusBadge status={row.status} />,
+              },
+            ]}
+            data={dueBills}
+          />
+        ) : (
         <DataTable<Invoice>
           keyExtractor={(row) => row.id}
           columns={[
@@ -189,6 +232,7 @@ function OutstandingInvoicesSection({
           ]}
           data={filtered}
         />
+        )}
       </CardContent>
     </Card>
   );

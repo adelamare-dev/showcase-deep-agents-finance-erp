@@ -24,6 +24,13 @@ def snapshot() -> dict:
     return get_store().snapshot()
 
 
+@router.post("/reset")
+def reset() -> dict:
+    """Restore the initial data, dropping every payment and order made since start-up."""
+    get_store().reset()
+    return {"status": "reset"}
+
+
 @router.get("/datasets/{dataset_id}")
 def dataset(
     dataset_id: str,

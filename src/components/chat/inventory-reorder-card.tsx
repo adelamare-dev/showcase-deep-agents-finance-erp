@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Package, Check, SkipForward } from "lucide-react";
 import { ToolCallStatus } from "@copilotkit/react-core/v2";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,13 @@ type Props =
 
 export function InventoryReorderCard(props: Props) {
   const { status, args } = props;
+  // Set on the first click so a second click cannot send another answer.
+  const [answered, setAnswered] = useState(false);
+  const answer = (result: { approved: boolean; message: string }) => {
+    if (answered || props.status !== ToolCallStatus.Executing) return;
+    setAnswered(true);
+    void props.respond(result);
+  };
 
   if (status === ToolCallStatus.InProgress) {
     return (
@@ -65,6 +73,7 @@ export function InventoryReorderCard(props: Props) {
 
   return (
     <div
+      data-testid="reorder-approval-card"
       className={`my-2 animate-in fade-in slide-in-from-bottom-2 rounded-2xl border bg-card p-5 duration-300 ease-out ${isComplete ? "border-border/50 opacity-80" : "border-border"}`}
     >
       {/* Header */}
@@ -98,7 +107,13 @@ export function InventoryReorderCard(props: Props) {
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.sku} className="border-b border-border/30">
+              <tr
+                key={item.sku}
+                data-testid="reorder-approval-row"
+                data-sku={item.sku}
+                data-quantity={item.reorderQty}
+                className="border-b border-border/30"
+              >
                 <td className="px-3 py-2 font-mono text-muted-foreground">
                   {item.sku}
                 </td>
@@ -122,7 +137,11 @@ export function InventoryReorderCard(props: Props) {
           <span className="text-xs font-medium text-muted-foreground">
             Estimated PO Total
           </span>
-          <span className="text-sm font-bold text-foreground">
+          <span
+            data-testid="reorder-approval-total"
+            data-amount={estimatedTotal}
+            className="text-sm font-bold text-foreground"
+          >
             {formatCurrency(estimatedTotal)}
           </span>
         </div>
@@ -146,8 +165,9 @@ export function InventoryReorderCard(props: Props) {
       {status === ToolCallStatus.Executing && (
         <div className="flex gap-2">
           <Button
+            disabled={answered}
             onClick={() =>
-              props.respond({
+              answer({
                 approved: true,
                 message: `PO approved for ${items.length} items, estimated ${formatCurrency(estimatedTotal)}`,
               })
@@ -158,8 +178,9 @@ export function InventoryReorderCard(props: Props) {
           </Button>
           <Button
             variant="secondary"
+            disabled={answered}
             onClick={() =>
-              props.respond({
+              answer({
                 approved: false,
                 message: "Reorder skipped by user",
               })

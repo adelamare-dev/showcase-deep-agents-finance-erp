@@ -47,6 +47,26 @@ async (page, h) => {
     return { invoices: snap.invoices.length, outstanding: open };
   });
 
+  await h.test("Invoices page lists supplier bills apart from client invoices", async () => {
+    const snap = await h.snapshot();
+    await h.visit("/invoices?filter=supplier");
+    const text = await bodyText();
+    for (const bill of snap.bills) {
+      h.assert(text.includes(bill.number), `${bill.number} is listed`);
+    }
+    h.assert(!snap.invoices.some((inv) => text.includes(inv.number)), "no client invoice is listed");
+    const owed = sum(
+      snap.bills.filter((b) => b.status !== "paid"),
+      (b) => b.amount,
+    );
+    h.assert(text.includes(h.formatUsd(owed)), `outstanding ${h.formatUsd(owed)} is shown`);
+    await h.visit("/invoices?filter=supplier-paid");
+    const paidText = await bodyText();
+    const unpaid = snap.bills.filter((b) => b.status !== "paid");
+    h.assert(unpaid.every((b) => !paidText.includes(b.number)), "the paid filter hides unpaid bills");
+    return { bills: snap.bills.length, owed };
+  });
+
   await h.test("Accounts page shows the chart of accounts and the transactions", async () => {
     const snap = await h.snapshot();
     await h.visit("/accounts");

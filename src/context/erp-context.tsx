@@ -5,20 +5,51 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
+import { useAgent } from "@copilotkit/react-core/v2";
 import { Button } from "@/components/ui/button";
 import { fetchSnapshot, type ErpSnapshot } from "@/lib/erp-api";
 
-type ErpContextValue = ErpSnapshot & { refresh: () => Promise<void> };
+// Custom event the agent sends once an approved action has changed the books.
+export const ERP_DATA_CHANGED_EVENT = "erp_data_changed";
+
+// How long a changed figure stays highlighted.
+export const HIGHLIGHT_MS = 3000;
+
+type ErpContextValue = ErpSnapshot & {
+  refresh: () => Promise<void>;
+  // Signed change by KPI label, cleared HIGHLIGHT_MS after the last change.
+  highlights: Record<string, number>;
+};
 
 const ErpContext = createContext<ErpContextValue | null>(null);
+
+// Keeps the well-formed `{metric, delta}` pairs of an event payload.
+function readChanges(value: unknown): Record<string, number> {
+  const raw = (value as { changes?: unknown } | null)?.changes;
+  const out: Record<string, number> = {};
+  if (!Array.isArray(raw)) return out;
+  for (const entry of raw) {
+    const { metric, delta } = (entry ?? {}) as {
+      metric?: unknown;
+      delta?: unknown;
+    };
+    if (typeof metric === "string" && typeof delta === "number" && delta !== 0) {
+      out[metric] = (out[metric] ?? 0) + delta;
+    }
+  }
+  return out;
+}
 
 // Renders its children only once the snapshot is loaded, so no page ever
 // reads a partial dataset.
 export function ErpProvider({ children }: { children: React.ReactNode }) {
   const [snapshot, setSnapshot] = useState<ErpSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [highlights, setHighlights] = useState<Record<string, number>>({});
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bumped by the retry button to run the initial load again.
   const [attempt, setAttempt] = useState(0);
 
@@ -42,6 +73,34 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     setSnapshot(await fetchSnapshot());
   }, []);
+
+  // The agent reports each change to the books; the figures are reloaded first
+  // so the highlight lands on the new values. The reload at the end of every
+  // run covers a lost event. A failed reload keeps the old data on screen.
+  const { agent } = useAgent({ agentId: "finance_erp_agent", updates: [] });
+  useEffect(() => {
+    const subscription = agent.subscribe({
+      onCustomEvent: ({ event }) => {
+        if (event.name !== ERP_DATA_CHANGED_EVENT) return;
+        const changes = readChanges(event.value);
+        void refresh()
+          .then(() => {
+            if (Object.keys(changes).length === 0) return;
+            setHighlights(changes);
+            if (clearTimer.current) clearTimeout(clearTimer.current);
+            clearTimer.current = setTimeout(() => setHighlights({}), HIGHLIGHT_MS);
+          })
+          .catch(() => {});
+      },
+      onRunFinalized: () => {
+        void refresh().catch(() => {});
+      },
+    });
+    return () => {
+      subscription.unsubscribe();
+      if (clearTimer.current) clearTimeout(clearTimer.current);
+    };
+  }, [agent, refresh]);
 
   if (!snapshot) {
     return (
@@ -70,7 +129,7 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ErpContext.Provider value={{ ...snapshot, refresh }}>
+    <ErpContext.Provider value={{ ...snapshot, refresh, highlights }}>
       {children}
     </ErpContext.Provider>
   );

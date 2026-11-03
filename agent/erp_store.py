@@ -20,7 +20,8 @@ from erp_calendar import quarter_label, quarter_of, shift_quarter
 from erp_datasets import FORECAST_QUARTERS, revenue_scenarios
 
 MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-CASH_CODE_PREFIX = "10"
+CASH_CODE_PREFIX = sd.CASH_CODE_PREFIX
+OPERATING_CASH_CODE = "1000"
 
 
 def _usd(amount: int) -> str:
@@ -33,6 +34,26 @@ def _change(current: int, previous: int) -> float:
 
 def _trend(change: float) -> str:
     return "up" if change > 0 else "down" if change < 0 else "flat"
+
+
+class ErpError(ValueError):
+    """A request the books refuse; the message is safe to show to the model."""
+
+
+class UnknownIds(ErpError):
+    pass
+
+
+class AlreadyPaid(ErpError):
+    pass
+
+
+class AlreadyOnOrder(ErpError):
+    pass
+
+
+class InsufficientCash(ErpError):
+    pass
 
 
 class ErpStore:
@@ -171,6 +192,147 @@ class ErpStore:
         with self._lock:
             accounts = self._accounts(self._data)
         return [a for a in accounts if a["code"].startswith(CASH_CODE_PREFIX)]
+
+    # -- mutations -----------------------------------------------------------
+    # Every mutation validates first and writes second, under one lock
+    # acquisition, so a refused request leaves the books untouched.
+
+    def _resolve_bills(self, bill_ids: list[str]) -> list[dict]:
+        """Stored bill records for ids or numbers, deduplicated, in request order."""
+        if not bill_ids:
+            raise ErpError("No bill given.")
+        by_key = {}
+        for bill in self._data["bills"]:
+            by_key[bill["id"].lower()] = bill
+            by_key[bill["number"].lower()] = bill
+        found, unknown = [], []
+        for raw in bill_ids:
+            bill = by_key.get(str(raw).strip().lower())
+            if bill is None:
+                unknown.append(str(raw))
+            elif bill not in found:
+                found.append(bill)
+        if unknown:
+            raise UnknownIds(f"Unknown bill(s): {', '.join(unknown)}.")
+        return found
+
+    @staticmethod
+    def _bill_row(bill: dict) -> dict:
+        return {key: bill[key] for key in ("id", "number", "supplier", "amount", "dueDate")}
+
+    def preview_bill_payment(self, bill_ids: list[str]) -> dict:
+        """The bills a payment would settle and their total. Changes nothing.
+
+        Raises `UnknownIds` for an id that matches no bill and `AlreadyPaid` when
+        any bill is settled already.
+        """
+        with self._lock:
+            bills = self._resolve_bills(bill_ids)
+            paid = [b["number"] for b in bills if b["status"] == "paid"]
+            if paid:
+                raise AlreadyPaid(f"Already paid: {', '.join(paid)}.")
+            rows = [self._bill_row(b) for b in bills]
+        return {"bills": rows, "totalAmount": sum(r["amount"] for r in rows)}
+
+    def pay_bills(self, bill_ids: list[str]) -> dict:
+        """Pay the unpaid bills among `bill_ids` from the operating account.
+
+        Idempotent: a bill that is already paid is skipped and not counted, so a
+        repeated call pays nothing more. Cash and accounts payable both fall by
+        `totalPaid`; equity does not move. Returns the ids actually paid, the
+        total, and the signed `changes` of the headline figures they moved.
+        """
+        with self._lock:
+            bills = self._resolve_bills(bill_ids)
+            due = [b for b in bills if b["status"] != "paid"]
+            total = sum(b["amount"] for b in due)
+            operating = next(a for a in self._data["accounts"] if a["code"] == OPERATING_CASH_CODE)
+            if total > operating["balance"]:
+                raise InsufficientCash(
+                    f"The operating account holds {_usd(operating['balance'])}, "
+                    f"{_usd(total)} are due."
+                )
+            today = self._as_of.isoformat()
+            for bill in due:
+                bill["status"] = "paid"
+                self._data["transactions"].insert(
+                    0,
+                    {
+                        "id": f"txn-{len(self._data['transactions']) + 1:03d}",
+                        "date": today,
+                        "description": f"Supplier payment, {bill['supplier']} ({bill['number']})",
+                        "amount": bill["amount"],
+                        "type": "debit",
+                        "category": "Accounts Payable",
+                        "accountCode": "2000",
+                        "status": "completed",
+                    },
+                )
+            operating["balance"] -= total
+        changes = [{"metric": "Cash", "delta": -total}, {"metric": "Accounts Payable", "delta": -total}]
+        return {
+            "paidBillIds": [b["id"] for b in due],
+            "totalPaid": total,
+            "changes": changes if total else [],
+        }
+
+    def _resolve_items(self, items: list[dict]) -> list[tuple[dict, int]]:
+        if not items:
+            raise ErpError("No item given.")
+        by_sku = {i["sku"].lower(): i for i in self._data["inventoryItems"]}
+        lines, unknown = {}, []
+        for entry in items:
+            sku = str(entry.get("sku", "")).strip()
+            quantity = entry.get("quantity")
+            if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+                raise ErpError(f"Quantity for {sku or 'an item'} must be a whole number above 0.")
+            item = by_sku.get(sku.lower())
+            if item is None:
+                unknown.append(sku)
+            else:
+                lines[item["sku"]] = (item, quantity)
+        if unknown:
+            raise UnknownIds(f"Unknown SKU(s): {', '.join(unknown)}.")
+        return list(lines.values())
+
+    def preview_reorder(self, items: list[dict]) -> dict:
+        """The purchase order a reorder of `[{sku, quantity}]` would place. Changes nothing.
+
+        Raises `UnknownIds` for an unknown SKU and `AlreadyOnOrder` for an item
+        that already has an order open.
+        """
+        with self._lock:
+            lines = self._resolve_items(items)
+            open_orders = [item["sku"] for item, _ in lines if item["onOrder"]]
+            if open_orders:
+                raise AlreadyOnOrder(f"Already on order: {', '.join(open_orders)}.")
+            rows = [
+                {
+                    "sku": item["sku"],
+                    "name": item["name"],
+                    "currentQty": item["quantity"],
+                    "reorderQty": quantity,
+                    "unitCost": item["unitCost"],
+                }
+                for item, quantity in lines
+            ]
+        # The seed holds no supplier per item, so none is claimed.
+        return {"items": rows, "estimatedTotal": sum(r["reorderQty"] * r["unitCost"] for r in rows), "supplier": ""}
+
+    def reorder(self, items: list[dict]) -> dict:
+        """Mark the items as on order. Idempotent: an item already on order is left as it is.
+
+        A purchase order is not a debt yet: no account moves, and the stock only
+        grows when goods arrive.
+        """
+        with self._lock:
+            lines = self._resolve_items(items)
+            placed = []
+            for item, quantity in lines:
+                if not item["onOrder"]:
+                    item["onOrder"] = quantity
+                    placed.append(item["sku"])
+        return {"orderedSkus": placed, "changes": []}
 
     def snapshot(self) -> dict:
         """Every dataset in the camelCase shape of `src/types/erp.ts`, plus `totals`."""

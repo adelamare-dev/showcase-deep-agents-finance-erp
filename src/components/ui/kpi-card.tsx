@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
+import { useErp } from "@/context/erp-context";
+import { formatCurrency } from "@/lib/utils";
 import type { KPI } from "@/types/erp";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -28,10 +30,17 @@ export function KPICard({ kpi }: { kpi: KPI }) {
   const Icon = iconMap[kpi.icon] || DollarSign;
   const isPositive = kpi.trend === "up";
   const isFlat = kpi.trend === "flat";
+  const delta = useErp().highlights[kpi.label];
+  const highlighted = delta !== undefined;
 
   return (
     <Card
-      className="group transition-all duration-300 hover:shadow-lg"
+      data-testid={`kpi-${kpi.label}`}
+      className={cn(
+        "group transition-all duration-300 hover:shadow-lg",
+        // The ring stays under reduced motion; only the pulse is dropped.
+        highlighted && "ring-2 ring-primary motion-safe:animate-pulse",
+      )}
       size="sm"
     >
       <CardContent>
@@ -65,6 +74,18 @@ export function KPICard({ kpi }: { kpi: KPI }) {
             {kpi.value}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">{kpi.label}</p>
+          {highlighted && (
+            <p
+              data-testid={`kpi-delta-${kpi.label}`}
+              className={cn(
+                "mt-1 text-sm font-semibold",
+                delta < 0 ? "text-red-600" : "text-emerald-600",
+              )}
+            >
+              {delta < 0 ? "−" : "+"}
+              {formatCurrency(Math.abs(delta))}
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

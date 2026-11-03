@@ -43,7 +43,11 @@ export type RecentTransactionsWidget = BaseWidget & {
 
 export type OutstandingInvoicesWidget = BaseWidget & {
   type: "outstanding-invoices";
-  config: { statuses?: ("pending" | "overdue")[] };
+  // `receivable` lists client invoices (the default), `payable` supplier bills.
+  config: {
+    kind?: "receivable" | "payable";
+    statuses?: ("pending" | "overdue")[];
+  };
 };
 
 // Filled from the dataset catalog at render time: the config names a dataset

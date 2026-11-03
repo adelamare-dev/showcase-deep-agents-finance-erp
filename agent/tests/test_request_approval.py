@@ -1,0 +1,197 @@
+from __future__ import annotations
+
+import asyncio
+import json
+
+import pytest
+from langchain_core.runnables import RunnableLambda
+
+import erp_store
+import frontend_tools
+from frontend_tools import ERP_DATA_CHANGED_EVENT, request_approval
+
+
+@pytest.fixture
+def shared_store(store, monkeypatch):
+    """Point the store the tool reads at the parametrized one."""
+    monkeypatch.setattr(erp_store, "_store", store)
+    return store
+
+
+@pytest.fixture
+def interrupt_spy(monkeypatch):
+    """Stand in for copilotkit_interrupt: records the card and answers with `.answer`."""
+    class Spy:
+        calls: list = []
+        answer: object = {"approved": True, "message": "ok"}
+
+    spy = Spy()
+    spy.calls = []
+
+    def fake(message=None, action=None, args=None):
+        spy.calls.append({"action": action, "args": args})
+        return json.dumps(spy.answer), spy.answer
+
+    monkeypatch.setattr(frontend_tools, "copilotkit_interrupt", fake)
+    return spy
+
+
+@pytest.fixture
+def custom_events(monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        frontend_tools,
+        "dispatch_custom_event",
+        lambda name, data, config=None: sent.append((name, data)),
+    )
+    return sent
+
+
+def unpaid(store, count=2):
+    return [b for b in store.snapshot()["bills"] if b["status"] != "paid"][:count]
+
+
+def call(**args):
+    return request_approval.invoke(args)
+
+
+def test_card_total_comes_from_the_store(shared_store, interrupt_spy, custom_events):
+    bills = unpaid(shared_store, 3)
+    call(type="supplier_payment", bill_ids=[b["id"] for b in bills])
+    (sent,) = interrupt_spy.calls
+    assert sent["action"] == "request_approval"
+    assert sent["args"]["type"] == "supplier_payment"
+    assert sent["args"]["totalAmount"] == sum(b["amount"] for b in bills)
+    assert [row["id"] for row in sent["args"]["bills"]] == [b["id"] for b in bills]
+    assert all("supplier" in row and "dueDate" in row for row in sent["args"]["bills"])
+
+
+def test_the_model_cannot_pass_figures(shared_store):
+    assert set(request_approval.args) == {"type", "bill_ids", "items", "action"}
+
+
+def test_rejection_changes_nothing(shared_store, interrupt_spy, custom_events):
+    interrupt_spy.answer = {"approved": False, "message": "no"}
+    before = shared_store.snapshot()
+    result = call(type="supplier_payment", bill_ids=[b["id"] for b in unpaid(shared_store)])
+    assert "Rejected" in result
+    assert shared_store.snapshot() == before
+    assert custom_events == []
+
+
+@pytest.mark.parametrize("answer", ["not json", "[]", {"approved": "yes"}, {"message": "ok"}, None])
+def test_an_unclear_answer_is_a_refusal(shared_store, interrupt_spy, custom_events, answer):
+    interrupt_spy.answer = answer
+    before = shared_store.snapshot()
+    assert "Rejected" in call(type="supplier_payment", bill_ids=[b["id"] for b in unpaid(shared_store)])
+    assert shared_store.snapshot() == before
+
+
+@pytest.mark.parametrize("encoded", [False, True])
+def test_approval_pays_and_emits_changes(shared_store, interrupt_spy, custom_events, encoded):
+    bills = unpaid(shared_store)
+    total = sum(b["amount"] for b in bills)
+    before = shared_store.totals()
+    interrupt_spy.answer = json.dumps({"approved": True}) if encoded else {"approved": True}
+    result = call(type="supplier_payment", bill_ids=[b["id"] for b in bills])
+    after = shared_store.totals()
+    assert before["cash"] - after["cash"] == total
+    assert before["accountsPayable"] - after["accountsPayable"] == total
+    assert f"${total:,}" in result
+    assert custom_events == [
+        (
+            ERP_DATA_CHANGED_EVENT,
+            {"changes": [{"metric": "Cash", "delta": -total}, {"metric": "Accounts Payable", "delta": -total}]},
+        )
+    ]
+
+
+def test_unknown_bill_returns_an_error_to_the_model_without_interrupt(shared_store, interrupt_spy, custom_events):
+    result = call(type="supplier_payment", bill_ids=["bill-999"])
+    assert "bill-999" in result and result.startswith("Not sent for approval")
+    assert interrupt_spy.calls == []
+    assert custom_events == []
+
+
+def test_paid_bill_returns_an_error_to_the_model_without_interrupt(shared_store, interrupt_spy):
+    paid = next(b for b in shared_store.snapshot()["bills"] if b["status"] == "paid")
+    result = call(type="supplier_payment", bill_ids=[paid["id"]])
+    assert paid["number"] in result and "Already paid" in result
+    assert interrupt_spy.calls == []
+
+
+def test_no_bill_returns_an_error_to_the_model(shared_store, interrupt_spy):
+    assert call(type="supplier_payment").startswith("Not sent for approval")
+    assert call(type="inventory_reorder").startswith("Not sent for approval")
+    assert interrupt_spy.calls == []
+
+
+def test_reexecution_after_resume_does_not_pay_twice(shared_store, interrupt_spy, custom_events):
+    bills = unpaid(shared_store)
+    ids = [b["id"] for b in bills]
+    call(type="supplier_payment", bill_ids=ids)
+    after_first = shared_store.totals()
+    # The graph runs the tool body again; the bills are settled, so it stops at the preview.
+    again = call(type="supplier_payment", bill_ids=ids)
+    assert "Already paid" in again
+    assert shared_store.totals() == after_first
+    assert len(custom_events) == 1
+
+
+def test_a_resume_that_finds_the_bills_paid_in_between_applies_nothing(
+    shared_store, monkeypatch, custom_events
+):
+    ids = [b["id"] for b in unpaid(shared_store)]
+
+    def answer_after_a_concurrent_payment(message=None, action=None, args=None):
+        shared_store.pay_bills(ids)
+        return "{}", {"approved": True}
+
+    monkeypatch.setattr(frontend_tools, "copilotkit_interrupt", answer_after_a_concurrent_payment)
+    result = call(type="supplier_payment", bill_ids=ids)
+    assert "already paid" in result
+    assert custom_events == []
+
+
+def test_reorder_marks_items_on_order_and_emits(shared_store, interrupt_spy, custom_events):
+    item = next(i for i in shared_store.snapshot()["inventoryItems"] if i["status"] != "in-stock")
+    before = shared_store.totals()
+    call(type="inventory_reorder", items=[{"sku": item["sku"], "quantity": 5}])
+    (sent,) = interrupt_spy.calls
+    assert sent["args"]["estimatedTotal"] == 5 * item["unitCost"]
+    assert sent["args"]["items"][0]["currentQty"] == item["quantity"]
+    marked = next(i for i in shared_store.snapshot()["inventoryItems"] if i["sku"] == item["sku"])
+    assert marked["onOrder"] == 5
+    assert shared_store.totals() == before
+    assert custom_events == [(ERP_DATA_CHANGED_EVENT, {"changes": []})]
+
+
+def test_reorder_rejection_changes_nothing(shared_store, interrupt_spy, custom_events):
+    interrupt_spy.answer = {"approved": False}
+    item = shared_store.snapshot()["inventoryItems"][0]
+    before = shared_store.snapshot()
+    call(type="inventory_reorder", items=[{"sku": item["sku"], "quantity": 5}])
+    assert shared_store.snapshot() == before
+
+
+def test_unknown_sku_returns_an_error_to_the_model(shared_store, interrupt_spy):
+    result = call(type="inventory_reorder", items=[{"sku": "NOPE-1", "quantity": 5}])
+    assert "NOPE-1" in result and interrupt_spy.calls == []
+
+
+def test_the_event_reaches_the_event_stream(shared_store, interrupt_spy):
+    """Through a real run, the change arrives as a custom event named erp_data_changed."""
+    ids = [b["id"] for b in unpaid(shared_store)]
+    wrapper = RunnableLambda(
+        lambda _, config: request_approval.invoke({"type": "supplier_payment", "bill_ids": ids}, config)
+    )
+
+    async def collect():
+        return [e async for e in wrapper.astream_events("go", version="v2")]
+
+    events = [
+        e for e in asyncio.run(collect())
+        if e["event"] == "on_custom_event" and e["name"] == ERP_DATA_CHANGED_EVENT
+    ]
+    assert len(events) == 1
+    assert {c["metric"] for c in events[0]["data"]["changes"]} == {"Cash", "Accounts Payable"}

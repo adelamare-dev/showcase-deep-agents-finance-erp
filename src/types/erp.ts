@@ -57,6 +57,8 @@ export interface InventoryItem {
   reorderLevel: number;
   unitCost: number;
   location: string;
+  // Units on an open purchase order; stock only grows when the goods arrive.
+  onOrder: number;
   status: "in-stock" | "low-stock" | "out-of-stock";
 }
 

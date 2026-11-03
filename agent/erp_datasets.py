@@ -17,6 +17,7 @@ from datetime import date
 from typing import Callable
 
 from erp_calendar import quarter_label
+from erp_seed import CASH_CODE_PREFIX
 
 MIN_QUARTERS = 1
 MAX_QUARTERS = 8
@@ -374,7 +375,13 @@ def _chart(title: str, chart_type: str, labels: list[str], columns: list[tuple[s
 
 
 def _cash_position(r: _Request) -> dict:
-    accounts = [{"name": a["name"], "balance": a["balance"]} for a in r.store.cash_accounts()]
+    # Accounts and totals come from the same snapshot, so they cannot diverge
+    # when the store changes between two reads.
+    accounts = [
+        {"name": a["name"], "balance": a["balance"]}
+        for a in r.snap["accounts"]
+        if a["code"].startswith(CASH_CODE_PREFIX)
+    ]
     totals = r.snap["totals"]
     return {
         "title": "Cash Position Summary",

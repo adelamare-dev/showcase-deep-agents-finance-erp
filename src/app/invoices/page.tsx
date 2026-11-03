@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useErp } from "@/context/erp-context";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
-import type { Invoice } from "@/types/erp";
+import type { Bill, Invoice } from "@/types/erp";
 
 export default function InvoicesPage() {
   return (
@@ -23,30 +23,55 @@ export default function InvoicesPage() {
 }
 
 function InvoicesContent() {
-  const { invoices } = useErp();
+  const { invoices, bills } = useErp();
   const searchParams = useSearchParams();
   const activeFilter = searchParams.get("filter") || "all";
 
+  // `?filter=supplier` and `?filter=supplier-<status>` list the bills we owe;
+  // every other value lists client invoices, as before.
+  const supplierView = activeFilter.startsWith("supplier");
+  const status = supplierView
+    ? activeFilter.replace(/^supplier-?/, "") || "all"
+    : activeFilter;
+  const statuses = supplierView
+    ? ["all", "paid", "pending", "overdue"]
+    : ["all", "paid", "pending", "overdue", "draft"];
+  const hrefFor = (f: string) =>
+    supplierView
+      ? f === "all"
+        ? "/invoices?filter=supplier"
+        : `/invoices?filter=supplier-${f}`
+      : f === "all"
+        ? "/invoices"
+        : `/invoices?filter=${f}`;
+
   const filtered =
-    activeFilter === "all"
-      ? invoices
-      : invoices.filter((inv) => inv.status === activeFilter);
+    status === "all" ? invoices : invoices.filter((inv) => inv.status === status);
+  const filteredBills =
+    status === "all" ? bills : bills.filter((bill) => bill.status === status);
 
-  const totalOutstanding = invoices
-    .filter((inv) => inv.status === "pending" || inv.status === "overdue")
-    .reduce((sum, inv) => sum + inv.amount, 0);
-
-  const totalPaid = invoices
-    .filter((inv) => inv.status === "paid")
-    .reduce((sum, inv) => sum + inv.amount, 0);
-
-  const overdueCount = invoices.filter(
-    (inv) => inv.status === "overdue",
-  ).length;
+  const records: { amount: number; status: string }[] = supplierView
+    ? bills
+    : invoices;
+  const totalOutstanding = records
+    .filter((r) => r.status === "pending" || r.status === "overdue")
+    .reduce((sum, r) => sum + r.amount, 0);
+  const totalPaid = records
+    .filter((r) => r.status === "paid")
+    .reduce((sum, r) => sum + r.amount, 0);
+  const overdueCount = records.filter((r) => r.status === "overdue").length;
+  const noun = supplierView ? "bill" : "invoice";
 
   return (
     <Shell>
-      <Header title="Invoices" subtitle="Manage billing and payments" />
+      <Header
+        title="Invoices"
+        subtitle={
+          supplierView
+            ? "Supplier bills and payments"
+            : "Manage billing and payments"
+        }
+      />
 
       <div className="space-y-6 p-8">
         {/* Summary Cards */}
@@ -64,7 +89,7 @@ function InvoicesContent() {
           <Card size="sm">
             <CardContent>
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Collected YTD
+                {supplierView ? "Paid YTD" : "Collected YTD"}
               </p>
               <p className="mt-2 text-2xl font-bold text-emerald-600">
                 {formatCurrency(totalPaid)}
@@ -77,7 +102,7 @@ function InvoicesContent() {
                 Overdue
               </p>
               <p className="mt-2 text-2xl font-bold text-red-600">
-                {overdueCount} invoice{overdueCount !== 1 && "s"}
+                {overdueCount} {noun}{overdueCount !== 1 && "s"}
               </p>
             </CardContent>
           </Card>
@@ -86,13 +111,36 @@ function InvoicesContent() {
         {/* Actions Bar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {["all", "paid", "pending", "overdue", "draft"].map((f) => (
+            <Link
+              href="/invoices"
+              className={cn(
+                "rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors",
+                !supplierView
+                  ? "border-foreground/20 bg-foreground text-background"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Clients
+            </Link>
+            <Link
+              href="/invoices?filter=supplier"
+              className={cn(
+                "rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors",
+                supplierView
+                  ? "border-foreground/20 bg-foreground text-background"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Suppliers
+            </Link>
+            <span className="mx-1 h-5 w-px bg-border" />
+            {statuses.map((f) => (
               <Link
                 key={f}
-                href={f === "all" ? "/invoices" : `/invoices?filter=${f}`}
+                href={hrefFor(f)}
                 className={cn(
                   "rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors",
-                  activeFilter === f
+                  status === f
                     ? "border-primary/30 bg-primary/10 text-primary"
                     : "border-border bg-card text-muted-foreground hover:border-border hover:text-foreground",
                 )}
@@ -101,15 +149,58 @@ function InvoicesContent() {
               </Link>
             ))}
           </div>
-          <Button>
-            <Plus className="h-4 w-4" />
-            New Invoice
-          </Button>
+          {!supplierView && (
+            <Button>
+              <Plus className="h-4 w-4" />
+              New Invoice
+            </Button>
+          )}
         </div>
 
         {/* Invoice Table */}
         <Card className="p-0">
           <CardContent className="p-0">
+            {supplierView ? (
+              <DataTable<Bill>
+                keyExtractor={(row) => row.id}
+                columns={[
+                  {
+                    header: "Bill",
+                    accessor: (row) => (
+                      <p className="font-medium text-foreground">{row.number}</p>
+                    ),
+                  },
+                  {
+                    header: "Supplier",
+                    accessor: "supplier",
+                    className: "text-foreground",
+                  },
+                  {
+                    header: "Amount",
+                    accessor: (row) => (
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(row.amount)}
+                      </span>
+                    ),
+                  },
+                  {
+                    header: "Issued",
+                    accessor: "issuedDate",
+                    className: "text-muted-foreground",
+                  },
+                  {
+                    header: "Due Date",
+                    accessor: "dueDate",
+                    className: "text-muted-foreground",
+                  },
+                  {
+                    header: "Status",
+                    accessor: (row) => <StatusBadge status={row.status} />,
+                  },
+                ]}
+                data={filteredBills}
+              />
+            ) : (
             <DataTable<Invoice>
               keyExtractor={(row) => row.id}
               columns={[
@@ -161,6 +252,7 @@ function InvoicesContent() {
               ]}
               data={filtered}
             />
+            )}
           </CardContent>
         </Card>
       </div>

@@ -74,6 +74,13 @@
     [...text.matchAll(/\$\s?(\d[\d,]*(?:\.\d+)?)/g)].map((m) => Number(m[1].replace(/,/g, "")));
   const formatUsd = (n) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
+  // Restores the seeded data on the agent, then reloads the app on it.
+  const resetDemo = async () => {
+    const res = await page.request.post(ERP_URL + "/api/erp/reset");
+    assert(res.ok(), "POST " + ERP_URL + "/api/erp/reset answered " + res.status());
+    await visit("/");
+  };
+
   const test = async (name, fn) => {
     const started = Date.now();
     try {
@@ -96,7 +103,7 @@
   const h = {
     WEB_URL, ERP_URL, SNAPSHOT_URL,
     assert, assertEqual, expectVisible,
-    open, visit, sendPrompt, waitForRunEnd, chatText, snapshot,
+    open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
     moneyIn, formatUsd, test, run,
   };
   return h;
