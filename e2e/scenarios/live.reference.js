@@ -4,9 +4,12 @@
 // that total, books balanced), then a follow-up question that sees the new
 // state. Every dollar amount in the chat must belong to the money fields
 // computed for the pass: the store's totals, KPIs, aging buckets, bill amounts
-// and quarterly cash flow, plus what the dataset catalog drew during the run.
-// It is checked before the approval and again after it, when the chat cards
-// have refreshed. Needs `pnpm demo` with a real MISTRAL_API_KEY in agent/.env.
+// and quarterly cash flow, plus the money values the dataset catalog drew during
+// the run (chart values and cash position amounts, not counts or years). A
+// rounded amount ("$58K", "$1.2M") must equal one of those fields rounded the
+// same way. The check runs before the approval and again after it, when the chat
+// cards have refreshed; in the follow-up answer the values the approval changed
+// (cash, payables) must be the new ones, never the old ones. Needs `pnpm demo` with a real MISTRAL_API_KEY in agent/.env.
 //
 // The result carries the data the runner records per pass: the dashboard
 // segment seconds, the widgets chosen and the notices seen. Tokens and 429
@@ -20,19 +23,23 @@ async (page, h) => {
   const sum = (rows, pick) => rows.reduce((total, row) => total + pick(row), 0);
   const leaves = (v) => (typeof v === "number" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(leaves) : []);
 
-  // Dollar amounts as written in a text, with the rounding their wording implies:
-  // "$1,245,000" is exact, "$1.2M" is 1.2 million give or take 50 thousand.
+  // Dollar amounts as written in a text. A scaled amount ("$1.2M", "$58K",
+  // "$3 thousand") is a rounding: it matches a field whose value, rounded to the
+  // same number of decimals at the same scale, gives the written number.
   const SCALE = { k: 1e3, thousand: 1e3, m: 1e6, million: 1e6, b: 1e9, billion: 1e9 };
   const amountsIn = (text) =>
     [...text.matchAll(/\$\s?(\d[\d,]*)(?:\.(\d+))?\s?(thousand|million|billion|[KMBkmb]\b)?/g)].map((m) => {
       const scale = m[3] ? SCALE[m[3].toLowerCase()] : 1;
-      const decimals = m[2] ? m[2].length : 0;
-      const value = Number(m[1].replace(/,/g, "") + (m[2] ? "." + m[2] : "")) * scale;
-      return { text: m[0].trim(), value, tolerance: m[3] ? 0.5 * Math.pow(10, -decimals) * scale : 0.005 };
+      const written = Number(m[1].replace(/,/g, "") + (m[2] ? "." + m[2] : ""));
+      return { text: m[0].trim(), value: written * scale, written, scale, decimals: m[2] ? m[2].length : 0, rounded: Boolean(m[3]) };
     });
+  const matches = (a, v) =>
+    a.rounded
+      ? Math.abs(Math.round((v / a.scale) * 10 ** a.decimals) / 10 ** a.decimals - a.written) < 1e-9
+      : Math.abs(v - a.value) <= 0.005;
 
   // The money fields of this pass, read from the store now.
-  const moneyFields = async (snap, catalogNumbers) => {
+  const moneyFields = async (snap, catalogMoney) => {
     const cashPosition = await (await page.request.get(h.ERP_URL + "/api/erp/datasets/cash_position")).json();
     const ar = { ...snap.arAging };
     delete ar.collectionRate;
@@ -43,11 +50,19 @@ async (page, h) => {
       ...snap.bills.map((b) => b.amount),
       ...leaves(snap.cashFlowData),
       ...leaves(cashPosition),
-      ...catalogNumbers,
+      ...catalogMoney,
     ].map(Math.abs);
   };
-  const strangers = (text, fields) =>
-    amountsIn(text).filter((a) => !fields.some((v) => Math.abs(v - a.value) <= a.tolerance)).map((a) => a.text);
+  const strangers = (text, fields) => amountsIn(text).filter((a) => !fields.some((v) => matches(a, v))).map((a) => a.text);
+
+  // Supplier bills due, as the prompt defines them for a payment ask: unpaid
+  // bills, the ones due soonest. The card must not skip an unpaid bill that is
+  // due earlier than one it lists.
+  const dueSoonest = (bills, ids) => {
+    const unpaid = bills.filter((b) => b.status !== "paid");
+    const latest = unpaid.filter((b) => ids.includes(b.id)).map((b) => b.dueDate).sort().pop();
+    return unpaid.filter((b) => !ids.includes(b.id) && b.dueDate < latest).map((b) => b.number);
+  };
 
   // Subagent cards on screen: title, completed or not, and step labels.
   const readCards = () =>
@@ -109,14 +124,26 @@ async (page, h) => {
       const cardTotal = Number(await byId("bill-approval-total").getAttribute("data-amount"));
       const byBill = Object.fromEntries(before.bills.map((b) => [b.id, b]));
       h.assert(ids.length > 0, "the card lists bills");
-      h.assert(ids.every((id) => byBill[id] && byBill[id].status !== "paid"), "every listed bill is unpaid in the store");
+      h.assert(ids.every((id) => byBill[id] && byBill[id].status !== "paid"), "every listed bill is an unpaid supplier bill in the store");
+      h.assertEqual(dueSoonest(before.bills, ids), [], "unpaid supplier bills due earlier than a listed bill, left off the card");
       h.assertEqual(cardTotal, sum(ids, (id) => byBill[id].amount), "card total = sum of the listed bills");
       h.assert(cardTotal <= before.totals.cash, "the account can cover the card total");
 
-      const fieldsBefore = await moneyFields(before, seg.catalogNumbers);
+      const fieldsBefore = await moneyFields(before, seg.catalogMoney);
       const foreign = strangers(await h.chatText(), [...fieldsBefore, cardTotal]);
       h.assertEqual(foreign, [], "chat amounts before the approval that are not money fields of this pass");
 
+      // The Cash delta stays up about 3 s: record when it appears and goes.
+      await page.evaluate(() => {
+        const mark = (window.__cashDelta = { appeared: null, gone: null });
+        const look = () => {
+          const there = Boolean(document.querySelector('[data-testid="kpi-delta-Cash"]'));
+          if (there && mark.appeared === null) mark.appeared = performance.now();
+          if (!there && mark.appeared !== null && mark.gone === null) mark.gone = performance.now();
+        };
+        new MutationObserver(look).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+        look();
+      });
       await inChat("Approve Payment").click();
       await h.expectVisible(byId("kpi-delta-Cash"), 60000);
       const cashDelta = (await byId("kpi-delta-Cash").first().innerText()).trim();
@@ -136,9 +163,13 @@ async (page, h) => {
       h.assertEqual(untouched.map((b) => afterBill[b.id].status), untouched.map((b) => b.status), "other bills unchanged");
       data.approval = { ids, cardTotal, cashDelta, payablesDelta, cash: [before.totals.cash, after.totals.cash], payables: [before.totals.accountsPayable, after.totals.accountsPayable] };
 
-      const fieldsAfter = [...fieldsBefore, ...(await moneyFields(after, seg.catalogNumbers)), cardTotal];
+      const storeAfter = await moneyFields(after, []);
+      const fieldsAfter = [...fieldsBefore, ...storeAfter, ...(await moneyFields(after, seg.catalogMoney)), cardTotal];
       h.assertEqual(strangers(await h.chatText(), fieldsAfter), [], "chat amounts after the approval that are not money fields of this pass");
-      await byId("kpi-delta-Cash").first().waitFor({ state: "detached", timeout: 10000 });
+      await page.waitForFunction(() => window.__cashDelta.gone !== null, null, { timeout: 10000 });
+      const shownMs = await page.evaluate(() => window.__cashDelta.gone - window.__cashDelta.appeared);
+      data.approval.deltaMs = Math.round(shownMs);
+      h.assert(shownMs >= 2000 && shownMs <= 5000, `the Cash delta stayed ${Math.round(shownMs)} ms, expected about 3000 ms (2000 to 5000)`);
       h.assert((await byId("kpi-Cash").first().innerText()).includes(after.kpis.find((k) => k.label === "Cash").value), "the Cash KPI shows the new value");
 
       // 3. A follow-up that sees the new state.
@@ -151,9 +182,20 @@ async (page, h) => {
       const chatNow = await h.chatText();
       const lastAnswer = (await byId("copilot-assistant-message").last().innerText()).trim();
       const stated = amountsIn(lastAnswer + "\n" + chatNow.slice(chatNow.lastIndexOf(FOLLOW_UP)));
-      const says = (v) => stated.some((a) => Math.abs(a.value - v) <= a.tolerance);
+      const says = (v) => stated.some((a) => matches(a, v));
       h.assert(says(after.totals.cash), "the follow-up shows the new cash " + h.formatUsd(after.totals.cash) + ": " + lastAnswer);
       h.assert(says(after.totals.accountsPayable), "the follow-up shows the new payables " + h.formatUsd(after.totals.accountsPayable) + ": " + lastAnswer);
+      // What the approval changed must not be stated at its old value: cash,
+      // payables and the totals of the statuses the paid bills came from.
+      const statusTotal = (snap, status) => sum(snap.bills.filter((b) => b.status === status), (b) => b.amount);
+      const paidStatuses = [...new Set(ids.map((id) => byBill[id].status))];
+      const stale = [
+        before.totals.cash,
+        before.totals.accountsPayable,
+        sum(before.bills.filter((b) => b.status !== "paid"), (b) => b.amount),
+        ...paidStatuses.map((status) => statusTotal(before, status)),
+      ].filter((v) => !storeAfter.includes(Math.abs(v)));
+      h.assertEqual(stated.filter((a) => stale.some((v) => matches(a, v))).map((a) => a.text), [], "the follow-up states a value the approval changed at its old amount");
       h.assertEqual(strangers(chatNow, fieldsAfter), [], "chat amounts after the follow-up that are not money fields of this pass");
       data.followUp = { answer: lastAnswer.slice(0, 400) };
 

@@ -186,7 +186,7 @@
       }
     };
     target.on("response", onResponse);
-    const result = { complete: false, seconds: null, runSeconds: null, missing: [], mismatches: [], compared: [], widgets: [], notices: [], catalogNumbers: [] };
+    const result = { complete: false, seconds: null, runSeconds: null, missing: [], mismatches: [], compared: [], widgets: [], notices: [], catalogMoney: [] };
     try {
       const hero = target.locator("[data-testid='copilot-sidebar'] button", { hasText: /^Cash Flow Dashboard$/ });
       await expectVisible(hero, 15000);
@@ -216,10 +216,19 @@
       const { missing, shown: finalShown, found } = classifyDashboard(scan);
       result.missing = missing;
       result.complete = !missing.length;
-      // Every number the catalog drew during the run, for callers that check
-      // the amounts the model quotes afterwards.
-      const leaves = (v) => (typeof v === "number" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(leaves) : []);
-      result.catalogNumbers = [...new Set(catalog.flatMap((r) => leaves(r.body)))];
+      // The money values the catalog drew during the run, for callers that check
+      // the amounts the model quotes afterwards: the chart values of a currency
+      // chart and the cash position amounts. Counts, years and shares are left out.
+      const moneyOf = (body) => {
+        if (!body) return [];
+        const values = Array.isArray(body.data) && body.formatValues === "currency"
+          ? body.data.flatMap((row) => Object.entries(row).filter(([key]) => /^value\d*$/.test(key)).map(([, v]) => v))
+          : Array.isArray(body.accounts)
+            ? [body.totalCash, body.totalLiabilities, body.netPosition, ...body.accounts.map((a) => a.balance)]
+            : [];
+        return values.filter((v) => typeof v === "number");
+      };
+      result.catalogMoney = [...new Set(catalog.flatMap((r) => moneyOf(r.body)))];
       result.widgets = scan.widgets.map((w) => (w.dataset ? `${w.type}:${w.dataset}` : w.type));
       result.shown = shown ?? finalShown;
       result.notices = (await byId("copilot-sidebar").innerText()).split("\n").filter((l) => /429|rate.?limit|too many requests|went wrong|failed/i.test(l));
