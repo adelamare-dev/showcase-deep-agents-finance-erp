@@ -26,4 +26,4 @@ def test_the_orchestrator_may_only_quote_figures_as_returned():
 
 
 def test_a_dashboard_comment_carries_no_dollar_amount():
-    assert "with no dollar amount at all" in ORCHESTRATOR_PROMPT
+    assert "no dollar amount and no percentage at all" in ORCHESTRATOR_PROMPT
