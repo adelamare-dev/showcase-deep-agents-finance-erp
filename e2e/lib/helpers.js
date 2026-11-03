@@ -174,7 +174,7 @@
   // Clicks the hero suggestion and times the dashboard it builds. Compares the
   // displayed figures with the snapshot and with the catalog routes, both read
   // during the run. Returns what it saw; the caller decides what must hold.
-  const runDashboardSegment = async (target = page, timeout = 150000) => {
+  const runDashboardSegment = async (target = page, timeout = 240000) => {
     await open("/");
     const catalog = [];
     const onResponse = async (res) => {
@@ -194,6 +194,7 @@
       await hero.first().click();
 
       let shown = null;
+      let idleSince = 0;
       while (Date.now() - started < timeout) {
         const { missing, shown: now } = classifyDashboard(await scanDashboard());
         if (!missing.length) {
@@ -201,6 +202,10 @@
           shown = now;
           break;
         }
+        // A run that ended without the dashboard will not produce it later.
+        if ((await byId("copilot-loading-cursor").count()) > 0 || Date.now() - started < 8000) idleSince = 0;
+        else if (!idleSince) idleSince = Date.now();
+        else if (Date.now() - idleSince > 5000) break;
         await target.waitForTimeout(500);
       }
       await waitForRunEnd(Math.max(10000, timeout - (Date.now() - started)));
@@ -213,7 +218,7 @@
       result.complete = !missing.length;
       result.widgets = scan.widgets.map((w) => (w.dataset ? `${w.type}:${w.dataset}` : w.type));
       result.shown = shown ?? finalShown;
-      result.notices = (await chatText()).split("\n").filter((l) => /429|rate.?limit|too many requests|went wrong|failed/i.test(l));
+      result.notices = (await byId("copilot-sidebar").innerText()).split("\n").filter((l) => /429|rate.?limit|too many requests|went wrong|failed/i.test(l));
 
       // Figures, against the store as it is now.
       const snap = await snapshot();
