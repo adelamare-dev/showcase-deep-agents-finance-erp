@@ -8,10 +8,9 @@ import { Header } from "@/components/layout/header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useErp } from "@/context/erp-context";
 import { formatCurrency, cn } from "@/lib/utils";
-import { AlertTriangle, Package, Plus } from "lucide-react";
+import { AlertTriangle, Package } from "lucide-react";
 import type { InventoryItem } from "@/types/erp";
 
 export default function InventoryPage() {
@@ -104,10 +103,6 @@ function InventoryContent() {
               </Link>
             ))}
           </div>
-          <Button>
-            <Plus className="h-4 w-4" />
-            Add Item
-          </Button>
         </div>
 
         {/* Inventory Table */}

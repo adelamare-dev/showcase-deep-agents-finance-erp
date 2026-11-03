@@ -7,10 +7,9 @@ import { Shell } from "@/components/layout/shell";
 import { Header } from "@/components/layout/header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useErp } from "@/context/erp-context";
 import { formatCurrency, cn } from "@/lib/utils";
-import { Plus, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 
 export default function HRPage() {
   return (
@@ -79,8 +78,8 @@ function HRContent() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
             {["all", ...departments].map((f) => (
               <Link
                 key={f}
@@ -98,10 +97,6 @@ function HRContent() {
               </Link>
             ))}
           </div>
-          <Button>
-            <Plus className="h-4 w-4" />
-            Add Employee
-          </Button>
         </div>
 
         {/* Employee Cards Grid */}

@@ -19,15 +19,14 @@ async (page, h) => {
     return { kpis: snap.kpis.map((k) => `${k.label}=${k.value}`) };
   });
 
-  await h.test("Flat KPIs are not shown as a negative change", async () => {
+  await h.test("Flat KPIs show no change badge", async () => {
     const snap = await h.snapshot();
     await h.visit("/");
     const flat = snap.kpis.filter((k) => k.trend === "flat").map((k) => k.label);
     h.assert(flat.length > 0, "the store serves at least one flat KPI");
     for (const label of flat) {
-      const card = page.locator("p", { hasText: label }).first().locator("xpath=ancestor::*[contains(@class,'group')][1]");
-      const badge = (await card.locator("[class*='rounded-full']").first().getAttribute("class")) || "";
-      h.assert(!badge.includes("red"), `"${label}" has no red badge (${badge})`);
+      const text = await h.byId(`kpi-${label}`).innerText();
+      h.assert(!/\d%/.test(text), `"${label}" shows no percentage (${JSON.stringify(text)})`);
     }
     return { flat };
   });

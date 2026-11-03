@@ -8,10 +8,8 @@ import { Header } from "@/components/layout/header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useErp } from "@/context/erp-context";
 import { formatCurrency, cn } from "@/lib/utils";
-import { Plus } from "lucide-react";
 import type { Bill, Invoice } from "@/types/erp";
 
 export default function InvoicesPage() {
@@ -149,12 +147,6 @@ function InvoicesContent() {
               </Link>
             ))}
           </div>
-          {!supplierView && (
-            <Button>
-              <Plus className="h-4 w-4" />
-              New Invoice
-            </Button>
-          )}
         </div>
 
         {/* Invoice Table */}

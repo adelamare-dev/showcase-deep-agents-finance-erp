@@ -144,7 +144,7 @@
 
   const h = {
     WEB_URL, ERP_URL, SNAPSHOT_URL,
-    assert, assertEqual, expectVisible,
+    assert, assertEqual, expectVisible, byId,
     STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
     moneyIn, formatUsd, test, run,

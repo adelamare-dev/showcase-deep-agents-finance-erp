@@ -68,7 +68,7 @@ Without `--allow-agent-exit` the launcher brings the whole stack down when the a
 ## Rules for a scenario file
 
 - One single expression, no `import`, no `require`, no trailing `;`: the tool runs it in a VM without modules. `build.mjs` rejects a file that is not one expression.
-- Everything comes from `h`: `open`, `visit`, `resetDemo`, `sendPrompt`, `waitForRunEnd`, `chatText`, `snapshot`, `moneyIn`, `formatUsd`, `test`, `assert`, `assertEqual`, `expectVisible`, and for the stub `stubScript`, `stubRelease`, `stubReset`, `stubRequests`, `payableBillIds`, `openSettings`, `clickReset`.
+- Everything comes from `h`: `open`, `visit`, `resetDemo`, `sendPrompt`, `waitForRunEnd`, `chatText`, `snapshot`, `moneyIn`, `formatUsd`, `test`, `assert`, `assertEqual`, `expectVisible`, `byId`, and for the stub `stubScript`, `stubRelease`, `stubReset`, `stubRequests`, `payableBillIds`, `openSettings`, `clickReset`.
 - `h.resetDemo()` resets through the API and reloads the page; `h.clickReset()` uses the Settings control, which is what a scenario about the control must do.
 - Group related checks as named cases with `h.test(name, fn)`; every case runs and failures are collected.
 - Compare displayed figures with `h.snapshot()` (`GET /api/erp/snapshot`, served by the agent), never with hard-coded values.

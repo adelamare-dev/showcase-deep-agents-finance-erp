@@ -7,7 +7,6 @@ import {
   Receipt,
   Wallet,
   CreditCard,
-  Minus,
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
@@ -60,25 +59,23 @@ export function MetricCards({
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
                   <Icon className="h-5.5 w-5.5 text-primary" />
                 </div>
-                <div
-                  className={cn(
-                    "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
-                    isFlat
-                      ? "bg-muted text-muted-foreground"
-                      : isPositive
+                {!isFlat && (
+                  <div
+                    className={cn(
+                      "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
+                      isPositive
                         ? "bg-emerald-50 text-emerald-600"
                         : "bg-red-50 text-red-600",
-                  )}
-                >
-                  {isFlat ? (
-                    <Minus className="h-3.5 w-3.5" />
-                  ) : isPositive ? (
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  ) : (
-                    <ArrowDownRight className="h-3.5 w-3.5" />
-                  )}
-                  {Math.abs(kpi.change)}%
-                </div>
+                    )}
+                  >
+                    {isPositive ? (
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    ) : (
+                      <ArrowDownRight className="h-3.5 w-3.5" />
+                    )}
+                    {Math.abs(kpi.change)}%
+                  </div>
+                )}
               </div>
 
               <div className="mt-4">

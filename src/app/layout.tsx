@@ -10,6 +10,7 @@ import { Montserrat, Playfair_Display } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { DashboardProvider } from "@/context/dashboard-context";
 import { ErpProvider } from "@/context/erp-context";
+import { brand } from "@/content/brand";
 
 const playfairDisplayHeading = Playfair_Display({
   subsets: ["latin"],
@@ -22,7 +23,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "FinanceOS | Deep Agents ERP",
+  title: `${brand.product} | Deep Agents ERP`,
   description:
     "AI-powered enterprise resource planning dashboard with CopilotKit deep agents",
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UseAgentUpdate, useAgent } from "@copilotkit/react-core/v2";
@@ -12,31 +13,37 @@ import {
   Package,
   Users,
   Settings,
-  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useErp } from "@/context/erp-context";
+import { brand } from "@/content/brand";
+import { navItems } from "@/content/ui-text";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Dashboards", href: "/dashboards", icon: LayoutGrid },
-  { name: "Invoices", href: "/invoices", icon: FileText },
-  { name: "Accounts", href: "/accounts", icon: Landmark },
-  { name: "Inventory", href: "/inventory", icon: Package },
-  { name: "HR", href: "/hr", icon: Users },
-];
+const navIcons = {
+  "/": LayoutDashboard,
+  "/dashboards": LayoutGrid,
+  "/invoices": FileText,
+  "/accounts": Landmark,
+  "/inventory": Package,
+  "/hr": Users,
+} as const;
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 flex w-[72px] flex-col items-center border-r border-border bg-card py-4">
-      <div className="mb-8 flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-        <Bot className="h-5 w-5 text-primary-foreground" />
-      </div>
+      <Image
+        src={brand.logoSrc}
+        alt={brand.product}
+        width={40}
+        height={40}
+        className="mb-8 h-10 w-10 rounded-xl"
+      />
 
       <nav className="flex flex-1 flex-col items-center gap-1">
-        {navigation.map((item) => {
+        {navItems.map((item) => {
+          const Icon = navIcons[item.href];
           const isActive =
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));
@@ -51,7 +58,7 @@ export function Sidebar() {
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              <item.icon className="h-5 w-5" />
+              <Icon className="h-5 w-5" />
               <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                 {item.name}
               </span>

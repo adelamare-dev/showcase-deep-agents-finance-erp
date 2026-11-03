@@ -8,7 +8,7 @@ FastAPI + LangGraph service that exposes the `finance_erp_agent` graph over AG-U
 
 - Resync the environment: `uv sync` (already run by `pnpm install`).
 - Dev server: `uv run uvicorn main:app --host 127.0.0.1 --port 8123 --reload`.
-- Tests: `uv run pytest -q`. They run offline: `tests/conftest.py` sets a fake key, and the model is simulated or stopped before any network call.
+- Tests: `uv run pytest -q`. `tests/test_brand_names.py` walks `src/` and `agent/` for blocklisted brand names. They run offline: `tests/conftest.py` sets a fake key, and the model is simulated or stopped before any network call.
 - Adding a dependency: `uv add <pkg>`, then check that `exclude-newer`, `no-build` and `malware-check` in `pyproject.toml` do not refuse it. An exception is justified, never a loosened rule.
 
 ## Conventions

@@ -75,6 +75,8 @@ Start the servers (`pnpm demo`; live scenarios need a real `MISTRAL_API_KEY` in 
 
 A failed answer (rate limit, model service error, agent not reachable) is shown above the chat input in plain words, with a **Retry** that runs the assistant again on the same conversation without adding a message. A model rate limit is retried once automatically per model call, after the `Retry-After` delay when it is 8 s or less, or after 2 s when Mistral sends none. If the figures cannot be reloaded, the page keeps the old ones and says they may be out of date, with a Retry. The agent refuses to start without `MISTRAL_API_KEY` and names `agent/.env`.
 
+The app opens with the chat panel open and "Cash Flow Dashboard" as the first suggestion. Close it with the panel's Close button.
+
 ## Replaying the demo
 
 The Settings icon at the bottom of the left bar has one entry, **Reset demo data**. It restores the seeded books, the default dashboard, the dashboards saved in the browser and the subagent steps, and opens a fresh conversation. It is disabled while the assistant is answering. A pending approval card disappears on reset, because the reset opens a new conversation. Restarting the agent also restores the books.
