@@ -119,8 +119,8 @@ async (page, h) => {
 
       await inChat("Approve Payment").click();
       await h.expectVisible(byId("kpi-delta-Cash"), 60000);
-      const cashDelta = (await byId("kpi-delta-Cash").innerText()).trim();
-      const payablesDelta = (await byId("kpi-delta-Accounts Payable").innerText()).trim();
+      const cashDelta = (await byId("kpi-delta-Cash").first().innerText()).trim();
+      const payablesDelta = (await byId("kpi-delta-Accounts Payable").first().innerText()).trim();
       h.assertEqual(cashDelta, "−" + h.formatUsd(cardTotal), "Cash delta shown");
       h.assertEqual(payablesDelta, "−" + h.formatUsd(cardTotal), "Accounts Payable delta shown");
       await h.waitForRunEnd();
@@ -138,8 +138,8 @@ async (page, h) => {
 
       const fieldsAfter = [...fieldsBefore, ...(await moneyFields(after, seg.catalogNumbers)), cardTotal];
       h.assertEqual(strangers(await h.chatText(), fieldsAfter), [], "chat amounts after the approval that are not money fields of this pass");
-      await byId("kpi-delta-Cash").waitFor({ state: "detached", timeout: 10000 });
-      h.assert((await byId("kpi-Cash").innerText()).includes(after.kpis.find((k) => k.label === "Cash").value), "the Cash KPI shows the new value");
+      await byId("kpi-delta-Cash").first().waitFor({ state: "detached", timeout: 10000 });
+      h.assert((await byId("kpi-Cash").first().innerText()).includes(after.kpis.find((k) => k.label === "Cash").value), "the Cash KPI shows the new value");
 
       // 3. A follow-up that sees the new state.
       const answersBefore = await byId("copilot-assistant-message").count();

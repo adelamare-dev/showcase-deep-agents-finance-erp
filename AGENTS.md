@@ -13,7 +13,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 
 **First screen.** The chat is open on load with the reference suggestion ("Cash Flow Dashboard") first; the header holds only the fictional avatar (not a control) and the sidebar only routes plus Settings. No visible control is without an effect.
 
-**Not done yet.** The reference series. The orchestrator can place all twelve widget types (`update_dashboard`); the app is a working base, not the finished demo.
+**Not done yet.** The reference series: no run has yet passed from the dashboard to the follow-up question, so the count of consecutive passes is 0 of 5. Measured on `ministral-14b-2512`, the orchestrator placed the asked-for dashboard elements, including the newly exposed `ar_aging_gauge` and `metric_cards`, in every valid dashboard run (10 of 10, figures equal to the store); the click-to-dashboard time varied from 26 s to 141 s, and the 45 s limit is met only on some runs. The app is a working base, not the finished demo.
 
 `SETUP/` (spec, plan, evidence) is deliberately **outside the repo** and gitignored: cite nothing from it in code, commits, README or UI.
 
@@ -74,6 +74,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 - **With the chat open by default, its panel covers the chat toggle at 1280x720**; the panel header's Close button is the visible control, and the toggle reappears once closed.
 - **`useRenderTool` requires `parameters`** in `@copilotkit/react-core` 1.80.0: each front-end tool declares a permissive `zod` schema of the fields it reads. The live browser scenario rendered the research, cash and approval cards.
 - **No `instructions` prop on `CopilotSidebar`** in 1.80.0. Instructions go through `useAgentContext` (`shell.tsx`), like the KPIs and the dashboard layout.
+- **Free-tier live runs are unreliable.** Mistral answers many calls with a 429 `backend_out_of_capacity` that a 2 s retry does not always cure (11 of 21 live runs were lost to it or to a read timeout), and only the `ministral` family answers on this account (`agent/scripts/probe_models.py`: 3b, 8b and 14b answer 200; the Small and Medium ids answer 429 with a quota of 0, Large answers 403). A run lost to a 429 is discarded and replayed after the window, never counted. The agent logs one `model_usage` line per model call (ids and token counts only).
 - **`@copilotkit/*` stays on 1.80.0**: 1.83.0 is refused by `minimumReleaseAge`. Do not force the bump or loosen the cooldown.
 - **Windows `MAX_PATH`**: a clone that is too deep breaks `agent/.venv` past 260 characters. Keep the path short.
 - **Subagents run in isolated threads** (`isolated_subagents.py`) on purpose: it keeps internal events out of the parent stream. Do not "simplify" to `subagents=[...]`. The one thing that crosses is a `subagent_step` custom event per subagent tool call, dispatched from the parent's loop and stored by `src/lib/subagent-steps.ts` under the card's tool call id; the card lists them live.

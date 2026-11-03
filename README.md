@@ -71,6 +71,10 @@ pnpm e2e:build      # assembles helpers + each scenario into .playwright-mcp/sce
 
 Start the servers (`pnpm demo`; live scenarios need a real `MISTRAL_API_KEY` in `agent/.env`), then run a built file with the plugin's `browser_run_code_unsafe` tool and `filename: ".playwright-mcp/scenarios/live.agent.js"`. A scenario passes when the tool returns `passed` with an empty `failed` list. Scenarios that need a scripted model (`stub.*`) run on a local stand-in for the Mistral API and cost no credits: `node e2e/fixtures/stack.mjs` starts it with the agent and the web app (Windows only: it stops processes with `taskkill`). See `e2e/README.md`.
 
+## Measured behaviour
+
+On the free tier with `ministral-14b-2512`, a click on "Cash Flow Dashboard" builds the complete dashboard, with figures equal to the store, in 26 to 141 s depending on the model service's load; the target is 45 s. Mistral often answers a call with a 429 "not enough capacity" that an automatic retry does not always cure, so a live run can be lost to it: replay it after a few minutes. The reference scenario (`e2e/scenarios/live.reference.js`) has not yet passed five times in a row.
+
 ## When something fails
 
 A failed answer (rate limit, model service error, agent not reachable) is shown above the chat input in plain words, with a **Retry** that runs the assistant again on the same conversation without adding a message. A model rate limit is retried once automatically per model call, after the `Retry-After` delay when it is 8 s or less, or after 2 s when Mistral sends none. If the figures cannot be reloaded, the page keeps the old ones and says they may be out of date, with a Retry. The agent refuses to start without `MISTRAL_API_KEY` and names `agent/.env`.

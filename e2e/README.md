@@ -78,6 +78,10 @@ Without `--allow-agent-exit` the launcher brings the whole stack down when the a
 
 The result is `{ complete, seconds, runSeconds, missing, mismatches, compared, widgets, shown, notices }`; the caller decides what must hold. Start from `h.resetDemo()` so repeated runs are independent.
 
+## The reference scenario
+
+`live.reference.js` is one full pass per run: reset, the dashboard segment (limit `DASHBOARD_MAX_SECONDS` = 60 in the file), subagent cards that show a step before they complete, "Approve Payments" (card total equal to the sum of the store's bills, Cash and Accounts Payable both down by that total, books balanced), then a follow-up question that must state the new cash and payables. Every dollar amount in the chat, read before the approval and again after it, must be a money field of the pass: the store's totals, KPIs, aging buckets, bill amounts, quarterly cash flow and `cash_position` figures, plus the numbers the catalog drew during the dashboard (`catalogNumbers`). "$1.2M" style amounts match within their own rounding. A failure carries the pass data in its error text; the runner records one line per pass (seconds, result, 429 notices) and reads tokens from the agent's `model_usage` log lines. A pass lost to a 429 is discarded and replayed. `stub.reference-retry.js` is the stub-stack proof that a Retry around an approval pays once.
+
 ## Rules for a scenario file
 
 - One single expression, no `import`, no `require`, no trailing `;`: the tool runs it in a VM without modules. `build.mjs` rejects a file that is not one expression.
