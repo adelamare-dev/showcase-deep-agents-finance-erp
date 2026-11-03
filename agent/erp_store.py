@@ -220,17 +220,40 @@ class ErpStore:
     def _bill_row(bill: dict) -> dict:
         return {key: bill[key] for key in ("id", "number", "supplier", "amount", "dueDate")}
 
+    def _operating_account(self) -> dict:
+        return next(a for a in self._data["accounts"] if a["code"] == OPERATING_CASH_CODE)
+
+    def _require_cash(self, total: int) -> dict:
+        """Raise `InsufficientCash` when the operating account cannot cover `total`.
+
+        Payments leave from the operating account only, while the Cash figure on
+        the dashboard adds every cash account, so the message gives both.
+        """
+        operating = self._operating_account()
+        if total > operating["balance"]:
+            all_cash = sum(
+                a["balance"] for a in self._data["accounts"] if a["code"].startswith(CASH_CODE_PREFIX)
+            )
+            raise InsufficientCash(
+                f"The operating account ({OPERATING_CASH_CODE}) holds {_usd(operating['balance'])} "
+                f"but {_usd(total)} are due. Payments leave from that account only; "
+                f"total cash across all cash accounts is {_usd(all_cash)}."
+            )
+        return operating
+
     def preview_bill_payment(self, bill_ids: list[str]) -> dict:
         """The bills a payment would settle and their total. Changes nothing.
 
-        Raises `UnknownIds` for an id that matches no bill and `AlreadyPaid` when
-        any bill is settled already.
+        Raises `UnknownIds` for an id that matches no bill, `AlreadyPaid` when
+        any bill is settled already and `InsufficientCash` when the operating
+        account could not cover the total.
         """
         with self._lock:
             bills = self._resolve_bills(bill_ids)
             paid = [b["number"] for b in bills if b["status"] == "paid"]
             if paid:
                 raise AlreadyPaid(f"Already paid: {', '.join(paid)}.")
+            self._require_cash(sum(b["amount"] for b in bills))
             rows = [self._bill_row(b) for b in bills]
         return {"bills": rows, "totalAmount": sum(r["amount"] for r in rows)}
 
@@ -246,12 +269,7 @@ class ErpStore:
             bills = self._resolve_bills(bill_ids)
             due = [b for b in bills if b["status"] != "paid"]
             total = sum(b["amount"] for b in due)
-            operating = next(a for a in self._data["accounts"] if a["code"] == OPERATING_CASH_CODE)
-            if total > operating["balance"]:
-                raise InsufficientCash(
-                    f"The operating account holds {_usd(operating['balance'])}, "
-                    f"{_usd(total)} are due."
-                )
+            operating = self._require_cash(total)
             today = self._as_of.isoformat()
             for bill in due:
                 bill["status"] = "paid"

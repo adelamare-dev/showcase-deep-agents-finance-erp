@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from langchain_core.runnables import RunnableLambda
+from langchain_core.runnables import RunnableConfig, RunnableLambda
 
 import erp_store
 import frontend_tools
@@ -120,6 +120,19 @@ def test_paid_bill_returns_an_error_to_the_model_without_interrupt(shared_store,
     assert interrupt_spy.calls == []
 
 
+def test_a_payment_the_operating_account_cannot_cover_shows_no_card(shared_store, interrupt_spy, custom_events):
+    with shared_store._lock:
+        next(a for a in shared_store._data["accounts"] if a["code"] == "1000")["balance"] = 100
+    before = shared_store.snapshot()
+    result = call(type="supplier_payment", bill_ids=[b["id"] for b in unpaid(shared_store, 1)])
+    assert result.startswith("Not sent for approval")
+    assert "operating account (1000) holds $100" in result
+    assert f"${shared_store.totals()['cash']:,}" in result
+    assert interrupt_spy.calls == []
+    assert custom_events == []
+    assert shared_store.snapshot() == before
+
+
 def test_no_bill_returns_an_error_to_the_model(shared_store, interrupt_spy):
     assert call(type="supplier_payment").startswith("Not sent for approval")
     assert call(type="inventory_reorder").startswith("Not sent for approval")
@@ -135,6 +148,48 @@ def test_reexecution_after_resume_does_not_pay_twice(shared_store, interrupt_spy
     again = call(type="supplier_payment", bill_ids=ids)
     assert "Already paid" in again
     assert shared_store.totals() == after_first
+    assert len(custom_events) == 1
+
+
+def test_a_replayed_run_after_a_graph_resume_pays_once(shared_store, custom_events):
+    """Real interrupt and resume on a checkpointed graph, then the same tool call again."""
+    from langgraph.checkpoint.memory import MemorySaver
+    from langgraph.graph import END, START, StateGraph
+    from langgraph.types import Command
+    from typing_extensions import TypedDict
+
+    class State(TypedDict, total=False):
+        result: str
+
+    ids = [b["id"] for b in unpaid(shared_store)]
+    total = sum(b["amount"] for b in unpaid(shared_store))
+
+    def pay(state: State, config: RunnableConfig) -> State:
+        return {"result": request_approval.invoke({"type": "supplier_payment", "bill_ids": ids}, config)}
+
+    builder = StateGraph(State)
+    builder.add_node("pay", pay)
+    builder.add_edge(START, "pay")
+    builder.add_edge("pay", END)
+    graph = builder.compile(checkpointer=MemorySaver())
+    thread = {"configurable": {"thread_id": "retry"}}
+    cash_before = shared_store.totals()["cash"]
+
+    paused = graph.invoke({}, thread)
+    (interrupt,) = paused["__interrupt__"]
+    assert interrupt.value["__copilotkit_interrupt_value__"]["args"]["totalAmount"] == total
+    assert shared_store.totals()["cash"] == cash_before
+
+    resumed = graph.invoke(Command(resume={"approved": True}), thread)
+    assert "__interrupt__" not in resumed
+    assert resumed["result"].startswith("Approved.")
+    assert shared_store.totals()["cash"] == cash_before - total
+
+    # A retry runs the node body again on the same thread: it stops at the preview.
+    replayed = graph.invoke({}, thread)
+    assert "__interrupt__" not in replayed
+    assert "Already paid" in replayed["result"]
+    assert shared_store.totals()["cash"] == cash_before - total
     assert len(custom_events) == 1
 
 

@@ -103,6 +103,18 @@ def test_payment_beyond_the_operating_account_is_refused(store):
     assert store.snapshot() == before
 
 
+def test_the_preview_refuses_a_payment_the_operating_account_cannot_cover(store):
+    with store._lock:
+        next(a for a in store._data["accounts"] if a["code"] == "1000")["balance"] = 100
+    before = store.snapshot()
+    with pytest.raises(InsufficientCash) as refused:
+        store.preview_bill_payment(unpaid_ids(store, 1))
+    # The message names the short account and the dashboard's total cash.
+    assert "operating account (1000) holds $100" in str(refused.value)
+    assert f"${store.totals()['cash']:,}" in str(refused.value)
+    assert store.snapshot() == before
+
+
 def test_reset_restores_paid_bills(store):
     initial = store.snapshot()
     store.pay_bills(unpaid_ids(store))

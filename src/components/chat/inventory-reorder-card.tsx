@@ -63,7 +63,10 @@ export function InventoryReorderCard(props: Props) {
   const { items, estimatedTotal, supplier } = args as Args;
   const isComplete = status === ToolCallStatus.Complete;
   const result = isComplete ? (props as { result: string }).result : null;
-  const wasApproved = result?.includes("approved");
+  // The tool's success text starts with "Approved."; every refusal or
+  // "Approved, but ..." text differs in that prefix, so a substring match
+  // ("not approved") never counts.
+  const wasApproved = result?.startsWith("Approved.") ?? false;
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat("en-US", {
