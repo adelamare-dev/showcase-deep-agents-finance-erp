@@ -186,7 +186,7 @@
       }
     };
     target.on("response", onResponse);
-    const result = { complete: false, seconds: null, runSeconds: null, missing: [], mismatches: [], compared: [], widgets: [], notices: [] };
+    const result = { complete: false, seconds: null, runSeconds: null, missing: [], mismatches: [], compared: [], widgets: [], notices: [], catalogNumbers: [] };
     try {
       const hero = target.locator("[data-testid='copilot-sidebar'] button", { hasText: /^Cash Flow Dashboard$/ });
       await expectVisible(hero, 15000);
@@ -216,6 +216,10 @@
       const { missing, shown: finalShown, found } = classifyDashboard(scan);
       result.missing = missing;
       result.complete = !missing.length;
+      // Every number the catalog drew during the run, for callers that check
+      // the amounts the model quotes afterwards.
+      const leaves = (v) => (typeof v === "number" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(leaves) : []);
+      result.catalogNumbers = [...new Set(catalog.flatMap((r) => leaves(r.body)))];
       result.widgets = scan.widgets.map((w) => (w.dataset ? `${w.type}:${w.dataset}` : w.type));
       result.shown = shown ?? finalShown;
       result.notices = (await byId("copilot-sidebar").innerText()).split("\n").filter((l) => /429|rate.?limit|too many requests|went wrong|failed/i.test(l));
