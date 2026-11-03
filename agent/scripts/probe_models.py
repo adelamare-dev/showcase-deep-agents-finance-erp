@@ -17,7 +17,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 URL = "https://api.mistral.ai/v1/chat/completions"
-CANDIDATES = ["mistral-small-2603", "ministral-14b-2512", "ministral-8b-2512"]
+CANDIDATES = [
+    "mistral-small-2603",
+    "ministral-14b-2512",
+    "ministral-8b-2512",
+    "mistral-medium-2508",
+    "mistral-large-2512",
+    "mistral-small-2506",
+    "ministral-3b-2512",
+]
 
 TOOL = {
     "type": "function",

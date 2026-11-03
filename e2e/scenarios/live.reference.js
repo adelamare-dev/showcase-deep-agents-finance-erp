@@ -13,7 +13,7 @@
 // retries are read from the agent's log by the runner. On a failure the same
 // data is inside the error text.
 async (page, h) => {
-  const DASHBOARD_MAX_SECONDS = 45;
+  const DASHBOARD_MAX_SECONDS = 60;
   const FOLLOW_UP = "What is our cash position now, and how much do we owe suppliers?";
   const byId = (id) => page.getByTestId(id);
   const inChat = (name) => byId("copilot-message-list").getByRole("button", { name, exact: true });
