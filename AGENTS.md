@@ -7,7 +7,7 @@
 
 Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` showcase: no upstream resync is planned. Public demo repo (LinkedIn, meetings), run locally, later the base of a private repo. Success means an orchestration that is **visible, human-controlled and exact on the numbers**, not an absence of failures.
 
-**Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads the records from `GET /api/erp/snapshot` and every chart or card the model asks for from the dataset catalog (`agent/erp_datasets.py`, `GET /api/erp/datasets/{id}`): the model names a dataset and bounded parameters, the code fills in the figures. Approving a supplier payment or a reorder in the chat really changes the store (see the repo rules); `POST /api/erp/reset` restores the seed, and the Settings icon's **Reset demo data** (`useErp().resetDemo`) calls it, then clears the dashboard, the saved dashboards, the subagent steps and opens a new thread; it is disabled while a run is in progress. Postgres is archived in `templates/postgres/` and wired to nothing.
+**Done.** The agent runs on Mistral (dated model ids, `agent/models.py`). It owns all data in `ErpStore` (`agent/erp_store.py`, seeded by `agent/erp_seed.py`); derived values are computed at read time. The web reads the records from `GET /api/erp/snapshot` and every chart or card the model asks for from the dataset catalog (`agent/erp_datasets.py`, `GET /api/erp/datasets/{id}`): the model names a dataset and bounded parameters, the code fills in the figures. Approving a supplier payment or a reorder in the chat really changes the store (see the pitfall on `request_approval`); `POST /api/erp/reset` restores the seed, and the Settings icon's **Reset demo data** (`useErp().resetDemo`) calls it, then clears the dashboard, the saved dashboards, the subagent steps and opens a new thread; it is disabled while a run is in progress. Postgres is archived in `templates/postgres/` and wired to nothing.
 
 **Not done yet.** Failure handling in the UI, the first-screen rework, extra dashboard widgets and the reference series. The app is a working base, not the finished demo.
 
@@ -37,6 +37,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 - `pnpm lint` runs ESLint on the web app (`agent/` is ignored).
 - `pnpm test:agent` runs pytest in `agent/`. It makes no model call and needs no real key; `uv` itself needs network for its `malware-check`.
 - `pnpm e2e:build` assembles the browser scenarios into `.playwright-mcp/scenarios/`.
+- `pnpm build`, then `nohup node e2e/fixtures/stack.mjs --logs <dir> > <dir>/stack.out 2>&1 &` starts the Mistral stub (`:8790`), agent and web app for the `stub.*` scenarios; `node e2e/fixtures/stack.mjs stop` stops them. Windows only (`taskkill`).
 - Binaries: `pnpm exec <bin>`, never `npx`. Python: `uv run`, from `agent/`.
 
 Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12). Docker is not needed.

@@ -2,7 +2,7 @@
 
 ## Scope
 
-FastAPI + LangGraph service that exposes the `finance_erp_agent` graph over AG-UI on `127.0.0.1:8123`, and the ERP data over `GET /api/erp/snapshot` (plus `POST /api/erp/reset`). The Next runtime calls the agent (`/api/copilotkit`); the browser reads only the snapshot route directly. The front end lives at the repo root (`src/`), not here.
+FastAPI + LangGraph service that exposes the `finance_erp_agent` graph over AG-UI on `127.0.0.1:8123`, and the ERP data over `GET /api/erp/snapshot` (plus `POST /api/erp/reset`). The Next runtime calls the agent (`/api/copilotkit`); the browser calls the agent directly on three routes only: `GET /api/erp/snapshot`, `GET /api/erp/datasets/{id}` (`src/hooks/use-dataset.ts`) and `POST /api/erp/reset`. The front end lives at the repo root (`src/`), not here.
 
 ## Commands
 

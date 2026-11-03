@@ -73,7 +73,7 @@ Start the servers (`pnpm demo`; live scenarios need a real `MISTRAL_API_KEY` in 
 
 ## Replaying the demo
 
-The Settings icon at the bottom of the left bar has one entry, **Reset demo data**. It restores the seeded books, the default dashboard, the dashboards saved in the browser and the subagent steps, and opens a fresh conversation. It is disabled while the assistant is answering. Restarting the agent also restores the books.
+The Settings icon at the bottom of the left bar has one entry, **Reset demo data**. It restores the seeded books, the default dashboard, the dashboards saved in the browser and the subagent steps, and opens a fresh conversation. It is disabled while the assistant is answering. A pending approval card disappears on reset, because the reset opens a new conversation. Restarting the agent also restores the books.
 
 ## Architecture
 
