@@ -21,19 +21,19 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 
 ## Stack and paths
 
-| What | Where |
-|---|---|
-| Web: Next 16 (App Router), React 19, Tailwind v4, shadcn | `src/app`, `src/components`, `src/hooks`, `src/context`, `src/content`, `src/lib`, `src/types` |
-| Runtime CopilotKit to agent | `src/app/api/copilotkit/[[...slug]]/route.ts` (the only Next route) |
-| Chat, UI tools, agent context | `src/components/layout/shell.tsx` + `src/hooks/use-*.tsx` |
-| Brand, suggestions and UI text (single source) | `src/content/brand.ts`, `src/content/ui-text.ts` |
-| Snapshot client and context | `src/lib/erp-api.ts`, `src/context/erp-context.tsx` |
-| Agent FastAPI (`:8123`), graph | `agent/main.py`, `agent/agent.py` |
-| Data: seed, store, routes | `agent/erp_seed.py`, `agent/erp_store.py`, `agent/erp_datasets.py`, `agent/erp_api.py` |
-| Prompts, tools, subagents, models | `agent/prompts.py`, `agent/tools.py`, `agent/frontend_tools.py`, `agent/isolated_subagents.py`, `agent/models.py` |
-| Browser scenarios (Playwright plugin) | `e2e/` (see `e2e/README.md`) |
-| Mistral stub and its stack launcher | `e2e/fixtures/` (scripted answers and HTTP errors, no credit spent) |
-| Postgres archive (not wired) | `templates/postgres/` |
+| What                                                     | Where                                                                                                             |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Web: Next 16 (App Router), React 19, Tailwind v4, shadcn | `src/app`, `src/components`, `src/hooks`, `src/context`, `src/content`, `src/lib`, `src/types`                    |
+| Runtime CopilotKit to agent                              | `src/app/api/copilotkit/[[...slug]]/route.ts` (the only Next route)                                               |
+| Chat, UI tools, agent context                            | `src/components/layout/shell.tsx` + `src/hooks/use-*.tsx`                                                         |
+| Brand, suggestions and UI text (single source)           | `src/content/brand.ts`, `src/content/ui-text.ts`                                                                  |
+| Snapshot client and context                              | `src/lib/erp-api.ts`, `src/context/erp-context.tsx`                                                               |
+| Agent FastAPI (`:8123`), graph                           | `agent/main.py`, `agent/agent.py`                                                                                 |
+| Data: seed, store, routes                                | `agent/erp_seed.py`, `agent/erp_store.py`, `agent/erp_datasets.py`, `agent/erp_api.py`                            |
+| Prompts, tools, subagents, models                        | `agent/prompts.py`, `agent/tools.py`, `agent/frontend_tools.py`, `agent/isolated_subagents.py`, `agent/models.py` |
+| Browser scenarios (Playwright plugin)                    | `e2e/` (see `e2e/README.md`)                                                                                      |
+| Mistral stub and its stack launcher                      | `e2e/fixtures/` (scripted answers and HTTP errors, no credit spent)                                               |
+| Postgres archive (not wired)                             | `templates/postgres/`                                                                                             |
 
 ## Commands
 
