@@ -238,7 +238,7 @@ async (page, h) => {
       const byBill = Object.fromEntries(before.bills.map((b) => [b.id, b]));
       h.assert(ids.length > 0, "the card lists bills");
       h.assert(ids.every((id) => byBill[id] && byBill[id].status !== "paid"), "every listed bill is an unpaid supplier bill in the store");
-      h.assertEqual(h.dueSoonest(before.bills, ids), [], "unpaid supplier bills due earlier than a listed bill, left off the card");
+      data.leftOff = h.dueSoonest(before.bills, ids);
       h.assertEqual(total, sum(ids, (id) => byBill[id].amount), "card total = sum of the listed bills");
       h.assert(total <= before.totals.cash, "the account can cover the card total");
       Object.assign(data, { ids, total });
@@ -268,6 +268,8 @@ async (page, h) => {
     h.assertEqual(after.totals, before.totals, "totals unchanged by the rejection");
     h.assertEqual(after.bills, before.bills, "bills unchanged by the rejection");
     h.assertEqual(after.inventoryItems, before.inventoryItems, "inventory unchanged by the rejection");
+    // Judged last so the rest of the card and the rejection are still exercised and recorded.
+    if (isBills) h.assertEqual(data.leftOff, [], "unpaid supplier bills due earlier than a listed bill, left off the card (card: " + JSON.stringify(data) + ")");
     return data;
   };
 

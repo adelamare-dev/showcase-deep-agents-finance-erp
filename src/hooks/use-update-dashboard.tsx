@@ -28,6 +28,9 @@ const TYPE_MAP: Record<string, string> = {
 // Options that would carry figures: the widgets draw theirs from the store.
 const FIGURE_KEYS = ["scenarios", "comparisonData"];
 
+// Options the widgets read as lists: a lone string would crash the page.
+const LIST_KEYS = ["categories", "metrics", "statuses"];
+
 const DEFAULT_COLSPAN: Record<string, 1 | 2 | 3 | 4> = {
   "kpi-cards": 4,
   "revenue-chart": 3,
@@ -75,7 +78,10 @@ function DashboardUpdater({
           | 3
           | 4;
         const config = Object.fromEntries(
-          Object.entries(w.config ?? {}).filter(([k]) => !FIGURE_KEYS.includes(k)),
+          Object.entries(w.config ?? {})
+            .filter(([k]) => !FIGURE_KEYS.includes(k))
+            // A list option sent as a single string ("marketing") is one item.
+            .map(([k, v]) => [k, LIST_KEYS.includes(k) && typeof v === "string" ? [v] : v]),
         );
 
         if (internalType === "custom-chart") {
