@@ -39,6 +39,31 @@ def test_paying_suppliers_always_ends_with_an_approval_request():
     assert "never a substitute" in ORCHESTRATOR_PROMPT
 
 
+def test_a_figure_is_read_from_a_fresh_tool_and_never_computed():
+    assert "Call a fresh tool for every question about a current figure" in ORCHESTRATOR_PROMPT
+    assert "Never add figures yourself" in ORCHESTRATOR_PROMPT
+    assert "Never add up, average or subtract figures yourself" in RESEARCH_AGENT_PROMPT
+
+
+def test_missing_data_is_answered_with_the_exact_words():
+    assert 'start the reply with the exact words "I don\'t have this data"' in ORCHESTRATOR_PROMPT
+
+
+def test_a_question_about_matching_records_shows_them():
+    assert "Never write \"here are\" without showing them" in ORCHESTRATOR_PROMPT
+
+
+def test_payments_and_reorders_name_the_right_records():
+    assert "never leave out an unpaid bill that is due earlier" in ORCHESTRATOR_PROMPT
+    assert "never for an in-stock item" in ORCHESTRATOR_PROMPT
+
+
+def test_each_dashboard_element_has_its_widget():
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Dashboard / overview"))
+    assert 'metric_cards (metrics ["Cash", "Accounts Payable"])' in rule
+    assert 'invoices with kind "payable"' in rule
+
+
 def test_a_request_listing_its_widgets_is_built_not_loaded_from_a_template():
     lines = ORCHESTRATOR_PROMPT.splitlines()
     build = next(i for i, line in enumerate(lines) if line.startswith("- Dashboard / overview"))
