@@ -13,8 +13,8 @@
 // and no dollar amount.
 //
 // A run that ended on a rate-limit or model-side notice throws "DISCARDED ...":
-// the runner replays it and does not count it. Select entries by setting
-// `globalThis.questionsOnly = [indices]` before evaluating the file (default:
+// the runner replays it and does not count it. Select entries when building:
+// `pnpm e2e:build live.questions --only=3,5` inlines the indices (default:
 // every entry, which is long: run one entry per call).
 //
 // Entry fields: name, prompt (sent as typed), chip (a suggestion button to click
@@ -24,7 +24,7 @@
 // orUrl (a page the app may move to instead of naming a record), effect:
 // cashCard | chart | visual | widgets | forecast.
 async (page, h) => {
-  const ONLY = globalThis.questionsOnly ?? null;
+  const ONLY = null; // replaced by `--only` at build time
   const byId = (id) => page.getByTestId(id);
   const inChat = (name) => byId("copilot-message-list").getByRole("button", { name, exact: true });
   const sum = (rows, pick = (r) => r.amount) => rows.reduce((t, r) => t + pick(r), 0);

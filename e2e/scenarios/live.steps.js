@@ -22,7 +22,7 @@ async (page, h) => {
   await h.test("Subagent steps appear before the subagent tool ends and stay once it has", async () => {
     await h.open("/");
     const startedAt = Date.now();
-    await page.locator("button", { hasText: /^Cash Position$/ }).click();
+    await h.sendPrompt("What's our current cash position and how does it compare to our liabilities?");
 
     // key: card index + step index -> first time seen; done: card index -> first time seen complete.
     const firstSeen = {};

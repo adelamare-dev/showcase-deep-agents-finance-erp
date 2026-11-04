@@ -63,6 +63,8 @@ node e2e/fixtures/stack.mjs stop   # then stop the hand-started agent and check 
 
 Without `--allow-agent-exit` the launcher brings the whole stack down when the agent exits.
 
+`stub.dashboard-options.js` scripts an `update_dashboard` call whose list options (`metrics`, `categories`, `statuses`) arrive as one string each and checks the widgets render with a single item, with no error screen.
+
 `h.stubReset()` empties the queue and the request log; `h.stubRequests()` lists what the agent sent. A scripted `request_approval` takes bill ids read from `h.snapshot()` (`h.payableBillIds`), never hard-coded ones.
 
 ## The reference dashboard segment
@@ -94,15 +96,7 @@ Three kinds are special. The dashboard suggestion passes on a complete segment w
 
 A run that ended on a rate-limit or model-side notice throws an error starting with `DISCARDED`: the runner replays it and does not count it. Any other failure starts with `FAILED` or an assertion message and carries the reply and the catalog requests seen.
 
-Select entries with `globalThis.questionsOnly = [indices]` before the file is evaluated; with none, every entry runs, which is long: run one entry per call. A scenario run by `filename` echoes the whole file in the tool result, so a runner that repeats entries serves `.playwright-mcp/scenarios/` from any static file server and calls `browser_run_code_unsafe` with a short `code`:
-
-```js
-async (page) => {
-  globalThis.questionsOnly = [8];
-  const src = await (await fetch("http://127.0.0.1:8791/live.questions.js")).text();
-  return await (0, eval)("(" + src + ")")(page);
-}
-```
+Select entries when building: `pnpm e2e:build live.questions --only=8` writes `.playwright-mcp/scenarios/live.questions.only-8.js` with that index inlined (`--only=3,5` gives `only-3-5`), and that file runs like any other built scenario. The index is the position in `ENTRIES`, and each case is named after it. Without `--only` the full file runs every entry, which is long: run one entry per call.
 
 The chat-amount helpers (`amountsIn`, `matches`, `moneyFields`, `strangers`, `catalogMoneyOf`, `dueSoonest`) live in `lib/helpers.js`, shared with `live.reference.js`.
 
