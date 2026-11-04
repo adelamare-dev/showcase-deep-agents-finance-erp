@@ -76,6 +76,65 @@
     [...text.matchAll(/\$\s?(\d[\d,]*(?:\.\d+)?)/g)].map((m) => Number(m[1].replace(/,/g, "")));
   const formatUsd = (n) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
+  // ---- Dollar amounts in the chat -------------------------------------------
+  const leaves = (v) => (typeof v === "number" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(leaves) : []);
+
+  // Dollar amounts as written in a text. A scaled amount ("$1.2M", "$58K",
+  // "$3 thousand") is a rounding: it matches a field whose value, rounded to the
+  // same number of decimals at the same scale, gives the written number.
+  const SCALE = { k: 1e3, thousand: 1e3, m: 1e6, million: 1e6, b: 1e9, billion: 1e9 };
+  const amountsIn = (text) =>
+    [...text.matchAll(/\$\s?(\d[\d,]*)(?:\.(\d+))?\s?(thousand|million|billion|[KMBkmb]\b)?/g)].map((m) => {
+      const scale = m[3] ? SCALE[m[3].toLowerCase()] : 1;
+      const written = Number(m[1].replace(/,/g, "") + (m[2] ? "." + m[2] : ""));
+      return { text: m[0].trim(), value: written * scale, written, scale, decimals: m[2] ? m[2].length : 0, rounded: Boolean(m[3]) };
+    });
+  const matches = (a, v) =>
+    a.rounded
+      ? Math.abs(Math.round((v / a.scale) * 10 ** a.decimals) / 10 ** a.decimals - a.written) < 1e-9
+      : Math.abs(v - a.value) <= 0.005;
+
+  // The money values a catalog response drew: the chart values of a currency
+  // chart and the cash position amounts. Counts, years and shares are left out.
+  const catalogMoneyOf = (body) => {
+    if (!body) return [];
+    const values = Array.isArray(body.data) && body.formatValues === "currency"
+      ? body.data.flatMap((row) => Object.entries(row).filter(([key]) => /^value\d*$/.test(key)).map(([, v]) => v))
+      : Array.isArray(body.accounts)
+        ? [body.totalCash, body.totalLiabilities, body.netPosition, ...body.accounts.map((a) => a.balance)]
+        : [];
+    return values.filter((v) => typeof v === "number");
+  };
+
+  // The money fields of a run, read from the store now: its totals, KPIs, aging
+  // buckets, bill amounts, quarterly cash flow and cash position, plus the
+  // catalog money the run drew (see catalogMoneyOf).
+  const moneyFields = async (snap, catalogMoney) => {
+    const cashPosition = await (await page.request.get(ERP_URL + "/api/erp/datasets/cash_position")).json();
+    const ar = { ...snap.arAging };
+    delete ar.collectionRate;
+    return [
+      ...leaves(snap.totals),
+      ...snap.kpis.flatMap((k) => moneyIn(k.value)),
+      ...leaves(ar),
+      ...snap.bills.map((b) => b.amount),
+      ...leaves(snap.cashFlowData),
+      ...leaves(cashPosition),
+      ...catalogMoney,
+    ].map(Math.abs);
+  };
+  // The amounts of a text that are none of the given fields.
+  const strangers = (text, fields) => amountsIn(text).filter((a) => !fields.some((v) => matches(a, v))).map((a) => a.text);
+
+  // Supplier bills due, as the prompt defines them for a payment ask: unpaid
+  // bills, the ones due soonest. Returns the numbers of unpaid bills the given
+  // ids skip although they are due earlier than a listed one.
+  const dueSoonest = (bills, ids) => {
+    const unpaid = bills.filter((b) => b.status !== "paid");
+    const latest = unpaid.filter((b) => ids.includes(b.id)).map((b) => b.dueDate).sort().pop();
+    return unpaid.filter((b) => !ids.includes(b.id) && b.dueDate < latest).map((b) => b.number);
+  };
+
   // Restores the seeded data on the agent, then reloads the app on it.
   const resetDemo = async () => {
     const res = await page.request.post(ERP_URL + "/api/erp/reset");
@@ -219,16 +278,7 @@
       // The money values the catalog drew during the run, for callers that check
       // the amounts the model quotes afterwards: the chart values of a currency
       // chart and the cash position amounts. Counts, years and shares are left out.
-      const moneyOf = (body) => {
-        if (!body) return [];
-        const values = Array.isArray(body.data) && body.formatValues === "currency"
-          ? body.data.flatMap((row) => Object.entries(row).filter(([key]) => /^value\d*$/.test(key)).map(([, v]) => v))
-          : Array.isArray(body.accounts)
-            ? [body.totalCash, body.totalLiabilities, body.netPosition, ...body.accounts.map((a) => a.balance)]
-            : [];
-        return values.filter((v) => typeof v === "number");
-      };
-      result.catalogMoney = [...new Set(catalog.flatMap((r) => moneyOf(r.body)))];
+      result.catalogMoney = [...new Set(catalog.flatMap((r) => catalogMoneyOf(r.body)))];
       result.widgets = scan.widgets.map((w) => (w.dataset ? `${w.type}:${w.dataset}` : w.type));
       result.shown = shown ?? finalShown;
       result.notices = (await byId("copilot-sidebar").innerText()).split("\n").filter((l) => /429|rate.?limit|too many requests|went wrong|failed/i.test(l));
@@ -316,7 +366,7 @@
     assert, assertEqual, expectVisible, byId,
     STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
-    moneyIn, formatUsd, scanDashboard, classifyDashboard, runDashboardSegment, test, run,
+    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, scanDashboard, classifyDashboard, runDashboardSegment, test, run,
   };
   return h;
 }

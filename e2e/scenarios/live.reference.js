@@ -21,48 +21,7 @@ async (page, h) => {
   const byId = (id) => page.getByTestId(id);
   const inChat = (name) => byId("copilot-message-list").getByRole("button", { name, exact: true });
   const sum = (rows, pick) => rows.reduce((total, row) => total + pick(row), 0);
-  const leaves = (v) => (typeof v === "number" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(leaves) : []);
-
-  // Dollar amounts as written in a text. A scaled amount ("$1.2M", "$58K",
-  // "$3 thousand") is a rounding: it matches a field whose value, rounded to the
-  // same number of decimals at the same scale, gives the written number.
-  const SCALE = { k: 1e3, thousand: 1e3, m: 1e6, million: 1e6, b: 1e9, billion: 1e9 };
-  const amountsIn = (text) =>
-    [...text.matchAll(/\$\s?(\d[\d,]*)(?:\.(\d+))?\s?(thousand|million|billion|[KMBkmb]\b)?/g)].map((m) => {
-      const scale = m[3] ? SCALE[m[3].toLowerCase()] : 1;
-      const written = Number(m[1].replace(/,/g, "") + (m[2] ? "." + m[2] : ""));
-      return { text: m[0].trim(), value: written * scale, written, scale, decimals: m[2] ? m[2].length : 0, rounded: Boolean(m[3]) };
-    });
-  const matches = (a, v) =>
-    a.rounded
-      ? Math.abs(Math.round((v / a.scale) * 10 ** a.decimals) / 10 ** a.decimals - a.written) < 1e-9
-      : Math.abs(v - a.value) <= 0.005;
-
-  // The money fields of this pass, read from the store now.
-  const moneyFields = async (snap, catalogMoney) => {
-    const cashPosition = await (await page.request.get(h.ERP_URL + "/api/erp/datasets/cash_position")).json();
-    const ar = { ...snap.arAging };
-    delete ar.collectionRate;
-    return [
-      ...leaves(snap.totals),
-      ...snap.kpis.flatMap((k) => h.moneyIn(k.value)),
-      ...leaves(ar),
-      ...snap.bills.map((b) => b.amount),
-      ...leaves(snap.cashFlowData),
-      ...leaves(cashPosition),
-      ...catalogMoney,
-    ].map(Math.abs);
-  };
-  const strangers = (text, fields) => amountsIn(text).filter((a) => !fields.some((v) => matches(a, v))).map((a) => a.text);
-
-  // Supplier bills due, as the prompt defines them for a payment ask: unpaid
-  // bills, the ones due soonest. The card must not skip an unpaid bill that is
-  // due earlier than one it lists.
-  const dueSoonest = (bills, ids) => {
-    const unpaid = bills.filter((b) => b.status !== "paid");
-    const latest = unpaid.filter((b) => ids.includes(b.id)).map((b) => b.dueDate).sort().pop();
-    return unpaid.filter((b) => !ids.includes(b.id) && b.dueDate < latest).map((b) => b.number);
-  };
+  const { amountsIn, matches, moneyFields, strangers, dueSoonest } = h;
 
   // Subagent cards on screen: title, completed or not, and step labels.
   const readCards = () =>
