@@ -75,3 +75,9 @@ def test_a_request_listing_its_widgets_is_built_not_loaded_from_a_template():
     assert "never answer it with load_dashboard, save_dashboard or manage_dashboard" in lines[build]
     assert "lists no widgets" in lines[themed]
     assert "without listing the widgets" in lines[templates]
+
+
+def test_the_quarterly_cash_projection_goes_on_the_forecast_chart_not_the_waterfall():
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Dashboard / overview"))
+    assert 'a quarterly cash projection in one custom_chart on dataset cash_flow_forecast with quarters 4' in rule
+    assert "never in cash_waterfall" in rule
