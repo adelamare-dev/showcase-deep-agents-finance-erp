@@ -104,12 +104,12 @@ Models: `ministral-14b-2512` for the orchestrator and both subagents, free tier,
 
 On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 1 to a read timeout, 1 that ended without a dashboard), 10 valid dashboards, all complete with figures equal to the store. Of the 10, 5 were within 45 s and the same 5 within 60 s; the time depends strongly on the model service's load, from 26 to 141 s. No run has yet passed from the dashboard through the follow-up question; in one run the follow-up said "$68,105 owed to suppliers" while the store held $11,050. Prompts were changed between runs, and each change reset the count.
 
-**Suggestions and likely free questions** (`e2e/scenarios/live.questions.js`): each of the 18 entries run three times on 2026-11-04, on commit 948b751, each on a fresh thread after a data reset, with no run lost to a 429. Figures on screen are compared with the store.
+**Suggestions and likely free questions** (`e2e/scenarios/live.questions.js`): each of the 18 entries run three times on 2026-11-04, on commit e1a735f, each on a fresh thread after a data reset, with no run lost to a 429. Figures on screen are compared with the store.
 
 | Entry | Passes |
 | --- | --- |
 | Cash Flow Dashboard | 2 of 3 |
-| Cash Position and Cash Position Chart (both typed) | 3 of 3 each |
+| Cash position and liabilities and Cash Position Chart (both typed) | 3 of 3 each |
 | Overdue Invoices | 3 of 3 |
 | Cash Flow Chart | 3 of 3 |
 | Approve Payments | 0 of 3 |
@@ -126,7 +126,7 @@ On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 
 | What-if of 12% over 6 quarters | 1 of 3 |
 | Headcount and payroll | 1 of 3 |
 
-These counts were measured on 948b751. Since that run the dashboard's projection chart and the Approve Payments message have changed (the quarterly projection now goes on the cash flow forecast chart, and the message also asks for overdue bills), so the dashboard entries and Approve Payments are owed a new measurement. At head, entry 1 clicks the chip and entry 6 types, while both were measured the other way, with the same messages.
+These counts were measured on e1a735f. Since that run the dashboard's projection chart and the Approve Payments message have changed (the quarterly projection now goes on the cash flow forecast chart, and the message also asks for overdue bills), so the dashboard entries and Approve Payments are owed a new measurement. Entry 1 was measured typed and entry 6 clicked; at head, entry 1 clicks its chip and entry 6 types, with the same messages.
 
 Counts vary between replays: an earlier series on mixed versions gave other counts (for example Cash Position 0 of 3, then 3 of 3), so read these as one sample of three, not as a rate.
 
