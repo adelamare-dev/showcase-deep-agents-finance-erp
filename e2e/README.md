@@ -89,7 +89,7 @@ The result is `{ complete, seconds, runSeconds, missing, mismatches, compared, w
 `live.questions.js` holds one entry per chat suggestion and per likely free question (indices in the file's `ENTRIES`), each run as one case on a fresh thread after a data reset, and compared with the snapshot and the catalog read at the end of the run. An entry passes when:
 
 - the run ends without an error notice and the reply is not empty;
-- every dollar amount in the chat (text and cards, chart axes left out) is a money field of the run (the helpers' `moneyFields`: totals, KPIs, aging buckets, bill amounts, quarterly cash flow, cash position, catalog money) or one of the entry's `expected(snapshot, ds)` figures, or a line or total computed by an approval card; a rounded amount must equal a field rounded the same way;
+- every dollar amount in the chat (text and cards, chart axes left out) is a money field of the run (the helpers' `moneyFields`: totals, KPIs, aging buckets, bill amounts, quarterly cash flow, cash position, catalog money) or one of the entry's `expected(snapshot, ds)` figures (these include sums the scenario computes itself: per client, per department, quantity x unit cost), or a line or total computed by an approval card; a rounded amount must equal a field rounded the same way;
 - the entry's own checks hold: figures it must state (`states`), records it must name (`mentions`, `mentionsAny`) or must not name (`mentionsNone`), and its visible effect (a cash card, a chart, a budget or spend widget, a chart for more than 4 quarters).
 
 Three kinds are special. The dashboard suggestion passes on a complete segment with matching figures (the seconds are recorded, not enforced). The approval suggestions pass on a card listing the right unpaid bills or the items needing a restock, with a total equal to the store's computation; the scenario then rejects it and the store must not change. The no-data question passes on a reply containing "I don't have this data" and no dollar amount.
@@ -98,7 +98,9 @@ A run that ended on a rate-limit or model-side notice throws an error starting w
 
 Select entries when building: `pnpm e2e:build live.questions --only=8` writes `.playwright-mcp/scenarios/live.questions.only-8.js` with that index inlined (`--only=3,5` gives `only-3-5`), and that file runs like any other built scenario. The index is the position in `ENTRIES`, and each case is named after it. Without `--only` the full file runs every entry, which is long: run one entry per call.
 
-The chat-amount helpers (`amountsIn`, `matches`, `moneyFields`, `strangers`, `catalogMoneyOf`, `dueSoonest`) live in `lib/helpers.js`, shared with `live.reference.js`.
+A pass shows that an amount equals a store figure or a sum the scenario computes from the store, not that a tool returned it.
+
+The chat-amount helpers (`amountsIn`, `matches`, `moneyFields`, `strangers`, `catalogMoneyOf`, `dueSoonest`, together with `moneyIn`, `formatUsd` and `leaves`) live in `lib/helpers.js`, shared with `live.reference.js`.
 
 ## Rules for a scenario file
 

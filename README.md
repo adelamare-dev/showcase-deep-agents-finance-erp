@@ -1,6 +1,6 @@
 # Deep Agents Finance ERP
 
-A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and quotes only figures that the ERP itself holds. Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
+A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The amounts it writes in the chat are checked against the store, and some free questions still fail (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
 
 **Status.** A working base for a demo, not a finished one. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, then ask a follow-up question) has not passed five times in a row yet. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
 
@@ -104,12 +104,12 @@ Models: `ministral-14b-2512` for the orchestrator and both subagents, free tier,
 
 On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 1 to a read timeout, 1 that ended without a dashboard), 10 valid dashboards, all complete with figures equal to the store. Of the 10, 5 were within 45 s and the same 5 within 60 s; the time depends strongly on the model service's load, from 26 to 141 s. No run has yet passed from the dashboard through the follow-up question; in one run the follow-up said "$68,105 owed to suppliers" while the store held $11,050. Prompts were changed between runs, and each change reset the count.
 
-**Suggestions and likely free questions** (`e2e/scenarios/live.questions.js`): each of the 18 entries run three times on 2026-11-04, on one commit, each on a fresh thread after a data reset, with no run lost to a 429. Figures on screen are compared with the store.
+**Suggestions and likely free questions** (`e2e/scenarios/live.questions.js`): each of the 18 entries run three times on 2026-11-04, on commit 948b751, each on a fresh thread after a data reset, with no run lost to a 429. Figures on screen are compared with the store.
 
 | Entry | Passes |
 | --- | --- |
 | Cash Flow Dashboard | 2 of 3 |
-| Cash Position (typed) and its chart chip | 3 of 3 each |
+| Cash Position and Cash Position Chart (both typed) | 3 of 3 each |
 | Overdue Invoices | 3 of 3 |
 | Cash Flow Chart | 3 of 3 |
 | Approve Payments | 0 of 3 |
@@ -126,11 +126,13 @@ On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 
 | What-if of 12% over 6 quarters | 1 of 3 |
 | Headcount and payroll | 1 of 3 |
 
+These counts were measured on 948b751. Since that run the dashboard's projection chart and the Approve Payments message have changed (the quarterly projection now goes on the cash flow forecast chart, and the message also asks for overdue bills), so the dashboard entries and Approve Payments are owed a new measurement. At head, entry 1 clicks the chip and entry 6 types, while both were measured the other way, with the same messages.
+
 Counts vary between replays: an earlier series on mixed versions gave other counts (for example Cash Position 0 of 3, then 3 of 3), so read these as one sample of three, not as a rate.
 
 ## Known limits
 
-- **Approve Payments** (0 of 3) lists the bills due this week and leaves off the one bill already overdue ($1,850). The model narrows its own query to "due this week"; no tool filters it out. The total on the card is right and rejecting changes nothing.
+- **Approve Payments** (0 of 3, measured with the old message, which asked only for the bills "due this week") lists the bills due this week and leaves off the one bill already overdue ($1,850). The model narrows its own query to "due this week"; no tool filters it out. The total on the card is right and rejecting changes nothing.
 - **Cash Flow Dashboard** (2 of 3): in one run the model loaded a saved template instead of building the dashboard, which misses the Cash and Accounts Payable cards and the supplier bills.
 - **Removed suggestions.** "Cost Control Dashboard" (2 of 3: one comment quoted a figure the store does not hold) and "Reorder Inventory" (2 of 3: one item left off the card) are no longer offered on the first screen; both can still be typed.
 - **Not covered** (the model wrote a figure the store does not hold, or named the wrong record): which client owes the most (it picks a draft invoice), the cash and payables follow-up (once showed the overdue receivables as payables), a what-if over 6 quarters (rounded or truncated values), and headcount and payroll (sums of its own). The percentages the model writes in a comment are not checked and vary from run to run.

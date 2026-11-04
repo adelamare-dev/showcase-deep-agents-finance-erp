@@ -370,6 +370,7 @@ async (page, h) => {
     return data;
   };
 
+  h.assert(!ONLY || ONLY.every((i) => i < ENTRIES.length), "unknown entry index");
   for (const [index, entry] of ENTRIES.entries()) {
     if (ONLY && !ONLY.includes(index)) continue;
     await h.test(`${index} ${entry.name}`, async () => {
