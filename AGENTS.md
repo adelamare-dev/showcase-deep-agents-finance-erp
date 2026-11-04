@@ -15,6 +15,8 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 
 **Not done yet.** The reference series: no run has yet passed from the dashboard to the follow-up question, so the count of consecutive passes is 0 of 5. The scenario enforces 60 s from click to complete dashboard (the allowed fallback after the other remedies); 45 s stays the target and is not reliably met. On `ministral-14b-2512` the valid dashboard runs were complete with figures equal to the store, but their time depends strongly on the model service's load (measurements, from several prompt states, are in the README and the evidence, not here). The suggestions and ten likely free questions are checked by a repeated live scenario (`e2e/scenarios/live.questions.js`); its results, the suggestions removed from the first screen and the questions not covered are in the README, "Measured behaviour". The app is a working base, not the finished demo.
 
+**README.** It is the public entry point and states the same limits as this file (reference series not proven, Approve Payments 0 of 3, uncovered free questions). It was followed step by step on a fresh clone with a placeholder key (`pnpm install`, `pnpm demo`, `pnpm test:agent`, the `offline.*` scenarios). When a measurement changes, change the README table and this paragraph together. It carries no video link until a video exists.
+
 `SETUP/` (spec, plan, evidence) is deliberately **outside the repo** and gitignored: cite nothing from it in code, commits, README or UI.
 
 ## Stack and paths
@@ -41,7 +43,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 - `pnpm build` / `pnpm start` are web only. `pnpm dev:agent` / `pnpm start:agent` are agent only.
 - `pnpm lint` runs ESLint on the web app (`agent/` is ignored).
 - `pnpm test:agent` runs pytest in `agent/`. It makes no model call and needs no real key; `uv` itself needs network for its `malware-check`.
-- `pnpm e2e:build` assembles the browser scenarios into `.playwright-mcp/scenarios/`.
+- `pnpm e2e:build` assembles the browser scenarios into `.playwright-mcp/scenarios/`; `pnpm e2e:build offline` builds only the names containing `offline`.
 - `pnpm build`, then `nohup node e2e/fixtures/stack.mjs --logs <dir> > <dir>/stack.out 2>&1 &` starts the Mistral stub (`:8790`), agent and web app for the `stub.*` scenarios; `node e2e/fixtures/stack.mjs stop` stops them. Windows only (`taskkill`).
 - Binaries: `pnpm exec <bin>`, never `npx`. Python: `uv run`, from `agent/`.
 
