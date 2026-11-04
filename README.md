@@ -77,6 +77,14 @@ On the free tier with `ministral-14b-2512`, a click on "Cash Flow Dashboard" bui
 
 Measured on 2026-11-03 across several prompt states: 21 live runs, 11 lost (9 to a 429, 1 to a read timeout, 1 that ended without a dashboard), 10 valid dashboards; of those 10, 5 were within 45 s and those same 5 were also within 60 s, so 5 runs were within 60 s in all (the first two, before the prompt changes, took 138 and 141 s).
 
+Suggestions and likely free questions were run three times each (18 entries, `e2e/scenarios/live.questions.js`) on 2026-11-04, with no run lost to a 429. Three times out of three: "Cash Flow Dashboard" (complete, figures equal to the store, 24 to 31 s), "Overdue Invoices", "Cash Flow Chart", "Cost Control Dashboard", the "Cash Position Chart" chip, and the questions on headcount and payroll, low stock, expense categories, budget and the no-data question ("What is our ESG score?" answers "I don't have this data").
+
+Known limits:
+
+- **Approve Payments** lists the soonest bills due this week and leaves off the one bill already overdue ($1,850), in 3 of 3 runs. The total on the card is right and rejecting changes nothing.
+- **Removed suggestions.** "Cash Position" (0 of 3: the comment gave $789,700 for liabilities against $729,850 on the card) and "Reorder Inventory" (2 of 3: one run left an item off the card) are no longer offered on the first screen; both can still be typed.
+- **Not covered.** Questions where the model wrote a figure the store does not hold: which client owes the most (it once picked a draft invoice), cash and payables together, the total of unpaid supplier bills, a what-if over 6 quarters (a value truncated instead of rounded), and the overdue part of receivables. The percentages the model writes in a comment are not checked and vary from run to run.
+
 ## When something fails
 
 A failed answer (rate limit, model service error, agent not reachable) is shown above the chat input in plain words, with a **Retry** that runs the assistant again on the same conversation without adding a message. A model rate limit is retried once automatically per model call, after the `Retry-After` delay when it is 8 s or less, or after 2 s when Mistral sends none. If the figures cannot be reloaded, the page keeps the old ones and says they may be out of date, with a Retry. The agent refuses to start without `MISTRAL_API_KEY` and names `agent/.env`.

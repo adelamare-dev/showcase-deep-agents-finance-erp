@@ -11,7 +11,7 @@ async (page, h) => {
 
   await h.test("Cash Position shows a research card then the cash card", async () => {
     await h.open("/");
-    await page.locator("button", { hasText: /^Cash Position$/ }).click();
+    await h.sendPrompt("What's our current cash position and how does it compare to our liabilities?");
     await h.expectVisible(page.getByText("Researching:"), 90000);
     await h.expectVisible(page.getByText("Cash Position Summary"), 90000);
     await h.waitForRunEnd();

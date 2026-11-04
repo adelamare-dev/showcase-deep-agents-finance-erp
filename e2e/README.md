@@ -82,6 +82,30 @@ The result is `{ complete, seconds, runSeconds, missing, mismatches, compared, w
 
 `live.reference.js` is one full pass per run: reset, the dashboard segment (limit `DASHBOARD_MAX_SECONDS` = 60 in the file), subagent cards that show a step before they complete, "Approve Payments" (the card lists unpaid supplier bills, none left off that is due earlier than a listed one, total equal to their sum; Cash and Accounts Payable both down by that total, the Cash delta visible for about 3 s, books balanced), then a follow-up question that must state the new cash and payables and none of their old values. Every dollar amount in the chat, read before the approval and again after it, must be a money field of the pass: the store's totals, KPIs, aging buckets, bill amounts, quarterly cash flow and `cash_position` figures, plus the money values the catalog drew during the dashboard (`catalogMoney`: chart values and cash position amounts, no counts or years). A rounded amount ("$1.2M", "$58K") must equal a field rounded the same way. A failure carries the pass data in its error text; the runner records one line per pass (seconds, result, 429 notices) and reads tokens from the agent's `model_usage` log lines. A pass lost to a 429 is discarded and replayed. `stub.reference-retry.js` is the stub-stack proof that a Retry around an approval pays once.
 
+## The suggestions and free questions
+
+`live.questions.js` holds one entry per chat suggestion and per likely free question (indices in the file's `ENTRIES`), each run as one case on a fresh thread after a data reset, and compared with the snapshot and the catalog read at the end of the run. An entry passes when:
+
+- the run ends without an error notice and the reply is not empty;
+- every dollar amount in the chat (text and cards, chart axes left out) is a money field of the run (the helpers' `moneyFields`: totals, KPIs, aging buckets, bill amounts, quarterly cash flow, cash position, catalog money) or one of the entry's `expected(snapshot, ds)` figures, or a line or total computed by an approval card; a rounded amount must equal a field rounded the same way;
+- the entry's own checks hold: figures it must state (`states`), records it must name (`mentions`, `mentionsAny`) or must not name (`mentionsNone`), and its visible effect (a cash card, a chart, a budget or spend widget, a chart for more than 4 quarters).
+
+Three kinds are special. The dashboard suggestion passes on a complete segment with matching figures (the seconds are recorded, not enforced). The approval suggestions pass on a card listing the right unpaid bills or the items needing a restock, with a total equal to the store's computation; the scenario then rejects it and the store must not change. The no-data question passes on a reply containing "I don't have this data" and no dollar amount.
+
+A run that ended on a rate-limit or model-side notice throws an error starting with `DISCARDED`: the runner replays it and does not count it. Any other failure starts with `FAILED` or an assertion message and carries the reply and the catalog requests seen.
+
+Select entries with `globalThis.questionsOnly = [indices]` before the file is evaluated; with none, every entry runs, which is long: run one entry per call. A scenario run by `filename` echoes the whole file in the tool result, so a runner that repeats entries serves `.playwright-mcp/scenarios/` from any static file server and calls `browser_run_code_unsafe` with a short `code`:
+
+```js
+async (page) => {
+  globalThis.questionsOnly = [8];
+  const src = await (await fetch("http://127.0.0.1:8791/live.questions.js")).text();
+  return await (0, eval)("(" + src + ")")(page);
+}
+```
+
+The chat-amount helpers (`amountsIn`, `matches`, `moneyFields`, `strangers`, `catalogMoneyOf`, `dueSoonest`) live in `lib/helpers.js`, shared with `live.reference.js`.
+
 ## Rules for a scenario file
 
 - One single expression, no `import`, no `require`, no trailing `;`: the tool runs it in a VM without modules. `build.mjs` rejects a file that is not one expression.

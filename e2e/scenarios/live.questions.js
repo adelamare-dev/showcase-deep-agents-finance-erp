@@ -65,8 +65,8 @@ async (page, h) => {
   const ENTRIES = [
     { name: "Cash Flow Dashboard", kind: "dashboard" },
     {
-      name: "Cash Position",
-      chip: "Cash Position",
+      name: "Cash position and liabilities",
+      prompt: "What's our current cash position and how does it compare to our liabilities?",
       expected: (s) => s.accounts.map((a) => a.balance),
       effect: "cashCard",
     },
@@ -80,7 +80,7 @@ async (page, h) => {
     },
     { name: "Cash Flow Chart", chip: "Cash Flow Chart", expected: () => [], effect: "chart" },
     { name: "Approve Payments", chip: "Approve Payments", kind: "bills" },
-    { name: "Reorder Inventory", chip: "Reorder Inventory", kind: "reorder" },
+    { name: "Reorder inventory", prompt: "Check inventory levels and reorder anything that needs restocking", kind: "reorder" },
     {
       name: "Cost Control Dashboard",
       chip: "Cost Control Dashboard",
@@ -212,10 +212,15 @@ async (page, h) => {
     await h.resetDemo();
     await h.open("/");
     const before = await h.snapshot();
-    const chip = byId("copilot-sidebar").locator("button", { hasText: new RegExp(`^${entry.chip}$`) });
-    await h.expectVisible(chip, 15000);
-    const started = Date.now();
-    await chip.first().click();
+    let started = Date.now();
+    if (entry.chip) {
+      const chip = byId("copilot-sidebar").locator("button", { hasText: new RegExp(`^${entry.chip}$`) });
+      await h.expectVisible(chip, 15000);
+      started = Date.now();
+      await chip.first().click();
+    } else {
+      await h.sendPrompt(entry.prompt);
+    }
     const card = byId(isBills ? "bill-approval-card" : "reorder-approval-card");
     const deadline = Date.now() + 180000;
     while (Date.now() < deadline && !(await card.count()) && !(await byId("run-error-banner").count())) {
@@ -254,7 +259,7 @@ async (page, h) => {
       h.assert(rows.every((r) => r.quantity > 0 && item[r.sku].quantity + r.quantity >= item[r.sku].reorderLevel), "each quantity brings the stock to at least its reorder level: " + JSON.stringify(rows.map((r) => ({ sku: r.sku, ordered: r.quantity, stock: item[r.sku].quantity, reorderLevel: item[r.sku].reorderLevel }))));
       h.assertEqual(total, sum(rows, (r) => r.quantity * item[r.sku].unitCost), "card total = sum of quantity x unit cost");
       Object.assign(data, { rows, total });
-      allowed = [total, ...stockFigures(before)];
+      allowed = [total, ...rows.map((r) => r.quantity * item[r.sku].unitCost), ...stockFigures(before)];
     }
     const fields = [...(await h.moneyFields(before, [])), ...allowed.map(Math.abs)];
     h.assertEqual(h.strangers(await readChat(), fields), [], "chat amounts that are not money fields of this run");
@@ -317,6 +322,7 @@ async (page, h) => {
   };
 
   const checkReply = async (entry, snap, reply, catalog, data) => {
+    const has = (s) => reply.toLowerCase().includes(s.toLowerCase());
     const catalogMoney = [...new Set(catalog.seen.flatMap((r) => h.catalogMoneyOf(r.body)))];
     // An approval card the question raised computes its own lines and total from
     // the store (the model only picks identifiers and quantities).
@@ -332,14 +338,14 @@ async (page, h) => {
     for (const v of entry.states ? entry.states(snap) : []) {
       h.assert(h.amountsIn(reply).some((a) => h.matches(a, Math.abs(v))), `the reply does not state ${h.formatUsd(v)}: ` + reply.slice(0, 400));
     }
-    for (const s of entry.mentions ? entry.mentions(snap) : []) h.assert(reply.includes(s), `the reply does not mention ${s}`);
+    for (const s of entry.mentions ? entry.mentions(snap) : []) h.assert(has(s), `the reply does not mention ${s}`);
     if (entry.mentionsAny) {
       const options = entry.mentionsAny(snap);
       const here = new URL(page.url());
       const moved = entry.orUrl && entry.orUrl.test(here.pathname + here.search);
-      h.assert(moved || options.some((s) => reply.includes(s)), "the reply mentions none of: " + options.slice(0, 8).join(", ") + " | " + reply.slice(0, 300));
+      h.assert(moved || options.some(has), "the reply mentions none of: " + options.slice(0, 8).join(", ") + " | " + reply.slice(0, 300));
     }
-    const named = entry.mentionsNone ? entry.mentionsNone(snap).filter((s) => reply.includes(s)) : [];
+    const named = entry.mentionsNone ? entry.mentionsNone(snap).filter(has) : [];
     h.assertEqual(named, [], "the reply names records the store says are settled");
 
     const charts = await byId("copilot-message-list").locator(".recharts-wrapper").count();
