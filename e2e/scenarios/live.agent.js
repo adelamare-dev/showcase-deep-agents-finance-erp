@@ -22,7 +22,7 @@ async (page, h) => {
 
   await h.test("Supplier payment: approval card, Approve, the graph resumes", async () => {
     await h.open("/");
-    await h.sendPrompt("Approve the supplier payments due this week");
+    await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
     await h.expectVisible(approveButton(), 90000);
     const messages = page.getByTestId("copilot-assistant-message");
     const countBefore = await messages.count();

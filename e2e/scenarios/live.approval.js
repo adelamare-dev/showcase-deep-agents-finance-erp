@@ -14,7 +14,7 @@ async (page, h) => {
     await h.resetDemo();
     await h.open("/");
     const before = await h.snapshot();
-    await h.sendPrompt("Approve the supplier payments due this week");
+    await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
     await h.expectVisible(page.getByTestId("bill-approval-card"), 120000);
 
     // The card total is the sum of the listed bills as the store holds them.
@@ -64,7 +64,7 @@ async (page, h) => {
     await h.resetDemo();
     await h.open("/");
     const before = await h.snapshot();
-    await h.sendPrompt("Approve the supplier payments due this week");
+    await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
     await h.expectVisible(page.getByTestId("bill-approval-card"), 120000);
     await inChat("Reject").click();
     await page.getByTestId("bill-approval-card").waitFor({ state: "detached", timeout: 30000 });

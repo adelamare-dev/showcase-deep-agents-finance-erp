@@ -28,7 +28,7 @@ async (page, h) => {
       { toolCall: { name: "request_approval", args: { type: "supplier_payment", bill_ids: ids } } },
       { text: "The payment was made." },
     ]);
-    await h.sendPrompt("Approve the supplier payments due this week");
+    await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
     await h.expectVisible(byId("bill-approval-card"), 30000);
     const shown = await byId("bill-approval-row").evaluateAll((rows) => rows.map((r) => r.dataset.billId));
     const total = Number(await byId("bill-approval-total").getAttribute("data-amount"));

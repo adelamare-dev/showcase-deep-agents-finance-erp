@@ -21,7 +21,7 @@ async (page, h) => {
     h.assert(ids.length > 0, "the store holds unpaid bills the account can cover");
     // The payment is applied, then the model call that should report it fails.
     await h.stubScript([ask(ids), { status: 500, message: "" }]);
-    await h.sendPrompt("Approve the supplier payments due this week");
+    await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
     await h.expectVisible(byId("bill-approval-card"), 30000);
     const total = await cardTotal();
     await inChat("Approve Payment").click();
@@ -48,7 +48,7 @@ async (page, h) => {
     const before = await h.snapshot();
     const ids = h.payableBillIds(before);
     await h.stubScript([{ status: 500, message: "" }]);
-    await h.sendPrompt("Approve the supplier payments due this week");
+    await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
     await h.expectVisible(banner, 30000);
     h.assertEqual((await h.snapshot()).totals, before.totals, "nothing was paid by the failed run");
 

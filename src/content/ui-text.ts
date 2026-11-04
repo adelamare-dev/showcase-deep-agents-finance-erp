@@ -48,7 +48,7 @@ export const demoSuggestions: Suggestion[] = [
   },
   {
     title: "Approve Payments",
-    message: "Approve the supplier payments due this week",
+    message: "Approve the supplier bills due this week, including any overdue ones",
   },
 ];
 
@@ -61,6 +61,6 @@ export const followUpSuggestions: Suggestion[] = [
   },
   {
     title: "Approve Payments",
-    message: "Approve the supplier payments due this week",
+    message: "Approve the supplier bills due this week, including any overdue ones",
   },
 ];
