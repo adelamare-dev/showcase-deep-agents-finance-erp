@@ -193,7 +193,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   // Saved dashboards context — agent can reference when loading saved layouts
   useAgentContext({
     description:
-      "Saved dashboard configurations (templates and custom). Use load_dashboard to restore a saved one, save_dashboard to save the current layout. When the user asks for a standard view, suggest loading a template before building from scratch.",
+      "Saved dashboard configurations (templates and custom). Use load_dashboard to restore a saved one, save_dashboard to save the current layout. When the user names a standard view without listing the widgets it wants, load a template instead of building from scratch. A request that lists its widgets is always built, never loaded.",
     value: savedDashboards.map((d) => ({
       id: d.id,
       name: d.name,
