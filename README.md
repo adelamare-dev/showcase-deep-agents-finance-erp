@@ -191,8 +191,6 @@ Browser (:3000)
 ## Going further
 
 - [`templates/postgres/`](templates/postgres/README.md): an archived Postgres setup (wired to nothing) and how to derive a private, persistent copy of this public repo.
-- [`docs/vite-migration.md`](docs/vite-migration.md): a note on moving from Next to React + Vite. Nothing has been migrated.
-
 ## Credit and licence
 
 This repository is a standalone fork of the [Deep Agents Finance ERP showcase](https://github.com/CopilotKit/CopilotKit/tree/main/examples/showcases/deep-agents-finance-erp) from [CopilotKit](https://github.com/CopilotKit/CopilotKit), released under the MIT licence (see `LICENSE`). No resync with the original is planned.
