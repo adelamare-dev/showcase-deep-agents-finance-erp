@@ -65,8 +65,8 @@ async (page, h) => {
   const ENTRIES = [
     { name: "Cash Flow Dashboard", kind: "dashboard" },
     {
-      name: "Cash position and liabilities",
-      prompt: "What's our current cash position and how does it compare to our liabilities?",
+      name: "Cash Position",
+      chip: "Cash Position",
       expected: (s) => s.accounts.map((a) => a.balance),
       effect: "cashCard",
     },
@@ -82,8 +82,8 @@ async (page, h) => {
     { name: "Approve Payments", chip: "Approve Payments", kind: "bills" },
     { name: "Reorder inventory", prompt: "Check inventory levels and reorder anything that needs restocking", kind: "reorder" },
     {
-      name: "Cost Control Dashboard",
-      chip: "Cost Control Dashboard",
+      name: "Cost control dashboard",
+      prompt: "I'm concerned about the Marketing overspend — set up a cost control view with budget tracking and spending trends",
       expected: budgetFigures,
       effect: "widgets",
     },

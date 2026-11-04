@@ -34,6 +34,11 @@ export const heroSuggestion: Suggestion = {
 export const demoSuggestions: Suggestion[] = [
   heroSuggestion,
   {
+    title: "Cash Position",
+    message:
+      "What's our current cash position and how does it compare to our liabilities?",
+  },
+  {
     title: "Overdue Invoices",
     message: "Show me all overdue invoices",
   },
@@ -44,11 +49,6 @@ export const demoSuggestions: Suggestion[] = [
   {
     title: "Approve Payments",
     message: "Approve the supplier payments due this week",
-  },
-  {
-    title: "Cost Control Dashboard",
-    message:
-      "I'm concerned about the Marketing overspend — set up a cost control view with budget tracking and spending trends",
   },
 ];
 
