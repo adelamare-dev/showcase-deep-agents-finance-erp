@@ -50,13 +50,22 @@ async (page, h) => {
     h.assert((await page.getByTestId("kpi-Cash").innerText()).includes(cashKpi.value), "the Cash KPI shows the new value");
 
     // A following turn no longer lists the paid bills.
+    // The turn is its message and the cards under it; earlier turns (the
+    // receipt lists the bills just paid) are cut off by the text read before.
+    const chatBefore = await h.chatText();
     await h.sendPrompt("Which supplier bills are still unpaid?");
     await h.waitForRunEnd();
-    const answer = await page.getByTestId("copilot-assistant-message").last().innerText();
+    const chatAfter = await h.chatText();
+    h.assert(chatAfter.startsWith(chatBefore), "the chat only grew");
+    const answer = chatAfter.slice(chatBefore.length);
     const nowPaid = paidNumbers(after).filter((n) => !paidNumbers(before).includes(n));
     h.assert(nowPaid.every((n) => !answer.includes(n)), "the answer omits the bills just paid");
     const stillOpen = after.bills.filter((b) => b.status !== "paid");
-    h.assert(stillOpen.length === 0 || stillOpen.some((b) => answer.includes(b.number)), "the answer lists a bill still unpaid");
+    // A card may name a bill by its number or by its supplier.
+    h.assert(
+      stillOpen.length === 0 || stillOpen.some((b) => answer.includes(b.number) || answer.includes(b.supplier)),
+      "the answer lists a bill still unpaid",
+    );
     return { ids, cardTotal, cashDelta, payablesDelta, beforeTotals: before.totals, afterTotals: after.totals };
   });
 
