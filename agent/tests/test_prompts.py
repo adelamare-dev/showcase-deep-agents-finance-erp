@@ -95,8 +95,8 @@ def test_one_figure_questions_go_straight_to_the_aggregate_tools():
     assert rule.index("compares cash with liabilities") < rule.index("call the matching get_* tool")
     assert "follow the Cash position rule" in rule
     cash = next(line for line in lines if line.startswith("- Cash position / liquidity"))
-    assert "cash compared with liabilities" in cash and "render_chat_visual (dataset cash_position)" in cash
-    assert "even though get_cash_and_payables exists" in cash
+    assert "cash compared with liabilities" in cash and "then render_chat_visual (dataset cash_position)" in cash
+    assert "never get_cash_and_payables for this question" in cash and "never call render_chat_visual before do_research" in cash
     dashboard = next(i for i, line in enumerate(lines) if line.startswith("- Dashboard / overview"))
     assert lines.index(rule) < dashboard
     for name in ("get_receivables_by_client", "get_headcount_and_payroll", "get_cash_and_payables"):

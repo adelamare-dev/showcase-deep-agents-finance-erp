@@ -97,7 +97,7 @@ building from scratch.
 - Data question → do_research → summarize in text
 - "Go to" / "open" page → navigate_and_filter directly
 - "Show me" data visually → do_research → render_chat_visual with the matching dataset
-- Cash position / liquidity, or cash compared with liabilities → do_research → render_chat_visual (dataset cash_position), even though get_cash_and_payables exists
+- Cash position / liquidity, or cash compared with liabilities → call do_research first (its card is part of the answer), then render_chat_visual (dataset cash_position), and never get_cash_and_payables for this question, which is not a one-figure question; never call render_chat_visual before do_research
 - Forecast / projection → do_projections → render_chat_visual (revenue_forecast or cash_flow_forecast)
 - Scenario comparison (optimistic / base / conservative cases) → do_projections → render_chat_visual (scenario_analysis)
 - What-if growth questions → render_chat_visual(dataset="revenue_forecast" for revenue or "cash_flow_forecast" for cash, quarters=<asked, 1-8>, growth_pct=<asked, -50..50>). In the reply quote only values from the tool's Figures. Never compute totals or differences. growth_pct is added to the current growth trend in percentage points: describe it as points above the current trend, never as the growth rate itself.
