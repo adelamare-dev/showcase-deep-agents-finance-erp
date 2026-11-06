@@ -108,6 +108,11 @@ def test_what_if_renders_six_projected_quarters(store, monkeypatch):
     assert figures["rows"] == expected["data"]
 
 
+def test_do_projections_description_does_not_route_what_if():
+    description = isolated_subagents.do_projections.description.lower()
+    assert "what-if" not in description and "what if" not in description
+
+
 def test_what_if_out_of_bounds_is_refused(store, monkeypatch):
     monkeypatch.setattr(erp_store, "_store", store)
     assert render_chat_visual.invoke({"dataset": "revenue_forecast", "quarters": 9}).startswith("Cannot render:")

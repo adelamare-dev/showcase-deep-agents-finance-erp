@@ -159,7 +159,7 @@ async def do_projections(
     scenario analysis, and trend analysis from historical data.
 
     Use this tool for forward-looking questions about future quarters,
-    "what-if" scenarios, or trend analysis.
+    scenario comparisons, or trend analysis.
 
     Args:
         query: The projection or forecast request.

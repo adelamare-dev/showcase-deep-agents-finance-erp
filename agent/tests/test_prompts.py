@@ -114,15 +114,20 @@ def test_research_is_not_asked_to_aggregate():
     assert "Never add up" in RESEARCH_AGENT_PROMPT
 
 
+def test_forward_looking_routing_excludes_what_if_growth():
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Use do_projections (not do_research)"))
+    assert "except what-if growth questions" in rule
+
+
 def test_prompt_routes_what_if_to_a_card():
     rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- What-if growth questions"))
     assert "render_chat_visual" in rule
     assert 'dataset="revenue_forecast"' in rule and '"cash_flow_forecast"' in rule
     assert "quarters=<asked, 1-8>" in rule and "growth_pct=<asked, -50..50>" in rule
     assert "Never compute totals or differences" in rule
-    # No line may route a what-if question through do_projections, except the CRITICAL rule that excludes it.
+    # No line may route a what-if question through do_projections, except the lines that exclude it.
     for line in ORCHESTRATOR_PROMPT.splitlines():
-        if "do_projections" in line and not line.startswith("- CRITICAL"):
+        if "do_projections" in line and "except what-if growth questions" not in line and "Exception:" not in line:
             assert "what-if" not in line.lower() and "what if" not in line.lower(), line
     critical = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- CRITICAL: ALWAYS call do_research"))
     assert "Exception: a what-if growth question calls render_chat_visual directly" in critical
