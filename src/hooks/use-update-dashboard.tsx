@@ -135,7 +135,7 @@ function DashboardUpdater({
     return (
       <CompletedToolCard
         name="update_dashboard"
-        args={{ widgets }}
+        args={{ widgets, replace }}
         result={result}
       />
     );

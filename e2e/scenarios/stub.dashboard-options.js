@@ -116,6 +116,7 @@ async (page, h) => {
     await page.waitForTimeout(1500);
     const types = (await h.scanDashboard()).widgets.map((w) => w.type);
     h.assertEqual(types, ["metric-cards", "ar-aging-gauge", "outstanding-invoices", "custom-chart"], "exactly the widgets given, in order");
+    h.assert((await h.chatText()).includes("Replacing dashboard with"), "the tool card says the dashboard is replaced");
     // The two KPI cards show on load; the gauge and the bills list sit one row
     // below, and the three rows together fit one screen of the scroll area (the
     // toolbar above them is the only reason the second row starts low).
