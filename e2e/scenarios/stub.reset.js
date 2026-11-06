@@ -137,20 +137,26 @@ async (page, h) => {
     await item.click();
     h.assertEqual((await item.innerText()).trim(), "Click again to reset", "the entry is armed");
 
+    // Send from the keyboard: a click in the chat would close the menu, and
+    // closing the menu disarms on its own. Here the menu stays open throughout.
     await h.stubScript([{ text: "Checking the books for you now.", hold: true }]);
-    await h.sendPrompt("Give me a status update");
+    const input = byId("copilot-chat-textarea");
+    await input.fill("Give me a status update");
+    await input.press("Enter");
     await h.expectVisible(page.getByText("Checking", { exact: false }).last(), 30000);
-    const during = await h.openSettings();
-    h.assert(await during.isDisabled(), "the entry is disabled during the run");
+    h.assert(await item.isVisible(), "the menu stayed open while the run started");
+    h.assert(await item.isDisabled(), "the entry is disabled during the run");
+    h.assertEqual((await item.innerText()).trim(), "Reset demo data", "the run disarmed the entry");
 
     await h.stubRelease();
     await h.waitForRunEnd();
-    h.assert(await during.isEnabled(), "the entry is available once the run is over");
-    h.assertEqual((await during.innerText()).trim(), "Reset demo data", "the entry is no longer armed");
+    h.assert(await item.isVisible(), "the menu is still open once the run is over");
+    h.assert(await item.isEnabled(), "the entry is available once the run is over");
+    h.assertEqual((await item.innerText()).trim(), "Reset demo data", "the entry is no longer armed");
     h.assertEqual(await chatCount(), 2, "the conversation was not cleared");
   });
 
-  await h.test("A message sent right after the reset lands in the new thread", async () => {
+  await h.test("A message sent during the reset lands in the new thread", async () => {
     await fresh();
     const lastCount = async () => (await h.stubRequests()).at(-1).messages;
     await h.stubScript([{ text: "Answer one." }]);
@@ -164,11 +170,23 @@ async (page, h) => {
     }
     h.assert((await lastCount()) > baseline, "the thread grew");
 
-    await h.clickReset();
+    // Hold the reset request so the prompt is sent while the reset is under way.
+    let pending = true;
+    await page.route("**/api/erp/reset", async (route) => {
+      while (pending) await new Promise((r) => setTimeout(r, 100));
+      await route.continue();
+    });
+    const item = await h.openSettings();
+    await item.click();
+    await item.click();
+    await page.waitForTimeout(500);
     await h.stubScript([{ text: "Answer one." }]);
     await h.sendPrompt("Hello");
     await h.waitForRunEnd();
     h.assertEqual(await lastCount(), baseline, "the request carries only the new message");
+    pending = false;
+    await page.waitForTimeout(2000);
+    await page.unroute("**/api/erp/reset");
   });
 
   await h.test("A saved custom dashboard is cleared by reset", async () => {
