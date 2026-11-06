@@ -88,10 +88,15 @@ def test_the_quarterly_cash_projection_goes_on_the_forecast_chart_not_the_waterf
 
 
 def test_one_figure_questions_go_straight_to_the_aggregate_tools():
-    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- One-figure questions"))
-    assert "no subagent" in rule and "quoting its fields exactly" in rule
-    assert "compares cash with liabilities" in rule and "follows the Cash position rule" in rule
     lines = ORCHESTRATOR_PROMPT.splitlines()
+    rule = next(line for line in lines if "one-figure questions (" in line)
+    assert "no subagent" in rule and "quoting its fields exactly" in rule
+    # The exclusion comes before the route, so it is read first.
+    assert rule.index("compares cash with liabilities") < rule.index("call the matching get_* tool")
+    assert "follow the Cash position rule" in rule
+    cash = next(line for line in lines if line.startswith("- Cash position / liquidity"))
+    assert "cash compared with liabilities" in cash and "render_chat_visual (dataset cash_position)" in cash
+    assert "even though get_cash_and_payables exists" in cash
     dashboard = next(i for i, line in enumerate(lines) if line.startswith("- Dashboard / overview"))
     assert lines.index(rule) < dashboard
     for name in ("get_receivables_by_client", "get_headcount_and_payroll", "get_cash_and_payables"):
