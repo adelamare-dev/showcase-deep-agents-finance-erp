@@ -78,7 +78,7 @@ Without `--allow-agent-exit` the launcher brings the whole stack down when the a
 
 `stub.dashboard-options.js` scripts an `update_dashboard` call whose list options (`metrics`, `categories`, `statuses`) arrive as one string each and checks the widgets render with a single item, with no error screen.
 
-`h.stubReset()` empties the queue and the request log; `h.stubRequests()` lists what the agent sent. A scripted `request_approval` passes a scope (`due_within_days`, `include_overdue`), never bill ids; the bills it should select are recomputed from `h.snapshot()` with `h.billsForApproval(snapshot, days, includeOverdue)`. `stub.approval.js` plays the card, the frozen receipt (`approval-receipt`, with `data-count` and `data-amount`) and the reload.
+`h.stubReset()` empties the queue and the request log; `h.stubRequests()` lists what the agent sent. A scripted `request_approval` passes a scope (`due_within_days`, `include_overdue`), never bill ids; the bills it should select are recomputed from `h.snapshot()` with `h.billsForApproval(snapshot, days, includeOverdue)`. `stub.approval.js` plays the card, the frozen receipt (`approval-receipt`, with `data-count` and `data-amount`), the rejection and the reload. `stub.card-changes.js` checks that the cash card in the chat shows its first figures struck through after an approval. `stub.reset.js` covers the two-click reset, the block while a run or an approval card is pending, the disarm when a run starts, a message sent during the reset, and a failed reset.
 
 ## The reference dashboard segment
 
@@ -118,8 +118,8 @@ The chat-amount helpers (`amountsIn`, `matches`, `moneyFields`, `strangers`, `ca
 ## Rules for a scenario file
 
 - One single expression, no `import`, no `require`, no trailing `;`: the tool runs it in a VM without modules. `build.mjs` rejects a file that is not one expression.
-- Everything comes from `h`: `open`, `visit`, `resetDemo`, `sendPrompt`, `waitForRunEnd`, `chatText`, `snapshot`, `moneyIn`, `formatUsd`, `test`, `assert`, `assertEqual`, `expectVisible`, `byId`, and for the stub `stubScript`, `stubRelease`, `stubReset`, `stubRequests`, `billsForApproval`, `payableBillIds`, `openSettings`, `clickReset`, `runDashboardSegment`, and `clippedCardContent` (lines describing content that overflows a dashboard card; empty when none).
-- `h.resetDemo()` resets through the API and reloads the page; `h.clickReset()` uses the Settings control, which is what a scenario about the control must do.
+- Everything comes from `h`: `open`, `visit`, `resetDemo`, `sendPrompt`, `waitForRunEnd`, `chatText` (the only way to read the chat: `h.chatText(skip)` leaves out struck-through values and the selectors in `skip`), `snapshot`, `moneyIn`, `formatUsd`, `test`, `assert`, `assertEqual`, `expectVisible`, `byId`, and for the stub `stubScript`, `stubRelease`, `stubReset`, `stubRequests`, `billsForApproval`, `payableBillIds` (no scenario calls it now), `openSettings`, `clickReset`, `runDashboardSegment`, and `clippedCardContent` (lines describing content that overflows a dashboard card; empty when none).
+- `h.resetDemo()` resets through the API and reloads the page; `h.clickReset()` uses the Settings control and clicks it twice (the first click only arms it), which is what a scenario about the control must do.
 - Group related checks as named cases with `h.test(name, fn)`; every case runs and failures are collected.
 - Compare displayed figures with `h.snapshot()` (`GET /api/erp/snapshot`, served by the agent), never with hard-coded values.
 - Validated at 1280x720; `h.open` sets it.

@@ -12,7 +12,9 @@ A small finance ERP whose AI assistant orchestrates sub-agents you can watch, as
 - 12 dashboard widget types with 4 pre-built templates (Executive Summary, Cash Flow Risk, Cost Control, Revenue Overview)
 - Dashboard gallery (`/dashboards`) for browsing, loading, saving, and deleting layouts (saved layouts live in the browser's `localStorage` under a versioned key; dashboards saved under an older version are ignored)
 - Multi-agent orchestration: orchestrator (with 3 exact-aggregate tools for one-figure questions) + research subagent (17 tools) + projections subagent (6 tools), with each subagent step listed live on its card
-- Human-in-the-loop approval that really pays supplier bills and marks reorders as on order, with the change highlighted on screen
+- Human-in-the-loop approval that really pays supplier bills and marks reorders as on order, with the change highlighted on screen. Approve Payments covers the unpaid bills due within the next 7 days and the overdue ones, the code picks them, and the decision stays in the thread as a receipt
+- After a payment, the cash card already in the chat keeps its first figures struck through beside the new ones
+- A what-if on revenue or cash (growth and quarters) is answered with a forecast card whose figures come from the catalog
 - No figure on a card or chart comes from the model: it names a dataset, the code fills in the numbers
 
 ## Prerequisites
@@ -131,13 +133,13 @@ On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 
 | What-if of 12% over 6 quarters | 1 of 3 |
 | Headcount and payroll | 1 of 3 |
 
-These counts were measured on e1a735f, before the aggregate tools and the prompt rule routing one-figure questions to them were added; they are due again. Since that run the dashboard's projection chart and the Approve Payments message have changed (the quarterly projection now goes on the cash flow forecast chart, and the message also asks for overdue bills), so the dashboard entries and Approve Payments are owed a new measurement. Entry 1 was measured typed and entry 6 clicked; at head, entry 1 clicks its chip and entry 6 types, with the same messages.
+These counts were measured on e1a735f, before the aggregate tools and the prompt rule routing one-figure questions to them were added, and before the scoped approval and the what-if route; they are due again. Since that run the dashboard's projection chart and the Approve Payments message have changed (the quarterly projection now goes on the cash flow forecast chart, and the message also asks for overdue bills), so the dashboard entries and Approve Payments are owed a new measurement. Entry 1 was measured typed and entry 6 clicked; at head, entry 1 clicks its chip and entry 6 types, with the same messages.
 
 Counts vary between replays: an earlier series on mixed versions gave other counts (for example Cash Position 0 of 3, then 3 of 3), so read these as one sample of three, not as a rate.
 
 ## Known limits
 
-- **Approve Payments** (0 of 3, measured with the old message, which asked only for the bills "due this week") lists the bills due this week and leaves off the one bill already overdue ($1,850). The model narrows its own query to "due this week"; no tool filters it out. The total on the card is right and rejecting changes nothing.
+- **Approve Payments** (0 of 3, measured with the old message and the old tool, where the model chose the bill ids) listed the bills due this week and left off the one bill already overdue ($1,850). The code now selects the bills from a scope that includes overdue ones, but this has not been measured again. The total on the card is right and rejecting changes nothing.
 - **Cash Flow Dashboard** (2 of 3): in one run the model loaded a saved template instead of building the dashboard, which misses the Cash and Accounts Payable cards and the supplier bills.
 - **Removed suggestions.** "Cost Control Dashboard" (2 of 3: one comment quoted a figure the store does not hold) and "Reorder Inventory" (2 of 3: one item left off the card) are no longer offered on the first screen; both can still be typed.
 - **Not covered** (the model wrote a figure the store does not hold, or named the wrong record): which client owes the most (it picks a draft invoice), the cash and payables follow-up (once showed the overdue receivables as payables), a what-if over 6 quarters (rounded or truncated values), and headcount and payroll (sums of its own). The percentages the model writes in a comment are not checked and vary from run to run.
@@ -152,7 +154,7 @@ The app opens with the chat panel open and "Cash Flow Dashboard" as the first su
 
 ## Replaying the demo
 
-The Settings icon at the bottom of the left bar has one entry, **Reset demo data**. It restores the seeded books, the default dashboard, the dashboards saved in the browser and the subagent steps, and opens a fresh conversation. The first click only arms it (the label becomes "Click again to reset" for 4 seconds); the second click resets. It is disabled while the assistant is answering or an approval card waits for an answer. A pending approval card disappears on reset, because the reset opens a new conversation. Restarting the agent also restores the books.
+The Settings icon at the bottom of the left bar has one entry, **Reset demo data**. It restores the seeded books, the default dashboard, the dashboards saved in the browser and the subagent steps, and opens a fresh conversation. The first click only arms it (the label becomes "Click again to reset" for 4 seconds); the second click resets. It is disabled while the assistant is answering or an approval card waits for an answer. A pending approval card disappears on reset, because the reset opens a new conversation. If the reset fails, the books and the dashboard stay as they were, the error is shown and the chat is already on a new, empty conversation. Restarting the agent also restores the books.
 
 ## Architecture
 
