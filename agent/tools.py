@@ -11,6 +11,7 @@ import json
 from langchain_core.tools import tool
 
 import erp_datasets
+from erp_aggregates import cash_and_payables, headcount_and_payroll, receivables_by_client
 from erp_store import get_store
 
 MAX_FORECAST_QUARTERS = erp_datasets.MAX_QUARTERS
@@ -160,7 +161,7 @@ NET CHANGE IN CASH              ${latest["net"]:>12,.0f}
         low_stock = [
             i for i in snap["inventoryItems"] if i["status"] in ("low-stock", "out-of-stock")
         ]
-        active_payroll = sum(e["salary"] for e in snap["employees"] if e["status"] == "active")
+        active_payroll = headcount_and_payroll(snap)["totalPayroll"]
 
         return f"""FINANCIAL SUMMARY — {as_of}
 
@@ -291,6 +292,24 @@ def query_ar_aging() -> str:
 
 
 @tool
+def get_receivables_by_client() -> str:
+    """Return exact open receivables per client as JSON: amount, invoiceCount and overdueAmount per client (largest first), plus total, overdueTotal and overdueSharePct. Use for "who owes us the most", total receivables and the overdue share."""
+    return json.dumps(receivables_by_client(_snapshot()), indent=2)
+
+
+@tool
+def get_headcount_and_payroll() -> str:
+    """Return exact active headcount and annual payroll as JSON: headcount, totalPayroll and, per department, headcount, payroll and payrollSharePct."""
+    return json.dumps(headcount_and_payroll(_snapshot()), indent=2)
+
+
+@tool
+def get_cash_and_payables() -> str:
+    """Return exact cash and supplier payables as JSON: cash, accountsPayable, openBills, overdueBills, overdueBillsAmount and cashAfterPayables (cash minus accounts payable)."""
+    return json.dumps(cash_and_payables(_snapshot()), indent=2)
+
+
+@tool
 def query_monthly_expenses(category: str | None = None) -> str:
     """Return monthly expense data for the current fiscal year as JSON.
 
@@ -382,6 +401,12 @@ def compute_trend_analysis(metric: str = "revenue") -> str:
 # Exported tool lists
 # ---------------------------------------------------------------------------
 
+aggregate_tools = [
+    get_receivables_by_client,
+    get_headcount_and_payroll,
+    get_cash_and_payables,
+]
+
 research_tools = [
     query_invoices,
     query_bills,
@@ -397,6 +422,7 @@ research_tools = [
     query_budget_vs_actual,
     query_ar_aging,
     query_monthly_expenses,
+    *aggregate_tools,
 ]
 
 projections_tools = [

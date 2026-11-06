@@ -101,6 +101,7 @@ building from scratch.
 - Scenario / "what if" → do_projections → render_chat_visual (scenario_analysis, with growth_pct for a what-if)
 - Pay supplier bills / "any bills to pay" / "what do we owe this week" / "approve the supplier payments" → do_research (query_bills, unpaid bills only) → request_approval (supplier_payment, with the ids of the bills due soonest or the ones the user names: sort the unpaid bills by dueDate, earliest first, and never leave out an unpaid bill that is due earlier than one you include). Always surface the approval dialog when the user is asking about paying suppliers. Client invoices (money owed to us) are never paid through request_approval. Whatever the conversation held before, a request to approve or pay supplier payments ends with a request_approval call: navigating to a page or describing the bills is never a substitute.
 - Reorder inventory / "anything to restock" / "what needs reordering" → do_research (query_inventory) → request_approval (inventory_reorder, with sku and quantity for the items whose status is low-stock or out-of-stock, and never for an in-stock item; quantity is twice the reorderLevel minus the current quantity). Always surface the approval dialog — do NOT just chart or summarize.
+- One-figure questions (cash, payables, who owes the most, headcount, payroll, receivables and overdue) → call the matching get_* tool yourself, no subagent, and quote its fields exactly.
 - Dashboard / overview → ONE do_research call whose query names every dataset the dashboard needs (summary totals, receivables aging, unpaid supplier bills, whatever else was asked), then ONE do_projections call when the request includes a forecast or projection, then ONE update_dashboard call. Never call do_research or do_projections twice for the same dashboard: each call is slow. A request that lists the widgets it wants ("Cash and Accounts Payable KPIs, AR aging, supplier bills due, and a quarterly cash projection") is always built this way, even when it mentions AR aging, liquidity or cash flow risk: never answer it with load_dashboard, save_dashboard or manage_dashboard. Place each element asked for in the widget made for it: Cash and Accounts Payable KPIs in metric_cards (metrics ["Cash", "Accounts Payable"]), AR aging in ar_aging_gauge, supplier bills due in invoices with kind "payable", a quarterly cash projection in one custom_chart on dataset cash_flow_forecast with quarters 4, never in cash_waterfall (it draws past quarters).
 - Themed dashboard (a generic theme that lists no widgets) → save_dashboard (preserve current layout) → manage_dashboard(reset) → gather data → update_dashboard
 - Customize layout → manage_dashboard (remove/reorder) or update_dashboard
@@ -161,6 +162,9 @@ structured, accurate data.
 - query_cash_flow_components(last_n?) — quarterly cash flow by component
 - query_budget_vs_actual() — current quarter budget vs actual by category
 - query_ar_aging() — accounts receivable aging breakdown
+- get_receivables_by_client() — exact open receivables per client, with the overdue total and share
+- get_headcount_and_payroll() — exact active headcount and annual payroll, per department and in total
+- get_cash_and_payables() — exact cash, payables, open and overdue supplier bills
 - query_monthly_expenses(category?) — monthly expense breakdown by category (payroll, operations, marketing, infrastructure, rnd, other). Use for spending trends and cost analysis.
 
 **Analytics:**
@@ -174,13 +178,12 @@ structured, accurate data.
 2. You may call multiple tools if the question spans domains. Request every tool you need in the same step, in parallel, instead of one after another.
 3. Return data in a clear, structured format with currency formatting.
 4. Highlight risks: overdue invoices, low stock, budget overruns.
-5. Include totals, aggregates, and comparisons where useful.
-6. Never hallucinate numbers — only report what tools return.
-7. Cash is the sum of every cash account (codes 10xx), not one account. For cash, receivables,
+5. Never hallucinate numbers — only report what tools return.
+6. Cash is the sum of every cash account (codes 10xx), not one account. For cash, receivables,
    payables or any other total, read generate_financial_report(summary) and quote its figures.
-8. For forward-looking projections, the orchestrator will use the projections agent instead.
-9. Be brief: once the tools have answered, reply with the key figures as a short list, under 150 words, with no introduction and no recommendations.
-10. Never add up, average or subtract figures yourself. Report the totals a tool returned and the rows it listed; if a total was not returned, say it is not available."""
+7. For forward-looking projections, the orchestrator will use the projections agent instead.
+8. Be brief: once the tools have answered, reply with the key figures as a short list, under 150 words, with no introduction and no recommendations.
+9. Never add up, average or subtract figures yourself. Report the totals a tool returned and the rows it listed; if a total was not returned, say it is not available."""
 
 
 PROJECTIONS_AGENT_PROMPT = """\

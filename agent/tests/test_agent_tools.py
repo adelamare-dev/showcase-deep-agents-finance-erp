@@ -24,6 +24,9 @@ DEMO_TOOLS = {
     "manage_dashboard",
     "save_dashboard",
     "load_dashboard",
+    "get_receivables_by_client",
+    "get_headcount_and_payroll",
+    "get_cash_and_payables",
     "do_research",
     "do_projections",
 }

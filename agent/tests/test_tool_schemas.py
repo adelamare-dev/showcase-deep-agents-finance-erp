@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import erp_store
+import tools
 from frontend_tools import render_chat_visual, ui_tools, update_dashboard
 
 # Names under which the model used to send figures; none may come back.
@@ -56,3 +57,14 @@ def test_update_dashboard_refuses_figures_on_a_custom_chart_too():
     for key in ("scenarios", "comparisonData"):
         chart = {"type": "custom_chart", "config": {"dataset": "revenue_forecast", key: []}}
         assert update_dashboard.invoke({"widgets": [chart]}).startswith("Dashboard not updated")
+
+
+def test_aggregate_tools_take_no_argument_and_are_given_to_research():
+    assert [t.name for t in tools.aggregate_tools] == [
+        "get_receivables_by_client",
+        "get_headcount_and_payroll",
+        "get_cash_and_payables",
+    ]
+    for tool in tools.aggregate_tools:
+        assert tool.args == {}
+        assert tool in tools.research_tools

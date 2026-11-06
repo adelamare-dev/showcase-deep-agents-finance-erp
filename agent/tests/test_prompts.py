@@ -81,3 +81,18 @@ def test_the_quarterly_cash_projection_goes_on_the_forecast_chart_not_the_waterf
     rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Dashboard / overview"))
     assert 'a quarterly cash projection in one custom_chart on dataset cash_flow_forecast with quarters 4' in rule
     assert "never in cash_waterfall" in rule
+
+
+def test_one_figure_questions_go_straight_to_the_aggregate_tools():
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- One-figure questions"))
+    assert "no subagent" in rule and "quote its fields exactly" in rule
+    lines = ORCHESTRATOR_PROMPT.splitlines()
+    dashboard = next(i for i, line in enumerate(lines) if line.startswith("- Dashboard / overview"))
+    assert lines.index(rule) < dashboard
+    for name in ("get_receivables_by_client", "get_headcount_and_payroll", "get_cash_and_payables"):
+        assert name in RESEARCH_AGENT_PROMPT
+
+
+def test_research_is_not_asked_to_aggregate():
+    assert "Include totals, aggregates" not in RESEARCH_AGENT_PROMPT
+    assert "Never add up" in RESEARCH_AGENT_PROMPT
