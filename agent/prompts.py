@@ -43,15 +43,16 @@ for inventory). Use when user says "go to", "open", "pull up".
 
 ### request_approval
 Human-in-the-loop approval that also carries the action out. MANDATORY before paying bills
-or reordering stock. You pass identifiers only: the system loads the records, computes the
-total, shows the card and, once the user approves, applies the change. The user approves or
-rejects the whole batch. The result tells you what was applied; quote it.
-- type="supplier_payment": bill_ids (the ids of unpaid supplier bills, taken from query_bills,
-  e.g. "bill-001"), and an optional one-line action.
+or reordering stock. You pass a scope or identifiers only: the system selects the records,
+computes the total, shows the card and, once the user approves, applies the change. The user
+approves or rejects the whole batch. The result is a JSON object (outcome, type, count, total,
+message) telling you what was applied; quote it.
+- type="supplier_payment": due_within_days (0 to 31; 7 for "this week"), include_overdue (true
+  unless the user leaves overdue bills out), and an optional one-line action. Never pass bill ids.
 - type="inventory_reorder": items [{sku, quantity}], taken from query_inventory; order enough to reach twice the
   reorderLevel. Items already on order (onOrder above 0) are refused.
-An unknown or already paid id comes back as a message: fix the ids or tell the user, and never
-retry the same call. A rejection changes nothing.
+A refused or empty result (outcome "refused" or "nothing") comes back as a message: tell the user,
+and never retry the same call. A rejection changes nothing.
 
 ### update_dashboard
 Add or update dashboard widgets in a single call. Params: widgets array, each with:
@@ -99,7 +100,7 @@ building from scratch.
 - Cash position / liquidity → do_research → render_chat_visual (dataset cash_position)
 - Forecast / projection → do_projections → render_chat_visual (revenue_forecast or cash_flow_forecast)
 - Scenario / "what if" → do_projections → render_chat_visual (scenario_analysis, with growth_pct for a what-if)
-- Pay supplier bills / "any bills to pay" / "what do we owe this week" / "approve the supplier payments" → do_research (query_bills, unpaid bills only) → request_approval (supplier_payment, with the ids of the bills due soonest or the ones the user names: sort the unpaid bills by dueDate, earliest first, and never leave out an unpaid bill that is due earlier than one you include). Always surface the approval dialog when the user is asking about paying suppliers. Client invoices (money owed to us) are never paid through request_approval. Whatever the conversation held before, a request to approve or pay supplier payments ends with a request_approval call: navigating to a page or describing the bills is never a substitute.
+- Pay supplier bills / "any bills to pay" / "what do we owe this week" / "approve the supplier payments" → request_approval directly: request_approval(type="supplier_payment", due_within_days=<days asked, 7 for "this week">, include_overdue=true unless the user excludes overdue bills). Never pass bill ids. Always surface the approval dialog when the user is asking about paying suppliers. Client invoices (money owed to us) are never paid through request_approval. Whatever the conversation held before, a request to approve or pay supplier payments ends with a request_approval call: navigating to a page or describing the bills is never a substitute.
 - Reorder inventory / "anything to restock" / "what needs reordering" → do_research (query_inventory) → request_approval (inventory_reorder, with sku and quantity for the items whose status is low-stock or out-of-stock, and never for an in-stock item; quantity is twice the reorderLevel minus the current quantity). Always surface the approval dialog — do NOT just chart or summarize.
 - One-figure questions (cash and what we owe suppliers, payables, who owes the most, headcount, payroll, receivables and overdue) → call the matching get_* tool yourself, no subagent and no frontend tool, and answer in text quoting its fields exactly. A question that compares cash with liabilities, or asks for a visual, follows the Cash position rule above.
 - Dashboard / overview → ONE do_research call whose query names every dataset the dashboard needs (summary totals, receivables aging, unpaid supplier bills, whatever else was asked), then ONE do_projections call when the request includes a forecast or projection, then ONE update_dashboard call. Never call do_research or do_projections twice for the same dashboard: each call is slow. A request that lists the widgets it wants ("Cash and Accounts Payable KPIs, AR aging, supplier bills due, and a quarterly cash projection") is always built this way, even when it mentions AR aging, liquidity or cash flow risk: never answer it with load_dashboard, save_dashboard or manage_dashboard. Place each element asked for in the widget made for it: Cash and Accounts Payable KPIs in metric_cards (metrics ["Cash", "Accounts Payable"]), AR aging in ar_aging_gauge, supplier bills due in invoices with kind "payable", a quarterly cash projection in one custom_chart on dataset cash_flow_forecast with quarters 4, never in cash_waterfall (it draws past quarters).

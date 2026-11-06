@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import copy
 import threading
-from datetime import date
+from datetime import date, timedelta
 
 import erp_seed as sd
 from erp_calendar import quarter_label, quarter_of, shift_quarter
@@ -22,6 +22,7 @@ from erp_datasets import FORECAST_QUARTERS, revenue_scenarios
 MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 CASH_CODE_PREFIX = sd.CASH_CODE_PREFIX
 OPERATING_CASH_CODE = "1000"
+MAX_APPROVAL_WINDOW_DAYS = 31
 
 
 def _usd(amount: int) -> str:
@@ -240,6 +241,32 @@ class ErpStore:
                 f"total cash across all cash accounts is {_usd(all_cash)}."
             )
         return operating
+
+    def bills_for_approval(self, due_within_days: int, include_overdue: bool) -> list[str]:
+        """Ids of the unpaid bills a payment approval covers, earliest due first.
+
+        The window runs from today (`as_of`) to `due_within_days` later, both
+        ends included; with `include_overdue` the bills already past due come
+        too. Ties on the due date are ordered by bill number. Raises `ErpError`
+        for a window that is not a whole number from 0 to `MAX_APPROVAL_WINDOW_DAYS`.
+        """
+        if (
+            isinstance(due_within_days, bool)
+            or not isinstance(due_within_days, int)
+            or not 0 <= due_within_days <= MAX_APPROVAL_WINDOW_DAYS
+        ):
+            raise ErpError(f"due_within_days must be a whole number from 0 to {MAX_APPROVAL_WINDOW_DAYS}.")
+        with self._lock:
+            today = self._as_of.isoformat()
+            last = (self._as_of + timedelta(days=due_within_days)).isoformat()
+            picked = [
+                b
+                for b in self._data["bills"]
+                if b["status"] != "paid"
+                and ((include_overdue and b["dueDate"] < today) or today <= b["dueDate"] <= last)
+            ]
+        picked.sort(key=lambda b: (b["dueDate"], b["number"]))
+        return [b["id"] for b in picked]
 
     def preview_bill_payment(self, bill_ids: list[str]) -> dict:
         """The bills a payment would settle and their total. Changes nothing.

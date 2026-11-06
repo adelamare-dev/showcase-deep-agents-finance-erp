@@ -171,3 +171,46 @@ def test_reorder_refuses_unknown_sku_and_bad_quantity(store):
     for quantity in (0, -3, 2.5, "4", True):
         with pytest.raises(ErpError):
             store.preview_reorder([{"sku": sku, "quantity": quantity}])
+
+
+def _unpaid(store):
+    return [b for b in store.snapshot()["bills"] if b["status"] != "paid"]
+
+
+def test_selection_includes_overdue_bills_when_asked(store):
+    today = store.as_of.isoformat()
+    overdue = {b["id"] for b in _unpaid(store) if b["dueDate"] < today}
+    assert overdue, "the seed holds an unpaid overdue bill"
+    assert overdue <= set(store.bills_for_approval(7, True))
+    assert not overdue & set(store.bills_for_approval(7, False))
+
+
+def test_selection_window_is_inclusive_and_relative(store):
+    from datetime import timedelta
+
+    for bill in store._data["bills"]:
+        bill["status"] = "paid"
+    edge, past = store._data["bills"][0], store._data["bills"][1]
+    edge["status"], past["status"] = "pending", "pending"
+    edge["dueDate"] = (store.as_of + timedelta(days=7)).isoformat()
+    past["dueDate"] = (store.as_of + timedelta(days=8)).isoformat()
+    assert store.bills_for_approval(7, True) == [edge["id"]]
+    assert set(store.bills_for_approval(8, True)) == {edge["id"], past["id"]}
+    edge["dueDate"] = store.as_of.isoformat()
+    assert store.bills_for_approval(0, False) == [edge["id"]]
+
+
+def test_selection_is_sorted_by_due_date_then_number_and_skips_paid(store):
+    ids = store.bills_for_approval(31, True)
+    by_id = {b["id"]: b for b in store.snapshot()["bills"]}
+    keys = [(by_id[i]["dueDate"], by_id[i]["number"]) for i in ids]
+    assert keys == sorted(keys)
+    assert all(by_id[i]["status"] != "paid" for i in ids)
+    store.pay_bills(ids[:1])
+    assert ids[0] not in store.bills_for_approval(31, True)
+
+
+@pytest.mark.parametrize("days", [-1, 32, 7.5, "7", True, None])
+def test_selection_rejects_out_of_range_windows(store, days):
+    with pytest.raises(ErpError):
+        store.bills_for_approval(days, True)

@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 from copilotkit.langgraph import copilotkit_interrupt
 
 from erp_datasets import DATASET_IDS, build_dataset
-from erp_store import AlreadyPaid, ErpError, get_store
+from erp_store import ErpError, get_store
 
 logger = logging.getLogger(__name__)
 
@@ -98,14 +98,21 @@ class ReorderLine(TypedDict):
     quantity: int
 
 
-def _was_approved(response: object) -> bool:
-    """True only for an explicit `approved: true`; anything unreadable counts as a refusal."""
+def _decision(response: object) -> dict:
+    """The user's answer as a dict; anything unreadable is an empty answer."""
     if isinstance(response, str):
         try:
             response = json.loads(response)
         except ValueError:
-            return False
-    return isinstance(response, dict) and response.get("approved") is True
+            return {}
+    return response if isinstance(response, dict) else {}
+
+
+def _outcome(outcome: str, type: str, message: str, count: int = 0, total: int = 0) -> str:
+    """The tool's only return shape: the model quotes `message`, `count` and `total`."""
+    return json.dumps(
+        {"outcome": outcome, "type": type, "count": count, "total": total, "message": message}
+    )
 
 
 def _announce_change(changes: list[dict], config: RunnableConfig) -> None:
@@ -119,7 +126,8 @@ def _announce_change(changes: list[dict], config: RunnableConfig) -> None:
 @tool
 def request_approval(
     type: Literal["supplier_payment", "inventory_reorder"],
-    bill_ids: Optional[list[str]] = None,
+    due_within_days: Optional[int] = None,
+    include_overdue: bool = True,
     items: Optional[list[ReorderLine]] = None,
     action: Optional[str] = None,
     *,
@@ -127,26 +135,46 @@ def request_approval(
 ) -> str:
     """Ask the user to approve a supplier payment or an inventory reorder, and carry it out if approved.
 
-    MANDATORY before paying bills or reordering stock. You pass identifiers only: the
-    system loads the records, computes the total, shows the card and applies the decision.
-    The user approves or rejects the whole batch. Find the bill ids with query_bills first.
+    MANDATORY before paying bills or reordering stock. You pass a scope or identifiers
+    only: the system selects the bills, computes the total, shows the card and applies
+    the decision. The user approves or rejects the whole batch. Never pass bill ids.
+
+    Returns a JSON object: outcome ('approved', 'rejected', 'nothing' or 'refused'),
+    type, count, total (whole US dollars) and message. Quote them; do not recompute.
 
     Args:
         type: 'supplier_payment' to pay supplier bills, or 'inventory_reorder' to reorder stock.
-        bill_ids: (supplier_payment only) Ids of the unpaid supplier bills, e.g. 'bill-001'.
+        due_within_days: (supplier_payment only, required) Pay the unpaid bills due from today
+            up to this many days ahead, 0 to 31. Use 7 for "this week".
+        include_overdue: (supplier_payment only) Also pay the unpaid bills already past due.
+            Default true; false only when the user leaves overdue bills out.
         items: (inventory_reorder only) Items to reorder. Each has sku and quantity.
         action: Optional one-line description shown on the card.
     """
     store = get_store()
+    ids: list[str] = []
+    lines: list[dict] = []
     try:
         if type == "supplier_payment":
-            preview = store.preview_bill_payment(bill_ids or [])
+            if due_within_days is None:
+                raise ErpError("due_within_days is required to pay supplier bills.")
+            ids = store.bills_for_approval(due_within_days, include_overdue)
+            if not ids:
+                overdue = " or overdue" if include_overdue else ""
+                return _outcome(
+                    "nothing",
+                    type,
+                    f"No unpaid supplier bill is due within {due_within_days} day(s){overdue}. Nothing was changed.",
+                )
+            preview = store.preview_bill_payment(ids)
             card = {
                 "type": type,
                 "bills": preview["bills"],
+                "billIds": ids,
                 "totalAmount": preview["totalAmount"],
                 "action": action or f"Pay {len(preview['bills'])} supplier bill(s)",
             }
+            count, total = len(preview["bills"]), preview["totalAmount"]
         else:
             lines = [dict(line) for line in items or []]
             preview = store.preview_reorder(lines)
@@ -156,38 +184,50 @@ def request_approval(
                 "estimatedTotal": preview["estimatedTotal"],
                 "supplier": preview["supplier"],
             }
-    except AlreadyPaid as exc:
-        return f"{exc} These bills are already settled, so there is nothing to approve and nothing was changed."
+            count, total = len(preview["items"]), preview["estimatedTotal"]
     except ErpError as exc:
-        return f"Not sent for approval: {exc}"
+        return _outcome("refused", type, f"Not sent for approval: {exc}")
 
     # The graph re-runs this body on resume, so nothing is written before the
-    # interrupt returns.
+    # interrupt returns. The selection above is recomputed on every run.
     _, response = copilotkit_interrupt(action="request_approval", args=card)
-    if not _was_approved(response):
-        return "Rejected by the user. Nothing was changed."
+    answer = _decision(response)
+    if answer.get("approved") is not True:
+        return _outcome("rejected", type, "Rejected by the user. Nothing was changed.", count, total)
 
     try:
         if type == "supplier_payment":
-            done = store.pay_bills(bill_ids or [])
+            # The card sends back the bills it showed. Paying more than that, or
+            # anything when the scope no longer matches, is not what the user approved.
+            shown = answer.get("billIds")
+            if not isinstance(shown, list) or not set(ids) <= {str(i) for i in shown}:
+                return _outcome("nothing", type, "The selection changed; nothing was paid. Ask again.")
+            done = store.pay_bills(ids)
             if not done["paidBillIds"]:
-                return "Approved, but these bills were already paid. Nothing more was applied."
-            summary = (
-                f"Approved. Paid {len(done['paidBillIds'])} bill(s) totalling {_usd(done['totalPaid'])}; "
+                return _outcome(
+                    "nothing", type, "Approved, but these bills were already paid. Nothing more was applied."
+                )
+            paid = len(done["paidBillIds"])
+            message = (
+                f"Approved. Paid {paid} bill(s) totalling {_usd(done['totalPaid'])}; "
                 "cash and accounts payable each fell by that amount."
             )
+            result = _outcome("approved", type, message, paid, done["totalPaid"])
         else:
             done = store.reorder(lines)
             if not done["orderedSkus"]:
-                return "Approved, but these items were already on order. Nothing more was applied."
-            summary = (
+                return _outcome(
+                    "nothing", type, "Approved, but these items were already on order. Nothing more was applied."
+                )
+            message = (
                 f"Approved. Placed an order for {len(done['orderedSkus'])} item(s), estimated "
-                f"{_usd(preview['estimatedTotal'])}. Items are marked on order; cash and payables are unchanged."
+                f"{_usd(total)}. Items are marked on order; cash and payables are unchanged."
             )
+            result = _outcome("approved", type, message, len(done["orderedSkus"]), total)
     except ErpError as exc:
-        return f"Approved, but not applied: {exc}"
+        return _outcome("refused", type, f"Approved, but not applied: {exc}")
     _announce_change(done["changes"], config)
-    return summary
+    return result
 
 
 # ---------------------------------------------------------------------------

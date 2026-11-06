@@ -53,8 +53,12 @@ def test_a_question_about_matching_records_shows_them():
     assert "Never write \"here are\" without showing them" in ORCHESTRATOR_PROMPT
 
 
-def test_payments_and_reorders_name_the_right_records():
-    assert "never leave out an unpaid bill that is due earlier" in ORCHESTRATOR_PROMPT
+def test_payments_pass_a_scope_and_reorders_name_the_right_records():
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Pay supplier bills"))
+    assert 'due_within_days=<days asked, 7 for "this week">' in rule
+    assert "include_overdue=true unless the user excludes overdue bills" in rule
+    assert "Never pass bill ids" in rule
+    assert "bill_ids" not in ORCHESTRATOR_PROMPT
     assert "never for an in-stock item" in ORCHESTRATOR_PROMPT
 
 
