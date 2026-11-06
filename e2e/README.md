@@ -1,15 +1,28 @@
 # End-to-end scenarios
 
-Scenarios are plain JavaScript files run by the Playwright MCP plugin (`browser_run_code_unsafe`). The repo has no Playwright dependency and no test runner.
+Scenarios are plain JavaScript files with two runners over one source: `@playwright/test` (`pnpm e2e`, `pnpm e2e:live`) and the Playwright MCP plugin (`browser_run_code_unsafe`).
 
 ```
+playwright.config.ts           projects offline / stub / live, and the stub stack as webServer
 e2e/
-  build.mjs                    pnpm e2e:build
+  build.mjs                    pnpm e2e:build (plugin files)
+  playwright.live.config.ts    the live project only, no webServer
   lib/helpers.js               (page) => helpers, one expression
+  lib/load-scenario.mjs        assembles helpers + one scenario (used by build.mjs and the spec)
   scenarios/<group>.<name>.js  async (page, h) => { ... }, one expression
+  specs/scenarios.spec.ts      one test per scenario file
 ```
 
-## Run a scenario
+## Run with `@playwright/test`
+
+- `pnpm e2e` builds the web app, starts the stub stack (stub, agent, web) and runs the `offline` and `stub` projects. The runner starts and stops the servers; ports 8790, 8123 and 3000 must be free (`reuseExistingServer` is off). `stub.agent-down` is listed as skipped: it needs the agent killed by hand, so only the plugin plays it.
+- One scenario: `pnpm e2e -g stub.reset` (pnpm appends the arguments to `playwright test`; the build still runs first).
+- `pnpm e2e:live` runs the `live` project against a `pnpm demo` you started yourself with a real `MISTRAL_API_KEY`; it starts no server. Select with `pnpm e2e:live -g live.agent`.
+- Each test logs `<name>: n/n cases passed` and fails when a case fails, with the failed cases in the error.
+- First time on a machine: `pnpm exec playwright install chromium`.
+- `--only=<indices>` (below) is a build-time option of the plugin path; the spec runs whole files.
+
+## Run a scenario with the plugin
 
 1. `pnpm e2e:build` writes `.playwright-mcp/scenarios/<group>.<name>.js` (gitignored). `pnpm e2e:build live` builds only the names containing `live`.
 2. Start the servers it needs, check ports 3000 and 8123 are free first.
@@ -34,7 +47,7 @@ nohup node e2e/fixtures/stack.mjs --logs <dir> > <dir>/stack.out 2>&1 &
 node e2e/fixtures/stack.mjs stop
 ```
 
-`stack.mjs` starts the stub (`:8790`, `STUB_PORT` to change it, and keep `STUB_URL` in `lib/helpers.js` in step), then the agent with `MISTRAL_BASE_URL` pointing at the stub and a fake key, then the web app. It refuses to start when 8790, 8123 or 3000 is taken. `stop` kills the whole tree it started. The launcher is Windows only: it stops processes with `taskkill`.
+`stack.mjs` starts the stub (`:8790`, `STUB_PORT` to change it, and keep `STUB_URL` in `lib/helpers.js` in step), then the agent with `MISTRAL_BASE_URL` pointing at the stub and a fake key, then the web app. It refuses to start when 8790, 8123 or 3000 is taken. `stop` kills the whole tree it started. The launcher is Windows only: it stops processes with `taskkill`. `pnpm e2e` does not use it: the runner starts the same three servers itself.
 
 A scenario scripts the model with `h.stubScript([...])`. Each model call takes the next step; an empty queue answers 500. Steps:
 

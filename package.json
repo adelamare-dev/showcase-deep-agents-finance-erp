@@ -22,6 +22,8 @@
     "start:agent": "cd agent && uv run uvicorn main:app --host 127.0.0.1 --port 8123",
     "lint": "eslint .",
     "test:agent": "cd agent && uv run pytest -q",
+    "e2e": "pnpm build && playwright test --project=offline --project=stub",
+    "e2e:live": "playwright test --config e2e/playwright.live.config.ts",
     "e2e:build": "node e2e/build.mjs",
     "postinstall": "cd agent && uv sync"
   },
@@ -43,6 +45,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

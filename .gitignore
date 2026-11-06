@@ -59,3 +59,7 @@ __pycache__/
 .superpowers
 SETUP/
 docs/
+
+# Playwright test runner output
+test-results/
+playwright-report/
