@@ -236,10 +236,13 @@ def request_approval(
 
 
 @tool
-def update_dashboard(widgets: list) -> str:
+def update_dashboard(widgets: list, replace: bool = False) -> str:
     """Add or update one or more dashboard widgets in a single call.
 
     Args:
+        replace: Default false: each widget is added, or updates the widget of its type already
+            there. True: the dashboard shows exactly these widgets, in this order, and nothing else
+            (the default widgets are removed). Use it for a request that lists the widgets it wants.
         widgets: Array of widget configs. Each widget has:
             - type (str): Widget type — 'kpi_cards', 'revenue_chart', 'expense_breakdown',
               'transactions', 'invoices', 'custom_chart', 'cash_waterfall', 'ar_aging_gauge',
@@ -271,20 +274,26 @@ def update_dashboard(widgets: list) -> str:
                 None of these takes figures: never send scenarios or comparisonData.
     """
     problems = []
-    for w in widgets:
+    for index, w in enumerate(widgets):
         config = w.get("config") or {}
+        reasons = []
         if "scenarios" in config or "comparisonData" in config:
-            problems.append("widgets must not carry figures")
-        if w.get("type") != "custom_chart":
-            continue
-        if config.get("dataset") not in DATASET_IDS or config.get("dataset") == "cash_position":
-            problems.append("custom_chart needs a dataset from the catalog")
-        if "data" in config:
-            problems.append("custom_chart must not carry figures")
-    if problems:
-        return f"Dashboard not updated: {'; '.join(sorted(set(problems)))}."
-    types = [w.get("type", "widget") for w in widgets]
-    return f"Dashboard updated: {', '.join(types)}"
+            reasons.append("widgets must not carry figures")
+        if w.get("type") == "custom_chart":
+            if config.get("dataset") not in DATASET_IDS or config.get("dataset") == "cash_position":
+                reasons.append("custom_chart needs a dataset from the catalog")
+            if "data" in config:
+                reasons.append("custom_chart must not carry figures")
+        if reasons:
+            problems.append({"index": index, "type": w.get("type", "widget"), "reason": "; ".join(reasons)})
+    return json.dumps(
+        {
+            "updated": not problems,
+            "replace": bool(replace),
+            "widgets": [w.get("type", "widget") for w in widgets],
+            "problems": problems,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -79,8 +79,20 @@ const TOOL_CONFIG: Record<
       }
       return "Updating dashboard...";
     },
-    getResultSummary: (result) =>
-      typeof result === "string" ? result : "Dashboard updated",
+    getResultSummary: (result) => {
+      try {
+        const out = JSON.parse(String(result)) as {
+          updated?: boolean;
+          widgets?: string[];
+          problems?: Array<{ type: string; reason: string }>;
+        };
+        if (out.updated) return `Dashboard updated: ${(out.widgets ?? []).join(", ")}`;
+        const why = (out.problems ?? []).map((p) => `${p.type}: ${p.reason}`).join("; ");
+        return `Dashboard not updated${why ? ` (${why})` : ""}`;
+      } catch {
+        return typeof result === "string" ? result : "Dashboard updated";
+      }
+    },
   },
   manage_dashboard: {
     icon: Settings,

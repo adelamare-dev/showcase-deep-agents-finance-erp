@@ -52,24 +52,39 @@ interface WidgetSpec {
   config?: Record<string, unknown>;
 }
 
+/** The agent's verdict: only an explicit `updated: true` lets the web apply the widgets. */
+function isAcceptedUpdate(result: unknown): boolean {
+  if (typeof result !== "string") return false;
+  try {
+    return (JSON.parse(result) as { updated?: unknown })?.updated === true;
+  } catch {
+    return false;
+  }
+}
+
 function DashboardUpdater({
   widgets,
+  replace,
   status,
   result,
 }: {
   widgets: WidgetSpec[];
+  replace: boolean;
   status: string;
   result?: unknown;
 }) {
-  const { upsertWidget, addWidget, getWidgets } = useDashboard();
+  const { upsertWidget, addWidget, setWidgets, getWidgets } = useDashboard();
 
   useEffect(() => {
     if (status !== ToolCallStatus.Complete || !widgets?.length) return;
 
-    const key = `update_dashboard-${JSON.stringify(widgets)}`;
+    // A refused or unreadable result changes nothing.
+    if (!isAcceptedUpdate(result)) return;
+    const key = `update_dashboard-${replace}-${JSON.stringify(widgets)}`;
     if (!claimToolCall(key)) return;
 
     queueMicrotask(() => {
+      const placed: DashboardWidget[] = [];
       for (const w of widgets) {
         const internalType = TYPE_MAP[w.type] ?? w.type;
         const colSpan = (w.colSpan ?? DEFAULT_COLSPAN[internalType] ?? 2) as
@@ -88,32 +103,33 @@ function DashboardUpdater({
           // A chart is filled from the catalog: one without a dataset, or
           // carrying its own figures, cannot be drawn from the store.
           if (!isChartDatasetId(config.dataset) || "data" in config) continue;
-          const id = `custom-chart-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-          addWidget({
-            id,
+          const widget: DashboardWidget = {
+            id: `custom-chart-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             type: "custom-chart",
             colSpan,
-            order: getWidgets().length,
+            order: replace ? placed.length : getWidgets().length,
             config: config as CustomChartWidget["config"],
-          });
+          };
+          if (replace) placed.push(widget);
+          else addWidget(widget);
         } else {
           const type = internalType as WidgetType;
-          upsertWidget(
-            type,
-            (order) =>
-              ({
-                id: `${internalType}-${Date.now()}`,
-                type,
-                colSpan,
-                order,
-                config,
-              }) as DashboardWidget,
-            { config, colSpan } as Partial<DashboardWidget>,
-          );
+          const create = (order: number) =>
+            ({
+              id: `${internalType}-${Date.now()}`,
+              type,
+              colSpan,
+              order,
+              config,
+            }) as DashboardWidget;
+          if (replace) placed.push(create(placed.length));
+          else upsertWidget(type, create, { config, colSpan } as Partial<DashboardWidget>);
         }
       }
+      // The layout becomes exactly the widgets given, in their order.
+      if (replace) setWidgets(placed);
     });
-  }, [status, widgets, upsertWidget, addWidget, getWidgets]);
+  }, [status, widgets, replace, result, upsertWidget, addWidget, setWidgets, getWidgets]);
 
   if (status === ToolCallStatus.Complete) {
     return (
@@ -145,10 +161,12 @@ export function useUpdateDashboard() {
             }),
           )
           .optional(),
+        replace: z.boolean().optional(),
       }),
       render: ({ parameters, status, result }) => (
         <DashboardUpdater
           widgets={parameters?.widgets ?? []}
+          replace={parameters?.replace === true}
           status={status}
           result={result}
         />

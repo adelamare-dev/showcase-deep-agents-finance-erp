@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import erp_store
 import tools
 from frontend_tools import render_chat_visual, ui_tools, update_dashboard
@@ -24,11 +26,13 @@ def test_update_dashboard_doc_has_no_inline_chart_data():
 
 def test_update_dashboard_refuses_a_chart_without_a_dataset_or_with_figures():
     refused = update_dashboard.invoke({"widgets": [{"type": "custom_chart", "config": {"title": "x"}}]})
-    assert refused.startswith("Dashboard not updated")
+    assert json.loads(refused)["updated"] is False
     inline = {"type": "custom_chart", "config": {"dataset": "ar_aging", "data": [{"label": "a", "value": 1}]}}
-    assert update_dashboard.invoke({"widgets": [inline]}).startswith("Dashboard not updated")
+    assert json.loads(update_dashboard.invoke({"widgets": [inline]}))["updated"] is False
     ok = {"type": "custom_chart", "config": {"dataset": "ar_aging"}}
-    assert update_dashboard.invoke({"widgets": [ok]}) == "Dashboard updated: custom_chart"
+    assert json.loads(update_dashboard.invoke({"widgets": [ok]})) == {
+        "updated": True, "replace": False, "widgets": ["custom_chart"], "problems": [],
+    }
 
 
 def test_render_chat_visual_reports_the_catalog_figures(store, monkeypatch):
@@ -46,17 +50,17 @@ def test_update_dashboard_names_every_widget_type_and_refuses_figures_in_them():
     ]
     for name in types:
         assert name in update_dashboard.description
-    assert update_dashboard.invoke({"widgets": [{"type": "metric_cards"}]}) == "Dashboard updated: metric_cards"
+    assert json.loads(update_dashboard.invoke({"widgets": [{"type": "metric_cards"}]}))["updated"] is True
     own_scenarios = {"type": "revenue_forecast", "config": {"scenarios": [{"label": "Base", "values": []}]}}
-    assert update_dashboard.invoke({"widgets": [own_scenarios]}).startswith("Dashboard not updated")
+    assert json.loads(update_dashboard.invoke({"widgets": [own_scenarios]}))["updated"] is False
     own_flows = {"type": "cash_waterfall", "config": {"comparisonData": []}}
-    assert update_dashboard.invoke({"widgets": [own_flows]}).startswith("Dashboard not updated")
+    assert json.loads(update_dashboard.invoke({"widgets": [own_flows]}))["updated"] is False
 
 
 def test_update_dashboard_refuses_figures_on_a_custom_chart_too():
     for key in ("scenarios", "comparisonData"):
         chart = {"type": "custom_chart", "config": {"dataset": "revenue_forecast", key: []}}
-        assert update_dashboard.invoke({"widgets": [chart]}).startswith("Dashboard not updated")
+        assert json.loads(update_dashboard.invoke({"widgets": [chart]}))["updated"] is False
 
 
 def test_aggregate_tools_take_no_argument_and_are_given_to_research():
@@ -68,3 +72,23 @@ def test_aggregate_tools_take_no_argument_and_are_given_to_research():
     for tool in tools.aggregate_tools:
         assert tool.args == {}
         assert tool in tools.research_tools
+
+
+def test_update_dashboard_lists_each_refused_widget():
+    kpis = {"type": "metric_cards", "config": {"metrics": ["Cash"]}}
+    unknown = {"type": "custom_chart", "config": {"dataset": "no_such_dataset"}}
+    out = json.loads(update_dashboard.invoke({"widgets": [kpis, unknown]}))
+    assert out["updated"] is False
+    assert out["widgets"] == ["metric_cards", "custom_chart"]
+    assert len(out["problems"]) == 1
+    problem = out["problems"][0]
+    assert problem["index"] == 1
+    assert problem["type"] == "custom_chart"
+    assert "dataset" in problem["reason"]
+
+
+def test_update_dashboard_reports_whether_it_replaces_the_layout():
+    kpis = {"type": "metric_cards"}
+    assert json.loads(update_dashboard.invoke({"widgets": [kpis], "replace": True}))["replace"] is True
+    assert json.loads(update_dashboard.invoke({"widgets": [kpis]}))["replace"] is False
+    assert "replace" in update_dashboard.description

@@ -10,6 +10,11 @@ def test_a_dashboard_makes_one_research_and_one_projections_call():
     assert "ONE update_dashboard" in rule
 
 
+def test_a_dashboard_that_lists_its_widgets_replaces_the_layout():
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Dashboard / overview"))
+    assert "replace true" in rule
+
+
 def test_projections_stay_available_to_the_orchestrator():
     assert "do_projections" in ORCHESTRATOR_PROMPT
     assert "compute_cash_flow_forecast" in PROJECTIONS_AGENT_PROMPT
