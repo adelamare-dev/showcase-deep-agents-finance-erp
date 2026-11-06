@@ -156,18 +156,7 @@ async (page, h) => {
 
   // The chat as text, without the user message and the chart axes (their tick
   // labels are drawn by the chart library, not written by the assistant).
-  const readChat = () =>
-    page.evaluate(() => {
-      const copy = document.querySelector("[data-testid='copilot-message-list']").cloneNode(true);
-      copy.querySelectorAll(".recharts-wrapper,[data-testid='copilot-user-message']").forEach((el) => el.remove());
-      const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
-      const parts = [];
-      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-        const t = n.textContent.trim();
-        if (t) parts.push(t);
-      }
-      return parts.join("\n");
-    });
+  const readChat = () => h.chatText([".recharts-wrapper", "[data-testid='copilot-user-message']"]);
 
   // A run that ended on a notice is not a verdict on the code when the cause is
   // the model service: the runner discards it and replays.

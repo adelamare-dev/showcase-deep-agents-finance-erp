@@ -23,20 +23,26 @@
   };
 
   const byId = (id) => page.getByTestId(id);
-  // The text of the chat as the person reads it now. A figure struck through
-  // beside its replacement is stale by design, so it is left out: the read
-  // works on an off-screen copy and the page itself is not touched.
-  const chatText = async () =>
+  // The text of the chat as the person reads it now, one text node per line. A
+  // figure struck through beside its replacement is stale by design, so it is
+  // always left out; `skip` adds selectors to leave out too. It walks the live
+  // list and touches nothing on the page.
+  const chatText = async (skip = []) =>
     (
-      await byId("copilot-message-list").evaluate((list) => {
-        const copy = list.cloneNode(true);
-        copy.querySelectorAll('[data-testid="changed-value-before"]').forEach((el) => el.remove());
-        copy.style.cssText = "position:fixed;left:-99999px;top:0;width:" + list.clientWidth + "px";
-        document.body.appendChild(copy);
-        const text = copy.innerText;
-        copy.remove();
-        return text;
-      })
+      await byId("copilot-message-list").evaluate((list, extra) => {
+        const selector = ['[data-testid="changed-value-before"]', ...extra].join(",");
+        const walker = document.createTreeWalker(list, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+          acceptNode: (n) =>
+            n.nodeType === Node.ELEMENT_NODE && n.matches(selector) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+        });
+        const parts = [];
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          if (n.nodeType !== Node.TEXT_NODE) continue;
+          const t = n.textContent.trim();
+          if (t) parts.push(t);
+        }
+        return parts.join("\n");
+      }, skip)
     ).trim();
 
   // Opens a route at 1280x720 and makes sure the chat sidebar is open.
