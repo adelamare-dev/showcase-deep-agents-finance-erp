@@ -224,7 +224,7 @@ function DetailView({
           Layout Preview
         </h3>
         <div className="@container pointer-events-none origin-top-left">
-          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @5xl:grid-cols-4">
+          <div className="grid grid-flow-row-dense grid-cols-1 gap-4 @xl:grid-cols-2 @5xl:grid-cols-4">
             {[...dashboard.widgets]
               .sort((a, b) => a.order - b.order)
               .map((widget) => (

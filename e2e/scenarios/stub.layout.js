@@ -4,7 +4,6 @@
 // Needs the stub stack (`node e2e/fixtures/stack.mjs`): the stub plays the
 // model, so no credit is spent.
 async (page, h) => {
-  const DEFAULT_WIDGET_IDS = ["kpi-cards", "revenue-chart", "expense-breakdown", "recent-transactions", "outstanding-invoices"];
   const box = (type) =>
     page.evaluate((t) => {
       const el = document.querySelector(`[data-widget-type='${t}']`);
@@ -13,13 +12,13 @@ async (page, h) => {
       return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
     }, type);
 
-  // Empties the default dashboard first: the case checks the grid on the reference widget set alone.
+  // Builds the reference dashboard over the five default widgets, as the live flow does:
+  // the bills list is updated where it stands and the other widgets are appended.
   const build = async () => {
     await h.stubReset();
     await h.resetDemo();
     await h.open("/");
     await h.stubScript([
-      ...DEFAULT_WIDGET_IDS.map((widgetId) => ({ toolCall: { name: "manage_dashboard", args: { action: "remove", widgetId } } })),
       {
         toolCall: {
           name: "update_dashboard",
@@ -40,21 +39,21 @@ async (page, h) => {
     await page.waitForTimeout(1500);
   };
 
-  await h.test("reference layout fits 1280x720 with the chat open", async () => {
+  await h.test("reference layout fits one screen of the dashboard at 1280x720 with the chat open", async () => {
     await build();
     const gauge = await box("ar-aging-gauge");
     const bills = await box("outstanding-invoices");
     const metrics = await box("metric-cards");
     h.assert(gauge && bills && metrics, "the metric cards, the gauge and the bills list are on the dashboard");
     h.assert(Math.abs(gauge.top - bills.top) <= 2, `gauge and bills list share a row: ${gauge.top} vs ${bills.top}`);
-    const rowBottom = Math.max(gauge.bottom, bills.bottom);
     // One screen of the scroll area: its height minus the top padding of the grid wrapper.
     const budget = await page.evaluate(() => {
       const wrapper = document.querySelector("[data-widget-type]").parentElement.parentElement;
       return document.querySelector("main").clientHeight - parseFloat(getComputedStyle(wrapper).paddingTop);
     });
-    const extent = rowBottom - metrics.top;
-    h.assert(extent <= budget, `metric cards to the end of the row fit on one screen: extent ${extent}, budget ${budget}`);
+    // The rows holding the metric cards, the gauge and the bills list.
+    const extent = Math.max(gauge.bottom, bills.bottom, metrics.bottom) - Math.min(gauge.top, bills.top, metrics.top);
+    h.assert(extent <= budget, `the metric cards, the gauge and the bills list fit on one screen: extent ${extent}, budget ${budget}`);
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     h.assert(scrollWidth <= 1280, `no horizontal overflow: ${scrollWidth}`);
     await h.expectVisible(page.getByTestId("copilot-message-list"), 5000);
