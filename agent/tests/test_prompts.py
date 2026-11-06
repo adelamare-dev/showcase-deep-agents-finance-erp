@@ -125,6 +125,7 @@ def test_prompt_routes_what_if_to_a_card():
     assert 'dataset="revenue_forecast"' in rule and '"cash_flow_forecast"' in rule
     assert "quarters=<asked, 1-8>" in rule and "growth_pct=<asked, -50..50>" in rule
     assert "Never compute totals or differences" in rule
+    assert "points above the current trend" in rule
     # No line may route a what-if question through do_projections, except the lines that exclude it.
     for line in ORCHESTRATOR_PROMPT.splitlines():
         if "do_projections" in line and "except what-if growth questions" not in line and "Exception:" not in line:

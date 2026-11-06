@@ -54,9 +54,9 @@ function parseInterruptValue(raw: unknown): InterruptValue | undefined {
   return undefined;
 }
 
-// Flags the approval as pending while the card is on screen. Leaving the
-// screen (an answer, a reset, a new thread, a page change) clears the flag, so
-// it cannot stay set with no card to answer.
+// Flags the approval as pending while its card is mounted. The flag clears when
+// the user answers (`respond`) or when the card unmounts, which happens once the
+// interrupt is no longer rendered, for example after a reset or a new thread.
 function PendingMarker() {
   useEffect(() => {
     setApprovalPending(true);
@@ -69,7 +69,8 @@ export function useRequestApproval() {
   // The approval card itself comes from useInterrupt below: the agent's
   // `copilotkit_interrupt(action="request_approval", ...)` pauses the run. Once
   // the user has answered, the tool call completes and this renderer leaves a
-  // receipt in the thread (also when the thread is loaded again). It also keeps
+  // receipt in the thread. A reload starts a new thread, so a receipt is never
+  // replayed. It also keeps
   // the wildcard `useRenderTool({ name: "*" })` from drawing a generic ToolCard.
   useRenderTool(
     {
