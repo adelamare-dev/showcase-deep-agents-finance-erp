@@ -15,6 +15,7 @@ export type BillRow = {
 
 type Props = {
   bills: BillRow[];
+  billIds: string[];
   totalAmount: number;
   action: string;
   respond: (result: unknown) => Promise<void>;
@@ -22,15 +23,18 @@ type Props = {
 
 // The agent computes the rows and the total from the books; this card only
 // shows them and sends back one decision for the whole batch.
-export function BillApprovalCard({ bills, totalAmount, action, respond }: Props) {
+export function BillApprovalCard({ bills, billIds, totalAmount, action, respond }: Props) {
   // Set on the first click so a second click cannot send another answer.
   const [answered, setAnswered] = useState(false);
 
   const answer = (approved: boolean) => {
     if (answered) return;
     setAnswered(true);
+    // The bills shown travel back with the decision: the agent pays only
+    // what the card listed.
     void respond({
       approved,
+      billIds,
       message: approved
         ? `Payment approved for ${bills.length} bill(s) totalling ${formatCurrency(totalAmount)}`
         : "Payment rejected by user",

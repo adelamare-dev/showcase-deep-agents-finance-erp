@@ -64,3 +64,10 @@ export const followUpSuggestions: Suggestion[] = [
     message: "Approve the supplier bills due this week, including any overdue ones",
   },
 ];
+
+// The receipt that stays in the thread once an approval card is answered.
+export const approvalReceiptText = {
+  rejected: "Rejected",
+  approved: (count: number, noun: "bill" | "item", total: string) =>
+    `Approved by you · ${count} ${noun}${count === 1 ? "" : "s"} · ${total}`,
+} as const;

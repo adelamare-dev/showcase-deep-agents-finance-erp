@@ -137,6 +137,23 @@
     return unpaid.filter((b) => !ids.includes(b.id) && b.dueDate < latest).map((b) => b.number);
   };
 
+  // The unpaid bills a payment approval covers, read from a snapshot: those due
+  // from today up to `days` ahead (both ends included), plus the ones already
+  // past due when `includeOverdue`. Earliest due first, ties by number: the
+  // same selection the agent makes. Today is the local date, like the agent's.
+  const billsForApproval = (snap, days = 7, includeOverdue = true) => {
+    const day = (offset) => {
+      const d = new Date();
+      d.setDate(d.getDate() + offset);
+      return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+    };
+    const today = day(0);
+    const last = day(days);
+    return snap.bills
+      .filter((b) => b.status !== "paid" && ((includeOverdue && b.dueDate < today) || (b.dueDate >= today && b.dueDate <= last)))
+      .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : a.number < b.number ? -1 : a.number > b.number ? 1 : 0));
+  };
+
   // Restores the seeded data on the agent, then reloads the app on it.
   const resetDemo = async () => {
     const res = await page.request.post(ERP_URL + "/api/erp/reset");
@@ -390,7 +407,7 @@
   const h = {
     WEB_URL, ERP_URL, SNAPSHOT_URL,
     assert, assertEqual, expectVisible, byId,
-    STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds,
+    STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds, billsForApproval,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
     moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
   };

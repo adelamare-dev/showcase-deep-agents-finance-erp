@@ -22,10 +22,10 @@ async (page, h) => {
   // One take of the demo: ask, get the approval card for bills read from the
   // store now, approve. Returns what the card showed.
   const approveBills = async () => {
-    const ids = h.payableBillIds(await h.snapshot());
-    h.assert(ids.length > 0, "the store holds unpaid bills the account can cover");
+    const ids = h.billsForApproval(await h.snapshot()).map((b) => b.id);
+    h.assert(ids.length > 0, "the store holds unpaid bills overdue or due this week");
     await h.stubScript([
-      { toolCall: { name: "request_approval", args: { type: "supplier_payment", bill_ids: ids } } },
+      { toolCall: { name: "request_approval", args: { type: "supplier_payment", due_within_days: 7, include_overdue: true } } },
       { text: "The payment was made." },
     ]);
     await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
@@ -44,7 +44,7 @@ async (page, h) => {
     h.assert((await byId("kpi-Cash").innerText()).includes(cash), "the Cash KPI shows the starting value");
 
     const first = await approveBills();
-    h.assertEqual(first.shown, first.ids, "the card lists the scripted bills");
+    h.assertEqual(first.shown, first.ids, "the card lists the bills the store selects");
     const paid = await h.snapshot();
     h.assert(JSON.stringify(paid) !== JSON.stringify(initial), "approving changed the books");
     h.assertEqual(initial.totals.cash - paid.totals.cash, first.total, "cash fell by the card total");

@@ -10,11 +10,13 @@ import {
   BillApprovalCard,
   type BillRow,
 } from "@/components/chat/bill-approval-card";
+import { ApprovalReceipt } from "@/components/chat/approval-receipt";
 import { InventoryReorderCard } from "@/components/chat/inventory-reorder-card";
 
 type ApprovalArgs = {
   type: "supplier_payment" | "inventory_reorder";
   bills?: BillRow[];
+  billIds?: string[];
   totalAmount?: number;
   action?: string;
   items?: Array<{
@@ -51,16 +53,19 @@ function parseInterruptValue(raw: unknown): InterruptValue | undefined {
 }
 
 export function useRequestApproval() {
-  // Suppress the wildcard `useRenderTool({ name: "*" })` from rendering a generic
-  // ToolCard for `request_approval`. The actual approval UI is handled by
-  // useInterrupt below — the agent's `copilotkit_interrupt(action="request_approval", ...)`
-  // pauses the LangGraph run and emits an `on_interrupt` custom event, not a
-  // normal tool execution.
+  // The approval card itself comes from useInterrupt below: the agent's
+  // `copilotkit_interrupt(action="request_approval", ...)` pauses the run. Once
+  // the user has answered, the tool call completes and this renderer leaves a
+  // receipt in the thread (also when the thread is loaded again). It also keeps
+  // the wildcard `useRenderTool({ name: "*" })` from drawing a generic ToolCard.
   useRenderTool(
     {
       name: "request_approval",
       parameters: z.object({}),
-      render: () => null,
+      render: (props) =>
+        props.status === ToolCallStatus.Complete ? (
+          <ApprovalReceipt result={props.result} />
+        ) : null,
     },
     [],
   );
@@ -101,6 +106,7 @@ export function useRequestApproval() {
       return (
         <BillApprovalCard
           bills={args.bills ?? []}
+          billIds={args.billIds ?? []}
           totalAmount={args.totalAmount ?? 0}
           action={args.action ?? "Pay supplier bills"}
           respond={respond}

@@ -78,7 +78,7 @@ Without `--allow-agent-exit` the launcher brings the whole stack down when the a
 
 `stub.dashboard-options.js` scripts an `update_dashboard` call whose list options (`metrics`, `categories`, `statuses`) arrive as one string each and checks the widgets render with a single item, with no error screen.
 
-`h.stubReset()` empties the queue and the request log; `h.stubRequests()` lists what the agent sent. A scripted `request_approval` takes bill ids read from `h.snapshot()` (`h.payableBillIds`), never hard-coded ones.
+`h.stubReset()` empties the queue and the request log; `h.stubRequests()` lists what the agent sent. A scripted `request_approval` passes a scope (`due_within_days`, `include_overdue`), never bill ids; the bills it should select are recomputed from `h.snapshot()` with `h.billsForApproval(snapshot, days, includeOverdue)`. `stub.approval.js` plays the card, the frozen receipt (`approval-receipt`, with `data-count` and `data-amount`) and the reload.
 
 ## The reference dashboard segment
 
@@ -118,7 +118,7 @@ The chat-amount helpers (`amountsIn`, `matches`, `moneyFields`, `strangers`, `ca
 ## Rules for a scenario file
 
 - One single expression, no `import`, no `require`, no trailing `;`: the tool runs it in a VM without modules. `build.mjs` rejects a file that is not one expression.
-- Everything comes from `h`: `open`, `visit`, `resetDemo`, `sendPrompt`, `waitForRunEnd`, `chatText`, `snapshot`, `moneyIn`, `formatUsd`, `test`, `assert`, `assertEqual`, `expectVisible`, `byId`, and for the stub `stubScript`, `stubRelease`, `stubReset`, `stubRequests`, `payableBillIds`, `openSettings`, `clickReset`, `runDashboardSegment`, and `clippedCardContent` (lines describing content that overflows a dashboard card; empty when none).
+- Everything comes from `h`: `open`, `visit`, `resetDemo`, `sendPrompt`, `waitForRunEnd`, `chatText`, `snapshot`, `moneyIn`, `formatUsd`, `test`, `assert`, `assertEqual`, `expectVisible`, `byId`, and for the stub `stubScript`, `stubRelease`, `stubReset`, `stubRequests`, `billsForApproval`, `payableBillIds`, `openSettings`, `clickReset`, `runDashboardSegment`, and `clippedCardContent` (lines describing content that overflows a dashboard card; empty when none).
 - `h.resetDemo()` resets through the API and reloads the page; `h.clickReset()` uses the Settings control, which is what a scenario about the control must do.
 - Group related checks as named cases with `h.test(name, fn)`; every case runs and failures are collected.
 - Compare displayed figures with `h.snapshot()` (`GET /api/erp/snapshot`, served by the agent), never with hard-coded values.
