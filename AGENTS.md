@@ -98,6 +98,7 @@ Default level: **standard**.
 - Agent, offline: `pnpm test:agent` (no network call expected).
 - Browser, offline and stub: `pnpm e2e` (no real key, no credit).
 - End to end: `pnpm demo`, then `GET http://127.0.0.1:8123/health` and `http://localhost:3000`.
+- **A change that depends on the model** (prompt, tool contract, approval, chat cards, live checks) **is checked live with Mistral as soon as possible**, in its own batch of work, not left to the series: `pnpm demo`, then `pnpm e2e:live` (`E2E_ONLY` to select entries). The key is present in `agent/.env`; agents never read that file, but may run the servers that load it. "No key" is never a reason to skip.
 - Every live measurement compares with values **read from the store at test time**, never hard-coded. A 429 is not a code failure: wait out the window, replay, note it.
 - Check each library API in the installed package (or with Context7) before using it.
 
