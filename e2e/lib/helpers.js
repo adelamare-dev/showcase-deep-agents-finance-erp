@@ -115,6 +115,8 @@
     delete ar.collectionRate;
     return [
       ...leaves(snap.totals),
+      // cashAfterPayables of get_cash_and_payables.
+      snap.totals.cash - snap.totals.accountsPayable,
       ...snap.kpis.flatMap((k) => moneyIn(k.value)),
       ...leaves(ar),
       ...snap.bills.map((b) => b.amount),

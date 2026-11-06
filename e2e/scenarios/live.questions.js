@@ -52,9 +52,9 @@ async (page, h) => {
   ];
   const hrFigures = (s) => [
     ...s.employees.map((e) => e.salary),
-    ...Object.values(groupSums(s.employees.map((e) => ({ ...e, amount: e.salary })), "department")),
+    // Payroll counts active employees only, as the store does (headcount_and_payroll).
+    ...Object.values(groupSums(s.employees.filter((e) => e.status === "active").map((e) => ({ ...e, amount: e.salary })), "department")),
     sum(s.employees.filter((e) => e.status === "active"), (e) => e.salary),
-    sum(s.employees, (e) => e.salary),
     ...h.leaves(s.monthlyExpenseByCategory),
     ...s.expenseBreakdown.map((e) => e.amount),
   ];
