@@ -112,3 +112,11 @@ def test_the_totals_the_aggregate_tools_return_are_not_called_unavailable():
 def test_research_is_not_asked_to_aggregate():
     assert "Include totals, aggregates" not in RESEARCH_AGENT_PROMPT
     assert "Never add up" in RESEARCH_AGENT_PROMPT
+
+
+def test_prompt_routes_what_if_to_a_card():
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- What-if growth questions"))
+    assert "render_chat_visual" in rule
+    assert 'dataset="revenue_forecast"' in rule and '"cash_flow_forecast"' in rule
+    assert "quarters=<asked, 1-8>" in rule and "growth_pct=<asked, -50..50>" in rule
+    assert "Never compute totals or differences" in rule

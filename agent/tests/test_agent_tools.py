@@ -10,8 +10,11 @@ from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableLambda
 from langchain_mistralai import ChatMistralAI
 
+import erp_store
 import isolated_subagents
 from agent import build_agent
+from erp_datasets import build_dataset
+from frontend_tools import render_chat_visual
 from tests.fakes import ScriptedToolCaller, tool_names
 
 ORIGINAL_DUMPS = json.dumps
@@ -93,6 +96,22 @@ def test_subagents_expose_data_tools_only(monkeypatch):
     assert not model.bound_tools & REMOVED_TOOLS
     # The second model call saw the tool result of the first.
     assert "ToolMessage" in {type(m).__name__ for m in model.calls[1]}
+
+
+def test_what_if_renders_six_projected_quarters(store, monkeypatch):
+    monkeypatch.setattr(erp_store, "_store", store)
+    out = render_chat_visual.invoke({"dataset": "revenue_forecast", "quarters": 6, "growth_pct": 12})
+    assert out.startswith("Rendered '")
+    figures = json.loads(out.split("Figures: ", 1)[1])
+    expected = build_dataset(store, "revenue_forecast", quarters=6, growth_pct=12)
+    assert len(figures["rows"]) == 6
+    assert figures["rows"] == expected["data"]
+
+
+def test_what_if_out_of_bounds_is_refused(store, monkeypatch):
+    monkeypatch.setattr(erp_store, "_store", store)
+    assert render_chat_visual.invoke({"dataset": "revenue_forecast", "quarters": 9}).startswith("Cannot render:")
+    assert render_chat_visual.invoke({"dataset": "revenue_forecast", "growth_pct": 51}).startswith("Cannot render:")
 
 
 def test_context_objects_reach_the_prompt_without_global_patch():
