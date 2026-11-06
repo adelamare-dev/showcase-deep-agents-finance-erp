@@ -13,7 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useErp } from "@/context/erp-context";
-import { formatCurrency } from "@/lib/utils";
+import { KPI_HIGHLIGHT_RING, KpiDelta } from "@/components/ui/kpi-change";
 import { isKpiFavourable } from "@/lib/kpi";
 import type { KPI } from "@/types/erp";
 
@@ -39,8 +39,7 @@ export function KPICard({ kpi }: { kpi: KPI }) {
       data-testid={`kpi-${kpi.label}`}
       className={cn(
         "group transition-all duration-300 hover:shadow-lg",
-        // The ring stays under reduced motion; only the pulse is dropped.
-        highlighted && "ring-2 ring-primary motion-safe:animate-pulse",
+        highlighted && KPI_HIGHLIGHT_RING,
       )}
       size="sm"
     >
@@ -73,18 +72,7 @@ export function KPICard({ kpi }: { kpi: KPI }) {
             {kpi.value}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">{kpi.label}</p>
-          {highlighted && (
-            <p
-              data-testid={`kpi-delta-${kpi.label}`}
-              className={cn(
-                "mt-1 text-sm font-semibold",
-                delta < 0 ? "text-red-600" : "text-emerald-600",
-              )}
-            >
-              {delta < 0 ? "−" : "+"}
-              {formatCurrency(Math.abs(delta))}
-            </p>
-          )}
+          {highlighted && <KpiDelta label={kpi.label} delta={delta} />}
         </div>
       </CardContent>
     </Card>

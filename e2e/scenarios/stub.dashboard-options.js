@@ -153,4 +153,54 @@ async (page, h) => {
     await h.stubReset();
     return { types, inView };
   });
+
+  await h.test("metric cards show the change highlight after an approval", async () => {
+    await h.stubReset();
+    await h.resetDemo();
+    await h.open("/");
+    await h.stubScript([
+      {
+        toolCall: {
+          name: "update_dashboard",
+          args: {
+            replace: true,
+            widgets: [
+              { type: "metric_cards", config: { metrics: ["Cash", "Accounts Payable"] } },
+              { type: "ar_aging_gauge", config: {} },
+            ],
+          },
+        },
+      },
+      { text: "Done." },
+    ]);
+    await h.sendPrompt("Build the cash dashboard");
+    await h.waitForRunEnd();
+    const cards = page.locator("[data-widget-type='metric-cards']");
+    await h.expectVisible(cards, 10000);
+    const before = (await h.snapshot()).totals;
+
+    await h.stubScript([
+      { toolCall: { name: "request_approval", args: { type: "supplier_payment", due_within_days: 7, include_overdue: true } } },
+      { text: "The payment was made." },
+    ]);
+    await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
+    await h.expectVisible(page.getByTestId("bill-approval-card"), 30000);
+    await page.getByTestId("copilot-message-list").getByRole("button", { name: "Approve Payment", exact: true }).click();
+    const cashDelta = cards.getByTestId("kpi-delta-Cash");
+    const payablesDelta = cards.getByTestId("kpi-delta-Accounts Payable");
+    await h.expectVisible(cashDelta, 15000);
+    await h.expectVisible(payablesDelta, 15000);
+    const cashText = await cashDelta.innerText();
+    const payablesText = await payablesDelta.innerText();
+    await h.waitForRunEnd();
+    const after = (await h.snapshot()).totals;
+    const paid = before.cash - after.cash;
+    h.assert(paid > 0, "the approval paid something");
+    const money = (text) => Number(text.replace(/[^0-9.]/g, ""));
+    h.assert(cashText.startsWith("−"), `the Cash change is a decrease: ${cashText}`);
+    h.assertEqual(money(cashText), paid, "the Cash change on the metric card is the paid total");
+    h.assertEqual(money(payablesText), before.accountsPayable - after.accountsPayable, "the Accounts Payable change is the amount paid");
+    await h.stubReset();
+    return { cashText, payablesText, paid };
+  });
 }

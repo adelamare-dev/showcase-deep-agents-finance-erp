@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useErp } from "@/context/erp-context";
+import { KPI_HIGHLIGHT_RING, KpiDelta } from "@/components/ui/kpi-change";
 import { isKpiFavourable } from "@/lib/kpi";
 import type { MetricCardsWidget } from "@/types/dashboard";
 
@@ -30,7 +31,7 @@ export function MetricCards({
 }: {
   config?: Partial<MetricCardsWidget["config"]>;
 }) {
-  const { kpis } = useErp();
+  const { kpis, highlights } = useErp();
   // The orchestrator may omit the metrics: show every KPI then.
   const filtered = config?.metrics
     ? kpis.filter((k) => config.metrics!.includes(k.label))
@@ -52,12 +53,17 @@ export function MetricCards({
         const isPositive = kpi.trend === "up";
         const isFavourable = isKpiFavourable(kpi);
         const isFlat = kpi.trend === "flat";
+        const delta = highlights[kpi.label];
+        const highlighted = delta !== undefined;
 
         return (
           <Card
             key={kpi.label}
             data-testid={`kpi-${kpi.label}`}
-            className="flex flex-col justify-center"
+            className={cn(
+              "flex flex-col justify-center",
+              highlighted && KPI_HIGHLIGHT_RING,
+            )}
             size="sm"
           >
             <CardContent>
@@ -91,6 +97,7 @@ export function MetricCards({
                 <p className="mt-1.5 text-sm text-muted-foreground">
                   {kpi.label}
                 </p>
+                {highlighted && <KpiDelta label={kpi.label} delta={delta} />}
               </div>
             </CardContent>
           </Card>
