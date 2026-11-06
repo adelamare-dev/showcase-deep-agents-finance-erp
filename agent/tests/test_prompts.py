@@ -85,12 +85,24 @@ def test_the_quarterly_cash_projection_goes_on_the_forecast_chart_not_the_waterf
 
 def test_one_figure_questions_go_straight_to_the_aggregate_tools():
     rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- One-figure questions"))
-    assert "no subagent" in rule and "quote its fields exactly" in rule
+    assert "no subagent" in rule and "quoting its fields exactly" in rule
+    assert "compares cash with liabilities" in rule and "follows the Cash position rule" in rule
     lines = ORCHESTRATOR_PROMPT.splitlines()
     dashboard = next(i for i, line in enumerate(lines) if line.startswith("- Dashboard / overview"))
     assert lines.index(rule) < dashboard
     for name in ("get_receivables_by_client", "get_headcount_and_payroll", "get_cash_and_payables"):
         assert name in RESEARCH_AGENT_PROMPT
+
+
+def test_the_rendering_rule_makes_an_exception_for_one_figure_answers():
+    assert "except for a one-figure question" in ORCHESTRATOR_PROMPT
+
+
+def test_the_totals_the_aggregate_tools_return_are_not_called_unavailable():
+    assert "a payroll total, an overdue total" not in ORCHESTRATOR_PROMPT
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- A total or sum no tool returned"))
+    assert "get_headcount_and_payroll" in rule and "get_receivables_by_client" in rule
+    assert "Never add figures yourself" in rule
 
 
 def test_research_is_not_asked_to_aggregate():
