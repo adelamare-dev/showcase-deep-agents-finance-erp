@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { ToolCallStatus } from "@copilotkit/react-core/v2";
 import { useDataset } from "@/hooks/use-dataset";
 import type { CashPositionDataset } from "@/lib/erp-api";
+import { ChangedValue } from "@/components/chat/changed-value";
 
 type Props = {
   status: string;
@@ -15,6 +17,10 @@ export function CashPositionCard({ status }: Props) {
     {},
     status === ToolCallStatus.Complete,
   );
+
+  // The first loaded figures stay as the "before" side of any later change.
+  const [firstData, setFirstData] = useState<CashPositionDataset | null>(null);
+  if (data && !firstData) setFirstData(data);
 
   if (error) {
     return (
@@ -46,6 +52,10 @@ export function CashPositionCard({ status }: Props) {
       currency: "USD",
     }).format(n);
 
+  const first = firstData ?? data;
+  const firstBalance = (name: string, fallback: number) =>
+    first.accounts.find((a) => a.name === name)?.balance ?? fallback;
+
   const isPositive = netPosition >= 0;
 
   return (
@@ -74,7 +84,11 @@ export function CashPositionCard({ status }: Props) {
               <tr key={account.name} className="border-b border-border/30">
                 <td className="px-3 py-2 text-foreground">{account.name}</td>
                 <td className="px-3 py-2 text-right font-medium text-foreground">
-                  {formatCurrency(account.balance)}
+                  <ChangedValue
+                    initial={firstBalance(account.name, account.balance)}
+                    current={account.balance}
+                    format={formatCurrency}
+                  />
                 </td>
               </tr>
             ))}
@@ -87,7 +101,11 @@ export function CashPositionCard({ status }: Props) {
         <div className="flex items-center justify-between">
           <span className="font-medium text-muted-foreground">Total Cash</span>
           <span className="font-semibold text-foreground">
-            {formatCurrency(totalCash)}
+            <ChangedValue
+              initial={first.totalCash}
+              current={totalCash}
+              format={formatCurrency}
+            />
           </span>
         </div>
         <div className="flex items-center justify-between">
@@ -95,7 +113,11 @@ export function CashPositionCard({ status }: Props) {
             Total Liabilities
           </span>
           <span className="font-semibold text-foreground">
-            {formatCurrency(totalLiabilities)}
+            <ChangedValue
+              initial={first.totalLiabilities}
+              current={totalLiabilities}
+              format={formatCurrency}
+            />
           </span>
         </div>
         <div className="flex items-center justify-between border-t border-border pt-2">
@@ -110,7 +132,11 @@ export function CashPositionCard({ status }: Props) {
             ) : (
               <TrendingDown className="h-3.5 w-3.5" />
             )}
-            {formatCurrency(netPosition)}
+            <ChangedValue
+              initial={first.netPosition}
+              current={netPosition}
+              format={formatCurrency}
+            />
           </span>
         </div>
       </div>

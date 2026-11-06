@@ -23,7 +23,21 @@
   };
 
   const byId = (id) => page.getByTestId(id);
-  const chatText = async () => (await byId("copilot-message-list").innerText()).trim();
+  // The text of the chat as the person reads it now. A figure struck through
+  // beside its replacement is stale by design, so it is left out: the read
+  // works on an off-screen copy and the page itself is not touched.
+  const chatText = async () =>
+    (
+      await byId("copilot-message-list").evaluate((list) => {
+        const copy = list.cloneNode(true);
+        copy.querySelectorAll('[data-testid="changed-value-before"]').forEach((el) => el.remove());
+        copy.style.cssText = "position:fixed;left:-99999px;top:0;width:" + list.clientWidth + "px";
+        document.body.appendChild(copy);
+        const text = copy.innerText;
+        copy.remove();
+        return text;
+      })
+    ).trim();
 
   // Opens a route at 1280x720 and makes sure the chat sidebar is open.
   const open = async (path = "/") => {
