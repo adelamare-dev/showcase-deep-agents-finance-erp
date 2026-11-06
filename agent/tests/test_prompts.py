@@ -12,7 +12,9 @@ def test_a_dashboard_makes_one_research_and_one_projections_call():
 
 def test_a_dashboard_that_lists_its_widgets_replaces_the_layout():
     rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Dashboard / overview"))
-    assert "replace true" in rule
+    start = rule.index("A request that lists the widgets it wants")
+    end = rule.index("Place each element asked for")
+    assert "update_dashboard call passes replace true" in rule[start:end]
 
 
 def test_projections_stay_available_to_the_orchestrator():

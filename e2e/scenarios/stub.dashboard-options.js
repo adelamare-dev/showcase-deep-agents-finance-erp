@@ -144,6 +144,9 @@ async (page, h) => {
       h.assert(view[name] && view[name].top >= 0 && view[name].bottom <= view.height, `the ${name} KPI is visible without scrolling: ${JSON.stringify(view[name])}`);
     }
     h.assert(view.gauge && view.bills, "the gauge and the bills list are on the dashboard");
+    for (const name of ["gauge", "bills"]) {
+      h.assert(view[name].top < view.height, `the ${name} starts inside the visible scroll area: ${JSON.stringify(view[name])}`);
+    }
     const extent = Math.max(view.gauge.bottom, view.bills.bottom) - Math.min(view.cash.top, view.payables.top);
     h.assert(extent <= view.budget, `the KPIs, the gauge and the bills list fit one screen: extent ${extent}, budget ${view.budget}`);
     const inView = view;

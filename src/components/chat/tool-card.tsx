@@ -75,7 +75,9 @@ const TOOL_CONFIG: Record<
       const widgets = args.widgets as Array<{ type: string }> | undefined;
       if (widgets?.length) {
         const types = widgets.map((w) => w.type).join(", ");
-        return `Adding widgets: ${types}`;
+        return args.replace === true
+          ? `Replacing dashboard with: ${types}`
+          : `Adding widgets: ${types}`;
       }
       return "Updating dashboard...";
     },
