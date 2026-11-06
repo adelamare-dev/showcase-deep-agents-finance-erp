@@ -152,7 +152,7 @@ The app opens with the chat panel open and "Cash Flow Dashboard" as the first su
 
 ## Replaying the demo
 
-The Settings icon at the bottom of the left bar has one entry, **Reset demo data**. It restores the seeded books, the default dashboard, the dashboards saved in the browser and the subagent steps, and opens a fresh conversation. It is disabled while the assistant is answering. A pending approval card disappears on reset, because the reset opens a new conversation. Restarting the agent also restores the books.
+The Settings icon at the bottom of the left bar has one entry, **Reset demo data**. It restores the seeded books, the default dashboard, the dashboards saved in the browser and the subagent steps, and opens a fresh conversation. The first click only arms it (the label becomes "Click again to reset" for 4 seconds); the second click resets. It is disabled while the assistant is answering or an approval card waits for an answer. A pending approval card disappears on reset, because the reset opens a new conversation. Restarting the agent also restores the books.
 
 ## Architecture
 

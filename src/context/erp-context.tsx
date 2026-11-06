@@ -109,15 +109,17 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
   const { resetDashboards } = useDashboard();
   const startNewThread = useCopilotChatConfiguration()?.startNewThread;
 
-  // The books are reset first: if the agent refuses, the screen is untouched.
+  // The new thread opens first, so a message typed while the reset is under
+  // way cannot land in the old conversation. If the agent then refuses, the
+  // books and the dashboard stay as they were and the error is shown.
   const resetDemo = useCallback(async () => {
+    startNewThread?.();
     await resetErpData();
     clearSubagentSteps();
     forgetToolCalls();
     if (clearTimer.current) clearTimeout(clearTimer.current);
     setHighlights({});
     await resetDashboards();
-    startNewThread?.();
     await refresh();
   }, [refresh, resetDashboards, startNewThread]);
 

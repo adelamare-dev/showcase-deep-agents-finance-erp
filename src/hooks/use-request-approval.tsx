@@ -5,7 +5,9 @@ import {
   useInterrupt,
   useRenderTool,
 } from "@copilotkit/react-core/v2";
+import { useEffect } from "react";
 import { z } from "zod";
+import { setApprovalPending } from "@/lib/approval-pending";
 import {
   BillApprovalCard,
   type BillRow,
@@ -52,6 +54,17 @@ function parseInterruptValue(raw: unknown): InterruptValue | undefined {
   return undefined;
 }
 
+// Flags the approval as pending while the card is on screen. Leaving the
+// screen (an answer, a reset, a new thread, a page change) clears the flag, so
+// it cannot stay set with no card to answer.
+function PendingMarker() {
+  useEffect(() => {
+    setApprovalPending(true);
+    return () => setApprovalPending(false);
+  }, []);
+  return null;
+}
+
 export function useRequestApproval() {
   // The approval card itself comes from useInterrupt below: the agent's
   // `copilotkit_interrupt(action="request_approval", ...)` pauses the run. Once
@@ -85,32 +98,39 @@ export function useRequestApproval() {
       if (!args) return <></>;
 
       const respond = async (result: unknown) => {
+        setApprovalPending(false);
         resolve(result);
       };
 
       if (args.type === "inventory_reorder") {
         return (
-          <InventoryReorderCard
-            status={ToolCallStatus.Executing}
-            args={{
-              items: args.items ?? [],
-              estimatedTotal: args.estimatedTotal ?? 0,
-              supplier: args.supplier,
-            }}
-            respond={respond}
-            result={undefined}
-          />
+          <>
+            <PendingMarker />
+            <InventoryReorderCard
+              status={ToolCallStatus.Executing}
+              args={{
+                items: args.items ?? [],
+                estimatedTotal: args.estimatedTotal ?? 0,
+                supplier: args.supplier,
+              }}
+              respond={respond}
+              result={undefined}
+            />
+          </>
         );
       }
 
       return (
-        <BillApprovalCard
-          bills={args.bills ?? []}
-          billIds={args.billIds ?? []}
-          totalAmount={args.totalAmount ?? 0}
-          action={args.action ?? "Pay supplier bills"}
-          respond={respond}
-        />
+        <>
+          <PendingMarker />
+          <BillApprovalCard
+            bills={args.bills ?? []}
+            billIds={args.billIds ?? []}
+            totalAmount={args.totalAmount ?? 0}
+            action={args.action ?? "Pay supplier bills"}
+            respond={respond}
+          />
+        </>
       );
     },
   });

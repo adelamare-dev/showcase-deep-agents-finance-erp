@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useErp } from "@/context/erp-context";
+import { useApprovalPending } from "@/lib/approval-pending";
 import { brand } from "@/content/brand";
 import { navItems } from "@/content/ui-text";
 
@@ -75,9 +76,13 @@ export function Sidebar() {
   );
 }
 
-// The one entry puts the demo back to its starting point. It stays disabled
-// while the agent is running: a reset in the middle of a run would let the
-// run write to books that were just restored.
+// How long the entry stays armed after its first click.
+export const RESET_CONFIRM_MS = 4000;
+
+// The one entry puts the demo back to its starting point, after a second
+// click. It stays disabled while the agent is running or an approval card
+// waits: a reset in the middle would let the run write to books that were
+// just restored, or drop a decision the user has not given.
 function SettingsMenu() {
   const { resetDemo } = useErp();
   const { agent } = useAgent({
@@ -86,6 +91,8 @@ function SettingsMenu() {
   });
   const [open, setOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [armed, setArmed] = useState(false);
+  const approvalPending = useApprovalPending();
   const [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
@@ -106,7 +113,23 @@ function SettingsMenu() {
     };
   }, [open]);
 
+  const busy = agent.isRunning || resetting || approvalPending;
+
+  // The first click only arms the entry. It disarms when the delay passes,
+  // when the menu closes and as soon as something is under way.
+  if (armed && (busy || !open)) setArmed(false);
+  useEffect(() => {
+    if (!armed) return;
+    const timer = setTimeout(() => setArmed(false), RESET_CONFIRM_MS);
+    return () => clearTimeout(timer);
+  }, [armed]);
+
   const reset = async () => {
+    if (!armed) {
+      setArmed(true);
+      return;
+    }
+    setArmed(false);
     setResetting(true);
     setError(null);
     try {
@@ -118,8 +141,6 @@ function SettingsMenu() {
       setResetting(false);
     }
   };
-
-  const busy = agent.isRunning || resetting;
 
   return (
     <div ref={root} className="relative mt-auto">
@@ -145,16 +166,20 @@ function SettingsMenu() {
           <button
             type="button"
             role="menuitem"
-            aria-label="Reset demo data"
             disabled={busy}
             onClick={reset}
-            className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent"
+            className={cn(
+              "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent",
+              armed && "bg-red-50 text-red-700 hover:bg-red-100",
+            )}
           >
-            Reset demo data
+            {armed ? "Click again to reset" : "Reset demo data"}
           </button>
-          {agent.isRunning && (
+          {(agent.isRunning || approvalPending) && (
             <p className="px-3 pb-2 text-xs text-muted-foreground">
-              Available when the assistant has finished.
+              {approvalPending
+                ? "Available once the approval has been answered."
+                : "Available when the assistant has finished."}
             </p>
           )}
           {error && (

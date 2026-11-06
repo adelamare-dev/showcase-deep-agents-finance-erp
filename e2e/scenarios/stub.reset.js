@@ -94,6 +94,83 @@ async (page, h) => {
     h.assertEqual(await chatCount(), 0, "the conversation is empty after the reset");
   });
 
+  await h.test("The first click only arms the reset", async () => {
+    await fresh();
+    await h.stubScript([{ text: "All good." }]);
+    await h.sendPrompt("Status please");
+    await h.waitForRunEnd();
+    const books = await h.snapshot();
+    const messages = await chatCount();
+
+    const item = await h.openSettings();
+    h.assertEqual((await item.innerText()).trim(), "Reset demo data", "the entry starts with its usual label");
+    await item.click();
+    h.assertEqual((await item.innerText()).trim(), "Click again to reset", "the label asks for a second click");
+    h.assert(await item.isEnabled(), "the entry can be clicked again");
+    await page.waitForTimeout(500);
+    h.assert(await item.isVisible(), "the menu stays open after the first click");
+    h.assertEqual(await h.snapshot(), books, "the books are unchanged");
+    h.assertEqual(await chatCount(), messages, "the conversation is unchanged");
+
+    await item.getByText("Reset demo data", { exact: true }).waitFor({ timeout: 8000 });
+    h.assertEqual((await item.innerText()).trim(), "Reset demo data", "the usual label is back once the delay has passed");
+    h.assertEqual(await chatCount(), messages, "the conversation is still unchanged");
+  });
+
+  await h.test("Reset is disabled while an approval card waits", async () => {
+    await fresh();
+    await h.stubScript([
+      { toolCall: { name: "request_approval", args: { type: "supplier_payment", due_within_days: 7, include_overdue: true } } },
+      { text: "The payment was made." },
+    ]);
+    await h.sendPrompt("Approve the supplier bills due this week, including any overdue ones");
+    await h.expectVisible(byId("bill-approval-card"), 30000);
+    const item = await h.openSettings();
+    h.assert(await item.isDisabled(), "Reset demo data is disabled while the card waits");
+    await item.click({ force: true, timeout: 1000 }).catch(() => {});
+    h.assertEqual(await byId("bill-approval-card").count(), 1, "the card is still there");
+  });
+
+  await h.test("A run that starts disarms the reset", async () => {
+    await fresh();
+    const item = await h.openSettings();
+    await item.click();
+    h.assertEqual((await item.innerText()).trim(), "Click again to reset", "the entry is armed");
+
+    await h.stubScript([{ text: "Checking the books for you now.", hold: true }]);
+    await h.sendPrompt("Give me a status update");
+    await h.expectVisible(page.getByText("Checking", { exact: false }).last(), 30000);
+    const during = await h.openSettings();
+    h.assert(await during.isDisabled(), "the entry is disabled during the run");
+
+    await h.stubRelease();
+    await h.waitForRunEnd();
+    h.assert(await during.isEnabled(), "the entry is available once the run is over");
+    h.assertEqual((await during.innerText()).trim(), "Reset demo data", "the entry is no longer armed");
+    h.assertEqual(await chatCount(), 2, "the conversation was not cleared");
+  });
+
+  await h.test("A message sent right after the reset lands in the new thread", async () => {
+    await fresh();
+    const lastCount = async () => (await h.stubRequests()).at(-1).messages;
+    await h.stubScript([{ text: "Answer one." }]);
+    await h.sendPrompt("Hello");
+    await h.waitForRunEnd();
+    const baseline = await lastCount();
+    for (const text of ["Second question", "Third question"]) {
+      await h.stubScript([{ text: "Answer to " + text }]);
+      await h.sendPrompt(text);
+      await h.waitForRunEnd();
+    }
+    h.assert((await lastCount()) > baseline, "the thread grew");
+
+    await h.clickReset();
+    await h.stubScript([{ text: "Answer one." }]);
+    await h.sendPrompt("Hello");
+    await h.waitForRunEnd();
+    h.assertEqual(await lastCount(), baseline, "the request carries only the new message");
+  });
+
   await h.test("A saved custom dashboard is cleared by reset", async () => {
     await fresh();
     const customise = async () => {
@@ -160,7 +237,7 @@ async (page, h) => {
     return { before, after };
   });
 
-  await h.test("A failed reset says why and changes nothing", async () => {
+  await h.test("A failed reset says why and leaves the books alone", async () => {
     await fresh();
     await h.stubScript([{ text: "Everything looks fine." }]);
     await h.sendPrompt("Status please");
@@ -174,6 +251,7 @@ async (page, h) => {
     await page.route("**/api/erp/reset", (route) => route.abort("connectionrefused"));
     const item = await h.openSettings();
     await item.click();
+    await item.click();
     const alert = page.getByRole("alert").filter({ hasText: "data service" });
     await h.expectVisible(alert, 10000);
     h.assertEqual(
@@ -182,7 +260,7 @@ async (page, h) => {
       "the alert says what is wrong in plain words",
     );
     h.assert(await item.isEnabled(), "the control can be tried again");
-    h.assertEqual(await chatCount(), messages, "the chat is unchanged");
+    h.assertEqual(await chatCount(), 0, "the new thread is empty");
     h.assertEqual(await byId("kpi-Cash").innerText(), kpi, "the dashboard is unchanged");
     h.assertEqual(await h.snapshot(), books, "the books are unchanged");
 

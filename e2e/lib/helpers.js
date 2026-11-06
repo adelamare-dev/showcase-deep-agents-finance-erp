@@ -181,16 +181,20 @@
     await visit("/");
   };
 
-  // Opens the Settings menu and returns its "Reset demo data" entry.
+  // Opens the Settings menu and returns its reset entry, found under either of
+  // its labels: "Reset demo data", or "Click again to reset" once armed.
   const openSettings = async () => {
-    const item = page.getByRole("menuitem", { name: "Reset demo data" });
+    const item = page.getByRole("menuitem", { name: /^(Reset demo data|Click again to reset)$/ });
     if (!(await item.isVisible())) await page.getByRole("button", { name: "Settings", exact: true }).click();
     await item.waitFor({ state: "visible", timeout: 5000 });
     return item;
   };
-  // Clicks it and waits for the reset to finish (the menu closes when it has).
+  // Clicks it twice (the first click only arms it) and waits for the reset to
+  // finish (the menu closes when it has).
   const clickReset = async () => {
     const item = await openSettings();
+    await item.click();
+    await item.getByText("Click again to reset", { exact: true }).waitFor({ timeout: 3000 });
     await item.click();
     await item.waitFor({ state: "detached", timeout: 30000 });
   };

@@ -194,6 +194,7 @@ async (page, h) => {
     await page.route("**/api/erp/snapshot", (route) => route.abort("connectionrefused"));
     const item = await h.openSettings();
     await item.click();
+    await item.click();
     await h.expectVisible(byId("erp-stale-notice"), 10000);
     await page.unroute("**/api/erp/snapshot");
     await page.keyboard.press("Escape");
