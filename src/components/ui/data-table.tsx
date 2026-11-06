@@ -13,7 +13,13 @@ interface Column<T> {
   header: string;
   accessor: keyof T | ((row: T) => React.ReactNode);
   className?: string;
+  // Hidden while the table's own container is narrower than 28rem.
+  secondary?: boolean;
+  // Amounts and badges stay on one line in a narrow table; other cells wrap.
+  nowrap?: boolean;
 }
+
+const SECONDARY_CLASS = "hidden @md:table-cell";
 
 interface DataTableProps<T> {
   columns: Column<T>[];
@@ -27,35 +33,37 @@ export function DataTable<T>({
   keyExtractor,
 }: DataTableProps<T>) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {columns.map((col, i) => (
-            <TableHead
-              key={i}
-              className="px-4 text-xs uppercase tracking-wider"
-            >
-              {col.header}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {data.map((row) => (
-          <TableRow key={keyExtractor(row)}>
+    <div className="@container">
+      <Table>
+        <TableHeader>
+          <TableRow>
             {columns.map((col, i) => (
-              <TableCell
+              <TableHead
                 key={i}
-                className={`px-4 py-3.5 ${col.className || "text-muted-foreground"}`}
+                className={`px-2 @md:px-4 text-xs uppercase tracking-wider ${col.secondary ? SECONDARY_CLASS : ""}`}
               >
-                {typeof col.accessor === "function"
-                  ? col.accessor(row)
-                  : String(row[col.accessor])}
-              </TableCell>
+                {col.header}
+              </TableHead>
             ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {data.map((row) => (
+            <TableRow key={keyExtractor(row)}>
+              {columns.map((col, i) => (
+                <TableCell
+                  key={i}
+                  className={`px-2 @md:px-4 py-3.5 ${col.className || "text-muted-foreground"} ${col.nowrap ? "" : "whitespace-normal @md:whitespace-nowrap"} ${col.secondary ? SECONDARY_CLASS : ""}`}
+                >
+                  {typeof col.accessor === "function"
+                    ? col.accessor(row)
+                    : String(row[col.accessor])}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

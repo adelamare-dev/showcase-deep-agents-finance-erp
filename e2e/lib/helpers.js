@@ -206,6 +206,30 @@
       return { widgets, kpis };
     });
 
+  // What overflows or squeezes inside the dashboard cards, as readable lines.
+  const clippedCardContent = () =>
+    page.evaluate(() => {
+      const out = [];
+      for (const card of document.querySelectorAll("main [data-slot='card']")) {
+        const box = card.getBoundingClientRect();
+        const name = (card.querySelector("[data-slot='card-title']")?.textContent || card.textContent).trim().slice(0, 30);
+        for (const el of card.querySelectorAll("*")) {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) continue;
+          if (r.right > box.right + 1) out.push(`${name}: <${el.tagName.toLowerCase()}> ends ${Math.round(r.right - box.right)}px past the card`);
+          else if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0 && getComputedStyle(el).display !== "inline") out.push(`${name}: <${el.tagName.toLowerCase()}> scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}`);
+        }
+        const title = card.querySelector("[data-slot='card-title']");
+        if (title && title.getClientRects().length) {
+          const lines = Math.round(title.getBoundingClientRect().height / parseFloat(getComputedStyle(title).lineHeight));
+          if (lines > 1) out.push(`${name}: title wraps over ${lines} lines`);
+        }
+        // A row whose label and amount are squeezed together is clipped in practice.
+        if (card.getBoundingClientRect().width < 300 && card.querySelector("[data-slot='card-title']")) out.push(`${name}: card only ${Math.round(box.width)}px wide`);
+      }
+      return out;
+    });
+
   // Which of the five asked-for elements the scan shows, and in which widget.
   const classifyDashboard = (scan) => {
     const found = {
@@ -366,7 +390,7 @@
     assert, assertEqual, expectVisible, byId,
     STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
-    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, scanDashboard, classifyDashboard, runDashboardSegment, test, run,
+    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
   };
   return h;
 }

@@ -223,12 +223,15 @@ function DetailView({
         <h3 className="mb-4 text-sm font-semibold text-foreground">
           Layout Preview
         </h3>
-        <div className="pointer-events-none origin-top-left">
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-4">
+        <div className="@container pointer-events-none origin-top-left">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @5xl:grid-cols-4">
             {[...dashboard.widgets]
               .sort((a, b) => a.order - b.order)
               .map((widget) => (
-                <div key={widget.id} className={colSpanClass(widget.colSpan)}>
+                <div
+                  key={widget.id}
+                  className={colSpanClass(widget.type, widget.colSpan)}
+                >
                   <WidgetRenderer widget={widget} />
                 </div>
               ))}

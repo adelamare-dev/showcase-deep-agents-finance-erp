@@ -18,19 +18,37 @@ import { formatCurrency } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { Transaction, Invoice, Bill } from "@/types/erp";
-import type { DashboardWidget } from "@/types/dashboard";
+import type { DashboardWidget, WidgetType } from "@/types/dashboard";
 
-const COL_SPAN_CLASS: Record<number, string> = {
-  // With the chat open, 1280px leaves about 720px for the page: widgets stay
-  // one per row until the viewport is wide enough for the four-column grid.
-  1: "col-span-1 2xl:col-span-1",
-  2: "col-span-1 2xl:col-span-2",
-  3: "col-span-1 2xl:col-span-3",
-  4: "col-span-1 2xl:col-span-4",
+// Small widgets that sit side by side on the two-column grid; the others take
+// a full row there. Both follow the width of the grid's container (the page
+// minus the chat), not the screen, and use the span on the four-column grid.
+export const COMPACT_WIDGET_TYPES: readonly WidgetType[] = [
+  "ar-aging-gauge",
+  "outstanding-invoices",
+  "expense-breakdown",
+  "recent-transactions",
+];
+
+const COMPACT_SPAN_CLASS: Record<number, string> = {
+  1: "col-span-1 @5xl:col-span-1",
+  2: "col-span-1 @5xl:col-span-2",
+  3: "col-span-1 @5xl:col-span-3",
+  4: "col-span-1 @5xl:col-span-4",
 };
 
-export function colSpanClass(span: number) {
-  return COL_SPAN_CLASS[span] || COL_SPAN_CLASS[2];
+const FULL_ROW_SPAN_CLASS: Record<number, string> = {
+  1: "col-span-1 @xl:col-span-2 @5xl:col-span-1",
+  2: "col-span-1 @xl:col-span-2 @5xl:col-span-2",
+  3: "col-span-1 @xl:col-span-2 @5xl:col-span-3",
+  4: "col-span-1 @xl:col-span-2 @5xl:col-span-4",
+};
+
+export function colSpanClass(type: WidgetType, span: number) {
+  const classes = COMPACT_WIDGET_TYPES.includes(type)
+    ? COMPACT_SPAN_CLASS
+    : FULL_ROW_SPAN_CLASS;
+  return classes[span] || classes[2];
 }
 
 export function WidgetRenderer({ widget: stored }: { widget: DashboardWidget }) {
@@ -113,6 +131,7 @@ function RecentTransactionsSection({ config }: { config: { limit?: number } }) {
             },
             {
               header: "Amount",
+              nowrap: true,
               accessor: (row) => (
                 <span
                   className={
@@ -128,7 +147,9 @@ function RecentTransactionsSection({ config }: { config: { limit?: number } }) {
             },
             {
               header: "Status",
+              nowrap: true,
               accessor: (row) => <StatusBadge status={row.status} />,
+              secondary: true,
             },
           ]}
           data={transactions.slice(0, limit)}
@@ -187,6 +208,7 @@ function OutstandingInvoicesSection({
               },
               {
                 header: "Amount",
+              nowrap: true,
                 accessor: (row) => (
                   <span className="text-foreground">
                     {formatCurrency(row.amount)}
@@ -197,9 +219,11 @@ function OutstandingInvoicesSection({
                 header: "Due",
                 accessor: "dueDate",
                 className: "text-muted-foreground",
+                secondary: true,
               },
               {
                 header: "Status",
+              nowrap: true,
                 accessor: (row) => <StatusBadge status={row.status} />,
               },
             ]}
@@ -220,6 +244,7 @@ function OutstandingInvoicesSection({
             },
             {
               header: "Amount",
+              nowrap: true,
               accessor: (row) => (
                 <span className="text-foreground">
                   {formatCurrency(row.amount)}
@@ -230,9 +255,11 @@ function OutstandingInvoicesSection({
               header: "Due",
               accessor: "dueDate",
               className: "text-muted-foreground",
+              secondary: true,
             },
             {
               header: "Status",
+              nowrap: true,
               accessor: (row) => <StatusBadge status={row.status} />,
             },
           ]}

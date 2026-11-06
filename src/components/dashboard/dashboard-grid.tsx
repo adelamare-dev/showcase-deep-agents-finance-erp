@@ -23,6 +23,8 @@ export function DashboardGrid() {
   );
   const prevIdsRef = useRef<Set<string>>(new Set(widgets.map((w) => w.id)));
   const exitTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const scrollTargetRef = useRef<string | null>(null);
+  const elementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
     const prevIds = prevIdsRef.current;
@@ -75,6 +77,14 @@ export function DashboardGrid() {
       exitTimersRef.current.add(timer);
     }
 
+    // A widget added on its own scrolls into view. A replaced layout (a saved
+    // dashboard loaded, a reset) removes widgets in the same update and stays
+    // where it is, so does the first render.
+    if (entering.length > 0 && exiting.length === 0) {
+      const last = entering.reduce((a, b) => (b.order >= a.order ? b : a));
+      scrollTargetRef.current = last.id;
+    }
+
     prevIdsRef.current = nextIds;
 
     return () => {
@@ -82,6 +92,15 @@ export function DashboardGrid() {
       exitTimersRef.current.clear();
     };
   }, [widgets]);
+
+  // Runs once the new widget is in the DOM.
+  useEffect(() => {
+    const id = scrollTargetRef.current;
+    const element = id ? elementsRef.current.get(id) : undefined;
+    if (!element) return;
+    scrollTargetRef.current = null;
+    element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [displayed]);
 
   const sorted = [...displayed].sort((a, b) => {
     // Exiting widgets go last
@@ -93,16 +112,20 @@ export function DashboardGrid() {
   return (
     <div>
       <DashboardToolbar />
-      <div className="space-y-8 p-8">
-        <div className="grid grid-cols-1 gap-6 transition-all duration-300 2xl:grid-cols-4">
+      <div className="@container space-y-8 p-8">
+        <div className="grid grid-cols-1 gap-6 transition-all duration-300 @xl:grid-cols-2 @5xl:grid-cols-4">
           {sorted.map((widget) => (
             <div
               key={widget.id}
+              ref={(el) => {
+                if (el) elementsRef.current.set(widget.id, el);
+                else elementsRef.current.delete(widget.id);
+              }}
               data-widget-type={widget.type}
               data-widget-dataset={
                 widget.type === "custom-chart" ? widget.config.dataset : undefined
               }
-              className={`${colSpanClass(widget.colSpan)} ${
+              className={`${colSpanClass(widget.type, widget.colSpan)} ${
                 widget.phase === "entering"
                   ? "widget-enter"
                   : widget.phase === "exiting"
