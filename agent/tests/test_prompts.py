@@ -120,3 +120,9 @@ def test_prompt_routes_what_if_to_a_card():
     assert 'dataset="revenue_forecast"' in rule and '"cash_flow_forecast"' in rule
     assert "quarters=<asked, 1-8>" in rule and "growth_pct=<asked, -50..50>" in rule
     assert "Never compute totals or differences" in rule
+    # No line may route a what-if question through do_projections, except the CRITICAL rule that excludes it.
+    for line in ORCHESTRATOR_PROMPT.splitlines():
+        if "do_projections" in line and not line.startswith("- CRITICAL"):
+            assert "what-if" not in line.lower() and "what if" not in line.lower(), line
+    critical = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- CRITICAL: ALWAYS call do_research"))
+    assert "Exception: a what-if growth question calls render_chat_visual directly" in critical

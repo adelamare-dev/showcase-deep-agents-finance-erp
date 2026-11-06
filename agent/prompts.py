@@ -14,7 +14,7 @@ to render rich UI components in the user's interface.
 
 2. **do_projections(query)** — Computes revenue forecasts, cash flow projections, scenario
    analysis, and trend analysis from historical data. Use for forward-looking questions
-   about future quarters, "what-if" scenarios, or trend analysis.
+   about future quarters, scenario comparisons, or trend analysis.
 
 ## Frontend Tools (call directly, not via subagents)
 
@@ -99,7 +99,7 @@ building from scratch.
 - "Show me" data visually → do_research → render_chat_visual with the matching dataset
 - Cash position / liquidity → do_research → render_chat_visual (dataset cash_position)
 - Forecast / projection → do_projections → render_chat_visual (revenue_forecast or cash_flow_forecast)
-- Scenario / "what if" → do_projections → render_chat_visual (scenario_analysis, with growth_pct for a what-if)
+- Scenario comparison (optimistic / base / conservative cases) → do_projections → render_chat_visual (scenario_analysis)
 - What-if growth questions → render_chat_visual(dataset="revenue_forecast" for revenue or "cash_flow_forecast" for cash, quarters=<asked, 1-8>, growth_pct=<asked, -50..50>). In the reply quote only values from the tool's Figures. Never compute totals or differences.
 - Pay supplier bills / "any bills to pay" / "what do we owe this week" / "approve the supplier payments" → request_approval directly: request_approval(type="supplier_payment", due_within_days=<days asked, 7 for "this week">, include_overdue=true unless the user excludes overdue bills). Never pass bill ids. Always surface the approval dialog when the user is asking about paying suppliers. Client invoices (money owed to us) are never paid through request_approval. Whatever the conversation held before, a request to approve or pay supplier payments ends with a request_approval call: navigating to a page or describing the bills is never a substitute.
 - Reorder inventory / "anything to restock" / "what needs reordering" → do_research (query_inventory) → request_approval (inventory_reorder, with sku and quantity for the items whose status is low-stock or out-of-stock, and never for an in-stock item; quantity is twice the reorderLevel minus the current quantity). Always surface the approval dialog — do NOT just chart or summarize.
@@ -125,7 +125,7 @@ When building dashboards with update_dashboard:
 
 ## Rules
 
-- CRITICAL: ALWAYS call do_research or do_projections BEFORE render_chat_visual, even for cash_position: the chart or card draws its own figures, but your comment must quote figures a tool returned.
+- CRITICAL: ALWAYS call do_research or do_projections BEFORE render_chat_visual, even for cash_position: the chart or card draws its own figures, but your comment must quote figures a tool returned. Exception: a what-if growth question calls render_chat_visual directly, because its result carries the Figures to quote.
 - Use do_projections (not do_research) for forward-looking questions.
 - CRITICAL: After getting data, ALWAYS call the appropriate frontend tool, except for a one-figure question answered from a get_* tool. Never respond
   with plain financial data in text when a rendering tool exists.
