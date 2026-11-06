@@ -17,10 +17,10 @@ e2e/
 
 - `pnpm e2e` builds the web app, starts the stub stack (stub, agent, web) and runs the `offline` and `stub` projects. The runner starts and stops the servers; ports 8790, 8123 and 3000 must be free (`reuseExistingServer` is off). `stub.agent-down` is listed as skipped: it needs the agent killed by hand, so only the plugin plays it.
 - One scenario: `pnpm e2e -g stub.reset` (pnpm appends the arguments to `playwright test`; the build still runs first).
-- `pnpm e2e:live` runs the `live` project against a `pnpm demo` you started yourself with a real `MISTRAL_API_KEY`; it starts no server. Select with `pnpm e2e:live -g live.agent`.
+- `pnpm e2e:live` runs the `live` project against a `pnpm demo` you started yourself with a real `MISTRAL_API_KEY`; it starts no server. Select with `pnpm e2e:live -g live.agent`. Its timeout is 60 minutes (a whole scenario file is one test, and `live.questions` has 18 entries of up to about 2 minutes each). To play only some entries of `live.questions`, pass their indices in `E2E_ONLY`, for example in PowerShell `$env:E2E_ONLY='3,5'; pnpm e2e:live -g live.questions` (unset it afterwards; a scenario without an entry selection fails while it is set).
 - Each test logs `<name>: n/n cases passed` and fails when a case fails, with the failed cases in the error.
 - First time on a machine: `pnpm exec playwright install chromium`.
-- `--only=<indices>` (below) is a build-time option of the plugin path; the spec runs whole files.
+- `--only=<indices>` (below) is the build-time form of that selection for the plugin path; the runner takes `E2E_ONLY`. Without either, whole files run. The live path of the runner has not been run with a real key yet.
 
 ## Run a scenario with the plugin
 

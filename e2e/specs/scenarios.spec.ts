@@ -19,8 +19,14 @@ for (const name of names) {
     // Imported at run time: the loader is an ES module (import.meta), which the
     // runner's CommonJS transform of this file cannot load statically.
     const { loadScenario } = await import("../lib/load-scenario.mjs");
-    const loaded = loadScenario(name);
-    if (!loaded) throw new Error(`scenario ${name} not found`);
+    // E2E_ONLY="3,5" plays only those entries of a scenario that declares a selection.
+    const onlyRaw = process.env.E2E_ONLY;
+    const only = onlyRaw ? onlyRaw.split(",").map((n) => n.trim()) : undefined;
+    if (only && !only.every((n) => /^\d+$/.test(n))) {
+      throw new Error("E2E_ONLY takes comma-separated entry indices, e.g. E2E_ONLY=3,5");
+    }
+    const loaded = loadScenario(name, { only });
+    if (!loaded) throw new Error(only ? `scenario ${name} not found or takes no entry selection (unset E2E_ONLY)` : `scenario ${name} not found`);
     const result = await loaded.run(page);
     console.log(`${name}: ${result.passed}/${result.cases.length} cases passed`);
     expect(result.failed).toEqual([]);

@@ -86,7 +86,7 @@ Copy `.env.example` to `.env` to change a default; the web app works without it.
 ```bash
 pnpm exec playwright install chromium   # once
 pnpm e2e            # builds the web app, starts stub + agent + web, runs the offline and stub projects (ports 8790, 8123, 3000 must be free)
-pnpm e2e:live       # live project against a running `pnpm demo` with a real key
+pnpm e2e:live       # live project against a running `pnpm demo` with a real key (E2E_ONLY=3,5 selects entries of live.questions)
 pnpm e2e:build      # assembles helpers + each scenario into .playwright-mcp/scenarios/<name>.js
 pnpm e2e:build offline   # only the scenarios whose name contains "offline"
 ```
