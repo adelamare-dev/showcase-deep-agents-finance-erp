@@ -13,7 +13,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 
 **First screen.** The chat is open on load with the reference suggestion ("Cash Flow Dashboard") first; the header holds only the fictional avatar (not a control) and the sidebar only routes plus Settings. No visible control is without an effect.
 
-**Not done yet.** The reference series: no run has yet passed from the dashboard to the follow-up question, so the count of consecutive passes is 0 of 5. The scenario enforces 60 s from click to complete dashboard (the allowed fallback after the other remedies); 45 s stays the target and is not reliably met. On `ministral-14b-2512` the valid dashboard runs were complete with figures equal to the store, but their time depends strongly on the model service's load (measurements, from several prompt states, are in the README and the evidence, not here). The suggestions and ten likely free questions are checked by a repeated live scenario (`e2e/scenarios/live.questions.js`); its results, the suggestions removed from the first screen and the questions not covered are in the README, "Measured behaviour". The app is a working base, not the finished demo.
+**Not done yet.** The reference series: no run has yet passed from the dashboard to the follow-up question, so the count of consecutive passes is 0 of 5. The scenario enforces 60 s from click to complete dashboard (the allowed fallback after the other remedies); 45 s stays the target and is not reliably met. On `ministral-14b-2512` the valid dashboard runs were complete with figures equal to the store, but their time depends strongly on the model service's load (measurements, from several prompt states, are in the README and the evidence, not here). The suggestions and ten likely free questions are checked by a repeated live scenario (`e2e/scenarios/live.questions.js`); its results, the suggestions removed from the first screen and the questions not covered are in the README, "Measured behaviour". The agent's tool set and prompt changed after the README measurements (aggregate tools for one-figure questions), so the measured counts predate it and are due again. The app is a working base, not the finished demo.
 
 **README.** It is the public entry point and states the same limits as this file (reference series not proven, Approve Payments 0 of 3, uncovered free questions). A fresh clone with a placeholder key proved `pnpm install`, `pnpm test:agent`, `pnpm demo` and the health checks; the `offline.*` scenarios ran from this repo's built files against the clone's servers. When a measurement changes, change the README table and this paragraph together. It carries no video link until a video exists.
 
@@ -31,7 +31,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 | Agent FastAPI (`:8123`), graph                           | `agent/main.py`, `agent/agent.py`                                                                                 |
 | Data: seed, store, routes                                | `agent/erp_seed.py`, `agent/erp_store.py`, `agent/erp_datasets.py`, `agent/erp_api.py`                            |
 | Prompts, tools, subagents, models                        | `agent/prompts.py`, `agent/tools.py`, `agent/frontend_tools.py`, `agent/isolated_subagents.py`, `agent/models.py` |
-| Browser scenarios (Playwright plugin)                    | `e2e/` (see `e2e/README.md`)                                                                                      |
+| Browser scenarios (`@playwright/test` and plugin)        | `e2e/`, `playwright.config.ts`, `e2e/specs/` (see `e2e/README.md`)                                                |
 | Mistral stub and its stack launcher                      | `e2e/fixtures/` (scripted answers and HTTP errors, no credit spent)                                               |
 | Postgres archive (not wired)                             | `templates/postgres/`                                                                                             |
 
@@ -43,8 +43,10 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 - `pnpm build` / `pnpm start` are web only. `pnpm dev:agent` / `pnpm start:agent` are agent only.
 - `pnpm lint` runs ESLint on the web app (`agent/` is ignored).
 - `pnpm test:agent` runs pytest in `agent/`. It makes no model call and needs no real key; `uv` itself needs network for its `malware-check`.
-- `pnpm e2e:build` assembles the browser scenarios into `.playwright-mcp/scenarios/`; `pnpm e2e:build offline` builds only the names containing `offline`.
-- `pnpm build`, then `nohup node e2e/fixtures/stack.mjs --logs <dir> > <dir>/stack.out 2>&1 &` starts the Mistral stub (`:8790`), agent and web app for the `stub.*` scenarios; `node e2e/fixtures/stack.mjs stop` stops them. Windows only (`taskkill`).
+- `pnpm exec playwright install chromium` installs the browser for the runner (once).
+- `pnpm e2e` builds the web app, starts stub, agent and web itself (any OS; ports 8790, 8123, 3000 free) and runs the `offline` and `stub` projects. `pnpm e2e:live` runs the `live` project against a running `pnpm demo` with a real key.
+- `pnpm e2e:build` (plugin path) assembles the browser scenarios into `.playwright-mcp/scenarios/`; `pnpm e2e:build offline` builds only the names containing `offline`.
+- `pnpm build`, then `nohup node e2e/fixtures/stack.mjs --logs <dir> > <dir>/stack.out 2>&1 &` starts the Mistral stub (`:8790`), agent and web app for the plugin path's `stub.*` scenarios; `node e2e/fixtures/stack.mjs stop` stops them. Windows only (`taskkill`).
 - Binaries: `pnpm exec <bin>`, never `npx`. Python: `uv run`, from `agent/`.
 
 Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12). Docker is not needed.
@@ -69,7 +71,8 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 ## Pitfalls
 
 - **A saved `custom-chart` without a `dataset` is ignored on read** (old format); a dashboard carrying inline figures is refused on save.
-- **`update_dashboard` widgets carry options, never figures.** `use-update-dashboard.tsx` drops `scenarios` and `comparisonData` from a config (and the tool refuses them); a widget with no config renders with its defaults (`WidgetRenderer` normalises it). A new widget type goes in `TYPE_MAP`, `DEFAULT_COLSPAN`, the tool docstring and the prompt.
+- **`update_dashboard` widgets carry options, never figures.** `use-update-dashboard.tsx` drops `scenarios` and `comparisonData` from a config (and the tool refuses them); a widget with no config renders with its defaults (`WidgetRenderer` normalises it). A new widget type goes in `TYPE_MAP`, `DEFAULT_COLSPAN`, the tool docstring and the prompt, and in `COMPACT_WIDGET_TYPES` when it is small.
+- **`update_dashboard` upserts by type, in place.** A type already on the dashboard (the default `outstanding-invoices`, say) is updated where it stands (`upsertWidget`), keeping its order, so a dashboard built over the defaults keeps them in front.
 - **`request_approval` applies the decision on the server, once.** The tool takes identifiers only (`bill_ids`, or `items` as sku and quantity), previews through the store, calls `copilotkit_interrupt` and mutates only after an explicit `approved: true`; LangGraph re-runs the tool body on resume, so nothing may be written before the interrupt. Paying is idempotent (a paid bill is skipped), a rejection changes nothing, and the tool then sends the custom event `erp_data_changed` (`{changes: [{metric, delta}]}`), which `ErpProvider` turns into a reload and a 3 s highlight on the KPI cards. A reorder only sets `onOrder` on the items: no account moves.
 - **A failed run is told once, in one place.** `RunErrorBanner` subscribes to `onRunErrorEvent` (error sent by the agent) and `onRunFailed` (request failed) and never shows the raw text, which can carry the provider URL. Retry calls `copilotkit.runAgent({ agent })` on the messages already in the thread: no message is added, and tool effects stay once per key, so a call carried out before the failure is not carried out again (and one the failed run never reached is carried out on the retry). The only retry on the model side is one 429 per model call (`agent/models.py`), after the `Retry-After` seconds when they are at most 8, or after 2 s when the header is missing or not a number (Mistral's 429 carries none); everything else fails at once. There is no run-wide wait budget, so a turn with several limited calls can add up to 8 s each.
 - **Brand and wording live in `src/content/`.** The product name, company, user initials and logo come from `brand.ts`; suggestions, titles and nav labels from `ui-text.ts`. `agent/tests/test_brand_names.py` fails when a blocklisted company name or a hard-coded "JD" appears elsewhere in `src/` or `agent/`. A KPI with no history (`trend: "flat"`) shows no change badge.
@@ -85,7 +88,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 - **`agent/.env` is not readable by agents** (workstation policy). Never try; check for the key with a script that prints only `bool(os.environ.get("MISTRAL_API_KEY"))`.
 - **Background servers start from Git Bash** with `nohup ... > log 2>&1 &`, never `Start-Process`, which opens a visible console window on the user's desktop. Check ports 3000 and 8123 are free first, stop what you started, and verify the ports are free again.
 - **Tool-call effects are applied once per key** (`src/lib/handled-tool-calls.ts`, keyed by tool name and arguments, not by call id). A reset forgets the keys; any new frontend tool that applies a side effect must claim its key there, or a replayed demo will skip it.
-- **E2E has no `@playwright/test`, by explicit decision.** Scenarios run through the Playwright plugin (`browser_run_code_unsafe`). A scenario is one single expression with no `import`. Run `pnpm e2e:build` first; the built files live in `.playwright-mcp/` (gitignored).
+- **E2E has two runners over one source.** `@playwright/test` (`pnpm e2e`, `pnpm e2e:live`) and the Playwright plugin (`browser_run_code_unsafe`) both load `e2e/scenarios/` through `e2e/lib/load-scenario.mjs`. A scenario is still one single expression with no `import`. `stub.agent-down` is plugin-only (skipped in the runner). For the plugin path run `pnpm e2e:build` first; its files live in `.playwright-mcp/` (gitignored).
 
 ## Verification
 
@@ -93,6 +96,7 @@ Default level: **standard**.
 
 - Web: `pnpm build` (type check on) and `pnpm lint`; lint is at 0 errors and 3 warnings (`dashboard-grid.tsx`, `shell.tsx` x2): add none.
 - Agent, offline: `pnpm test:agent` (no network call expected).
+- Browser, offline and stub: `pnpm e2e` (no real key, no credit).
 - End to end: `pnpm demo`, then `GET http://127.0.0.1:8123/health` and `http://localhost:3000`.
 - Every live measurement compares with values **read from the store at test time**, never hard-coded. A 429 is not a code failure: wait out the window, replay, note it.
 - Check each library API in the installed package (or with Context7) before using it.

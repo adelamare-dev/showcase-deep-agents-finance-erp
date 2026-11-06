@@ -11,7 +11,7 @@ A small finance ERP whose AI assistant orchestrates sub-agents you can watch, as
 - 7 frontend tools (6 UI + 1 human-in-the-loop approval), all registered with `useRenderTool`
 - 12 dashboard widget types with 4 pre-built templates (Executive Summary, Cash Flow Risk, Cost Control, Revenue Overview)
 - Dashboard gallery (`/dashboards`) for browsing, loading, saving, and deleting layouts (saved layouts live in the browser's `localStorage` under a versioned key; dashboards saved under an older version are ignored)
-- Multi-agent orchestration: orchestrator + research subagent (14 tools) + projections subagent (6 tools), with each subagent step listed live on its card
+- Multi-agent orchestration: orchestrator (with 3 exact-aggregate tools for one-figure questions) + research subagent (17 tools) + projections subagent (6 tools), with each subagent step listed live on its card
 - Human-in-the-loop approval that really pays supplier bills and marks reorders as on order, with the change highlighted on screen
 - No figure on a card or chart comes from the model: it names a dataset, the code fills in the numbers
 
@@ -74,25 +74,30 @@ Copy `.env.example` to `.env` to change a default; the web app works without it.
 | `pnpm build`       | Production build of the web app                      |
 | `pnpm lint`        | ESLint (web app only)                                |
 | `pnpm test:agent`  | Agent tests (pytest, offline)                        |
-| `pnpm e2e:build`   | Assemble the browser scenarios                       |
+| `pnpm e2e`         | Browser scenarios, offline and stub (starts its servers) |
+| `pnpm e2e:live`    | Live scenarios against a running `pnpm demo`         |
+| `pnpm e2e:build`   | Assemble the scenarios for the Playwright plugin     |
 
 ## Tests
 
 - **Agent:** `pnpm test:agent` runs pytest in `agent/`. It makes no model call and needs no real key (`uv` itself needs network access for its malware check).
-- **Browser scenarios:** they live in `e2e/scenarios/` and are driven by the Playwright MCP plugin, not by a test runner: the repo has no Playwright dependency.
+- **Browser scenarios:** they live in `e2e/scenarios/` and run under `@playwright/test` or through the Playwright MCP plugin, from one source.
 
 ```bash
+pnpm exec playwright install chromium   # once
+pnpm e2e            # builds the web app, starts stub + agent + web, runs the offline and stub projects (ports 8790, 8123, 3000 must be free)
+pnpm e2e:live       # live project against a running `pnpm demo` with a real key
 pnpm e2e:build      # assembles helpers + each scenario into .playwright-mcp/scenarios/<name>.js
 pnpm e2e:build offline   # only the scenarios whose name contains "offline"
 ```
 
-Start the servers with `pnpm demo`, then run a built file with the plugin's `browser_run_code_unsafe` tool and `filename: ".playwright-mcp/scenarios/offline.pages.js"`. A scenario passes when the tool returns `passed` with an empty `failed` list.
+For the plugin path, start the servers with `pnpm demo`, then run a built file with the plugin's `browser_run_code_unsafe` tool and `filename: ".playwright-mcp/scenarios/offline.pages.js"`. A scenario passes when the tool returns `passed` with an empty `failed` list.
 
 | Group | Needs |
 | --- | --- |
 | `offline.*` | `pnpm demo` with any non-empty `MISTRAL_API_KEY`; no model is called |
 | `live.*` | `pnpm demo` with a real key; spends free-tier quota, and a 429 loses the run |
-| `stub.*` | A local stand-in for the Mistral API, no credits: `node e2e/fixtures/stack.mjs` (Windows only, it stops processes with `taskkill`) |
+| `stub.*` | A local stand-in for the Mistral API, no credits: `node e2e/fixtures/stack.mjs` (Windows only, it stops processes with `taskkill`); `pnpm e2e` starts the same servers itself on any OS, except `stub.agent-down`, which only the plugin plays |
 
 See `e2e/README.md` for the details.
 
@@ -126,7 +131,7 @@ On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 
 | What-if of 12% over 6 quarters | 1 of 3 |
 | Headcount and payroll | 1 of 3 |
 
-These counts were measured on e1a735f. Since that run the dashboard's projection chart and the Approve Payments message have changed (the quarterly projection now goes on the cash flow forecast chart, and the message also asks for overdue bills), so the dashboard entries and Approve Payments are owed a new measurement. Entry 1 was measured typed and entry 6 clicked; at head, entry 1 clicks its chip and entry 6 types, with the same messages.
+These counts were measured on e1a735f, before the aggregate tools and the prompt rule routing one-figure questions to them were added; they are due again. Since that run the dashboard's projection chart and the Approve Payments message have changed (the quarterly projection now goes on the cash flow forecast chart, and the message also asks for overdue bills), so the dashboard entries and Approve Payments are owed a new measurement. Entry 1 was measured typed and entry 6 clicked; at head, entry 1 clicks its chip and entry 6 types, with the same messages.
 
 Counts vary between replays: an earlier series on mixed versions gave other counts (for example Cash Position 0 of 3, then 3 of 3), so read these as one sample of three, not as a rate.
 
@@ -163,12 +168,12 @@ Browser (:3000)
   |  FastAPI (:8123)
   |       |
   |       v
-  |  LangGraph Orchestrator (7 frontend tools + 2 subagent tools)
+  |  LangGraph Orchestrator (7 frontend tools + 2 subagent tools + 3 aggregate tools)
   |      /         \
   |     v           v
   |  Research    Projections
   |  Sub-agent   Sub-agent
-  |  (14 tools)  (6 tools)
+  |  (17 tools)  (6 tools)
   |     |
   |     v
   |  ERP store (in memory) — every figure the agent quotes and the pages show;
