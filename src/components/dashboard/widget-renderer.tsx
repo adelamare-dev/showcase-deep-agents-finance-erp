@@ -66,7 +66,7 @@ export function WidgetRenderer({ widget: stored }: { widget: DashboardWidget }) 
     case "recent-transactions":
       return <RecentTransactionsSection config={widget.config} />;
     case "outstanding-invoices":
-      return <OutstandingInvoicesSection config={widget.config} />;
+      return <OutstandingInvoicesSection config={widget.config} colSpan={widget.colSpan} />;
     case "custom-chart":
       return (
         <DashboardCustomChart config={widget.config} colSpan={widget.colSpan} />
@@ -159,13 +159,15 @@ function RecentTransactionsSection({ config }: { config: { limit?: number } }) {
   );
 }
 
-// The bills list sits beside the receivables gauge in half width: a few rows
-// keep the pair within one screen, and "View all" opens the full list.
-const BILLS_SHOWN = 3;
+// Below full width the bills list sits beside another widget: a few rows keep
+// the pair within one screen, and "View all (n)" counts and opens the full list.
+const BILLS_SHOWN_COMPACT = 3;
 
 function OutstandingInvoicesSection({
   config,
+  colSpan,
 }: {
+  colSpan: number;
   config: {
     kind?: "receivable" | "payable";
     statuses?: ("pending" | "overdue")[];
@@ -178,6 +180,8 @@ function OutstandingInvoicesSection({
     statuses.includes(status as "pending" | "overdue");
   const filtered = invoices.filter((inv) => open(inv.status));
   const dueBills = bills.filter((bill) => open(bill.status));
+  const shownBills = colSpan < 4 ? dueBills.slice(0, BILLS_SHOWN_COMPACT) : dueBills;
+  const hiddenBills = dueBills.length - shownBills.length;
 
   return (
     <Card>
@@ -190,7 +194,8 @@ function OutstandingInvoicesSection({
             href={payable ? "/invoices?filter=supplier" : "/invoices"}
             className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
           >
-            View all <ArrowRight className="h-3 w-3" />
+            View all{payable && hiddenBills > 0 ? ` (${dueBills.length})` : ""}{" "}
+            <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
       </CardHeader>
@@ -231,7 +236,7 @@ function OutstandingInvoicesSection({
                 accessor: (row) => <StatusBadge status={row.status} />,
               },
             ]}
-            data={dueBills.slice(0, BILLS_SHOWN)}
+            data={shownBills}
           />
         ) : (
         <DataTable<Invoice>
