@@ -35,13 +35,22 @@ _CENT = 0.005
 
 _NUMBER = r"\d+(?:,\d{3})*(?:\.\d+)?"
 _MARK_RE = re.compile(re.escape(MARK_OPEN) + r"[^" + MARK_CLOSE + r"]*" + MARK_CLOSE)
+_ENTITY = r"(?:employee|bill|invoice|client|customer|supplier|item)s?"
+_CURRENCY = r"(?:USD|dollars?)"
+# A scaled number followed by an ERP entity ("2 million customers") is a count,
+# not money; one adjective may sit between the number and the entity.
+_ENTITY_AHEAD = r"(?!\s+(?:[A-Za-z]+\s+)?" + _ENTITY + r"\b)"
 _MONEY_RE = re.compile(
-    r"(?:(?:\$|USD\s?)\s?(?P<n1>" + _NUMBER + r")(?:\s?(?P<s1>thousand|million|billion|[KMBkmb])\b)?"
-    r"|(?<![\w.,$])(?P<n2>" + _NUMBER + r")\s(?P<s2>thousand|million|billion)\b)"
+    r"(?:(?:\$|USD\s?)\s?(?P<n1>" + _NUMBER + r")(?:\s?(?P<s1>thousand|million|billion|[KMB])\b)?"
+    r"|(?<![\w.,$])(?P<n2>" + _NUMBER + r")\s?"
+    r"(?:(?P<s2>thousand|million|billion)\b" + _ENTITY_AHEAD + r"(?:\s" + _CURRENCY + r"\b)?"
+    r"|" + _CURRENCY + r"\b))",
+    re.IGNORECASE,
 )
 _PERCENT_RE = re.compile(r"(?<![\w.,])(\d+(?:\.\d+)?)\s?%")
 _COUNT_RE = re.compile(
-    r"(?<![\w.,$])(" + _NUMBER + r")\s+(?:employee|bill|invoice|client|customer|supplier|item)s?\b",
+    r"(?<![\w.,$])(?P<n>" + _NUMBER + r")(?:\s(?P<s>thousand|million|billion))?"
+    r"\s+(?:[A-Za-z]+\s+)?" + _ENTITY + r"\b",
     re.IGNORECASE,
 )
 _ANY_NUMBER_RE = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
@@ -83,7 +92,8 @@ def _scan(text: str) -> list[tuple[int, int, Figure]]:
     for m in _PERCENT_RE.finditer(hidden):
         found.append((m.start(), m.end(), Figure(m.group(0), "percent", _to_float(m.group(1)))))
     for m in _COUNT_RE.finditer(hidden):
-        found.append((m.start(), m.end(), Figure(m.group(0), "count", _to_float(m.group(1)))))
+        scale = _SCALES[m.group("s").lower()] if m.group("s") else 1
+        found.append((m.start(), m.end(), Figure(m.group(0), "count", round(_to_float(m.group("n")) * scale, 6))))
     found.sort(key=lambda item: item[0])
     return found
 
@@ -128,6 +138,20 @@ def _same(a: float, b: float) -> bool:
     return abs(a - b) < _TOLERANCE
 
 
+def _decimals(digits: str) -> int:
+    """Decimals a figure is written with, at least one."""
+    return max(len(digits.split(".")[1]) if "." in digits else 0, 1)
+
+
+def _within(value: float, written: float, decimals: int) -> bool:
+    """Whether `value`, displayed with `decimals` decimals, may read `written`.
+
+    One rule for both languages: no rounding function is involved, so exact
+    halves behave the same everywhere.
+    """
+    return abs(value - written) <= 0.5 * 10**-decimals + _TOLERANCE
+
+
 def _money_allowed(fig: Figure, allowed: set[float]) -> bool:
     if any(abs(fig.value - v) < _CENT for v in allowed):
         return True
@@ -137,9 +161,8 @@ def _money_allowed(fig: Figure, allowed: set[float]) -> bool:
         return False
     scale = _SCALES[suffix.lower()]
     digits = m.group("n1") or m.group("n2")
-    decimals = max(len(digits.split(".")[1]) if "." in digits else 0, 1)
     written = _to_float(digits)
-    return any(_same(round(v / scale, decimals), written) for v in allowed)
+    return any(_within(v / scale, written, _decimals(digits)) for v in allowed)
 
 
 def is_allowed(fig: Figure, allowed: set[float]) -> bool:
@@ -147,12 +170,11 @@ def is_allowed(fig: Figure, allowed: set[float]) -> bool:
     if fig.kind == "money":
         return _money_allowed(fig, allowed)
     if fig.kind == "percent":
-        for v in allowed:
-            if _same(round(v, 1), fig.value):
-                return True
-            if v <= 1 and _same(round(v * 100, 1), fig.value):
-                return True
-        return False
+        decimals = _decimals(fig.raw.rstrip("% ").strip())
+        return any(
+            _within(v, fig.value, decimals) or (v <= 1 and _within(v * 100, fig.value, decimals))
+            for v in allowed
+        )
     return any(_same(v, fig.value) for v in allowed)
 
 

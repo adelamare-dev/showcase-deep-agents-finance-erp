@@ -23,9 +23,16 @@ const TOLERANCE = 1e-9;
 const CENT = 0.005;
 
 const NUMBER = String.raw`\d+(?:,\d{3})*(?:\.\d+)?`;
-const MONEY = String.raw`(?:(?:\$|USD\s?)\s?(?<n1>${NUMBER})(?:\s?(?<s1>thousand|million|billion|[KMBkmb])\b)?|(?<![\w.,$])(?<n2>${NUMBER})\s(?<s2>thousand|million|billion)\b)`;
+const ENTITY = String.raw`(?:employee|bill|invoice|client|customer|supplier|item)s?`;
+const CURRENCY = String.raw`(?:USD|dollars?)`;
+// A scaled number followed by an ERP entity ("2 million customers") is a count,
+// not money; one adjective may sit between the number and the entity.
+const ENTITY_AHEAD = String.raw`(?!\s+(?:[A-Za-z]+\s+)?${ENTITY}\b)`;
+const MONEY =
+  String.raw`(?:(?:\$|USD\s?)\s?(?<n1>${NUMBER})(?:\s?(?<s1>thousand|million|billion|[KMB])\b)?` +
+  String.raw`|(?<![\w.,$])(?<n2>${NUMBER})\s?(?:(?<s2>thousand|million|billion)\b${ENTITY_AHEAD}(?:\s${CURRENCY}\b)?|${CURRENCY}\b))`;
 const PERCENT = String.raw`(?<![\w.,])(\d+(?:\.\d+)?)\s?%`;
-const COUNT = String.raw`(?<![\w.,$])(${NUMBER})\s+(?:employee|bill|invoice|client|customer|supplier|item)s?\b`;
+const COUNT = String.raw`(?<![\w.,$])(?<n>${NUMBER})(?:\s(?<s>thousand|million|billion))?\s+(?:[A-Za-z]+\s+)?${ENTITY}\b`;
 const ANY_NUMBER = String.raw`\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?`;
 
 const toFloat = (digits: string) => Number(digits.replace(/,/g, ""));
@@ -45,7 +52,7 @@ function widen(text: string, start: number, end: number): [number, number] {
 function scan(text: string): Array<{ start: number; end: number; fig: Figure }> {
   const hidden = blankMarks(text);
   const found: Array<{ start: number; end: number; fig: Figure }> = [];
-  for (const m of hidden.matchAll(new RegExp(MONEY, "g"))) {
+  for (const m of hidden.matchAll(new RegExp(MONEY, "gi"))) {
     const g = m.groups!;
     const suffix = g.s1 ?? g.s2;
     const scale = suffix ? SCALES[suffix.toLowerCase()] : 1;
@@ -60,7 +67,12 @@ function scan(text: string): Array<{ start: number; end: number; fig: Figure }> 
     found.push({ start: m.index!, end: m.index! + m[0].length, fig: { raw: m[0], kind: "percent", value: toFloat(m[1]) } });
   }
   for (const m of hidden.matchAll(new RegExp(COUNT, "gi"))) {
-    found.push({ start: m.index!, end: m.index! + m[0].length, fig: { raw: m[0], kind: "count", value: toFloat(m[1]) } });
+    const scale = m.groups!.s ? SCALES[m.groups!.s.toLowerCase()] : 1;
+    found.push({
+      start: m.index!,
+      end: m.index! + m[0].length,
+      fig: { raw: m[0], kind: "count", value: Math.round(toFloat(m.groups!.n) * scale * 1e6) / 1e6 },
+    });
   }
   return found.sort((a, b) => a.start - b.start);
 }
@@ -95,19 +107,25 @@ export function allowedValues(toolTexts: string[], snapshot: unknown, userText: 
 }
 
 const same = (a: number, b: number) => Math.abs(a - b) < TOLERANCE;
-const roundTo = (v: number, decimals: number) => Math.round(v * 10 ** decimals) / 10 ** decimals;
+
+// Decimals a figure is written with, at least one.
+const decimalsOf = (digits: string) => Math.max(digits.includes(".") ? digits.split(".")[1].length : 0, 1);
+
+// Whether `value`, displayed with `decimals` decimals, may read `written`. No
+// rounding function is involved, so exact halves behave as in the Python twin.
+const within = (value: number, written: number, decimals: number) =>
+  Math.abs(value - written) <= 0.5 * 10 ** -decimals + TOLERANCE;
 
 function moneyAllowed(fig: Figure, allowed: Set<number>): boolean {
   const values = [...allowed];
   if (values.some((v) => Math.abs(fig.value - v) < CENT)) return true;
-  const m = new RegExp(`^${MONEY}$`).exec(fig.raw.replace(/^[-(]+|[)]+$/g, "").trim());
+  const m = new RegExp(`^${MONEY}$`, "i").exec(fig.raw.replace(/^[-(]+|[)]+$/g, "").trim());
   const suffix = m?.groups && (m.groups.s1 ?? m.groups.s2);
   if (!m?.groups || !suffix) return false;
   const scale = SCALES[suffix.toLowerCase()];
   const digits = m.groups.n1 ?? m.groups.n2;
-  const decimals = Math.max(digits.includes(".") ? digits.split(".")[1].length : 0, 1);
   const written = toFloat(digits);
-  return values.some((v) => same(roundTo(v / scale, decimals), written));
+  return values.some((v) => within(v / scale, written, decimalsOf(digits)));
 }
 
 /** Whether `fig` equals an allowed value, allowing for display rounding. */
@@ -115,7 +133,8 @@ export function isAllowed(fig: Figure, allowed: Set<number>): boolean {
   if (fig.kind === "money") return moneyAllowed(fig, allowed);
   const values = [...allowed];
   if (fig.kind === "percent") {
-    return values.some((v) => same(roundTo(v, 1), fig.value) || (v <= 1 && same(roundTo(v * 100, 1), fig.value)));
+    const decimals = decimalsOf(fig.raw.replace(/[%\s]+$/, ""));
+    return values.some((v) => within(v, fig.value, decimals) || (v <= 1 && within(v * 100, fig.value, decimals)));
   }
   return values.some((v) => same(v, fig.value));
 }
