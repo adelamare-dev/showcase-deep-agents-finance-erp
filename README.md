@@ -1,6 +1,6 @@
 # Deep Agents Finance ERP
 
-A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The amounts it writes in the chat are checked against the store, and some free questions still fail (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
+A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The amounts it writes in the chat are checked against the store (an amount that cannot be matched is badged "unverified"), and some free questions still fail (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
 
 **Status.** A working base for a demo, not a finished one. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, then ask a follow-up question) has not passed five times in a row yet. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
 
@@ -16,6 +16,8 @@ A small finance ERP whose AI assistant orchestrates sub-agents you can watch, as
 - After a payment, the cash card already in the chat keeps its first figures struck through beside the new ones
 - A what-if on revenue or cash (growth and quarters) is answered with a forecast card whose figures come from the catalog
 - No figure on a card or chart comes from the model: it names a dataset, the code fills in the numbers
+- Figure guard: every dollar amount, percentage and count in the assistant's text must match this turn's tool results, the store or your own message; otherwise it is retried once, then shown with an "unverified" badge. "Checking figures…" shows while the reply is prepared
+- Rules fallback: when the model service is out of capacity on the "Cash Flow Dashboard" request, the dashboard is built from the store by fixed rules, with no model call, and a card says "Model unavailable — built from rules"
 
 ## Prerequisites
 
@@ -109,7 +111,9 @@ Models: `ministral-14b-2512` for the orchestrator and both subagents, free tier,
 
 **Reference scenario** (`e2e/scenarios/live.reference.js`): a click on "Cash Flow Dashboard" must build the complete dashboard, with figures equal to the store, and the follow-up question must then be answered correctly. Result: **not proven, 0 of 5 consecutive passes.** The pass criterion is **60 s** from click to complete dashboard (the allowed fallback after reducing calls and trying a larger model, which this account cannot use); **45 s** remains the target and is not reliably met.
 
-Off-series live checks on 2026-11-06 (not counted), after the dashboard started to replace the default widgets with exactly the ones it needs (Cash and Accounts Payable cards, AR aging gauge, payable bills, cash flow forecast): the reference dashboard was complete in 12.8 to 14.4 s in 5 runs, and one full reference pass (dashboard, approval, follow-up) passed in 38.2 s. In 4 runs the model wrote an amount of its own in its closing text ("$58K", "$58,000", "$43,000"); the series would count those as wrong figures, and no guard catches them yet.
+Off-series live checks on 2026-11-06 (not counted), after the dashboard started to replace the default widgets with exactly the ones it needs (Cash and Accounts Payable cards, AR aging gauge, payable bills, cash flow forecast): the reference dashboard was complete in 12.8 to 14.4 s in 5 runs, and one full reference pass (dashboard, approval, follow-up) passed in 38.2 s. In 4 runs the model wrote an amount of its own in its closing text ("$58K", "$58,000", "$43,000"); the series would count those as wrong figures, and the figure guard, added since, marks such amounts and has not been measured live in a series.
+
+Spaced probe on 2026-11-07, after the figure guard and the rules fallback (not counted in the series): the free tier then answered `x-ratelimit-limit-req-minute=2` for `ministral-14b`, `8b` and `3b`, and a targeted live check lost every run to a 429 (code 1300). With 70 s between commands, 4 two-call questions passed: "Cash position and payables" in 19.0 s, "Which client owes us the most?" in 10.4 s, "Headcount and payroll" in 9.4 s and the what-if over 6 quarters in 14.9 s. The reference dashboard was built by the rules fallback in 8 s, equal to the store; the approval that followed was lost to a 429. The parallel-subagent variant (shipped off) could not be measured at this quota.
 
 On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 1 to a read timeout, 1 that ended without a dashboard), 10 valid dashboards, all complete with figures equal to the store. Of the 10, 5 were within 45 s and the same 5 within 60 s; the time depends strongly on the model service's load, from 26 to 141 s. No run has yet passed from the dashboard through the follow-up question; in one run the follow-up said "$68,105 owed to suppliers" while the store held $11,050. Prompts were changed between runs, and each change reset the count.
 
@@ -155,7 +159,8 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 - **Cash Flow Dashboard** (2 of 3): in one run the model loaded a saved template instead of building the dashboard, which misses the Cash and Accounts Payable cards and the supplier bills.
 - **Removed suggestions.** "Cost Control Dashboard" (2 of 3: one comment quoted a figure the store does not hold) and "Reorder Inventory" (2 of 3: one item left off the card) are no longer offered on the first screen; both can still be typed.
 - **Not covered** (the model wrote a figure the store does not hold, or named the wrong record): which client owes the most (it picks a draft invoice), the cash and payables follow-up (once showed the overdue receivables as payables), a what-if over 6 quarters (rounded or truncated values), and headcount and payroll (sums of its own). The percentages the model writes in a comment are not checked and vary from run to run.
-- **Free-tier capacity.** Mistral often answers a call with a 429 "not enough capacity" that an automatic retry does not always cure, so a live run can be lost to it: replay it after a few minutes.
+- **Free-tier capacity.** The free tier now allows 2 requests per minute and often answers a 429 "not enough capacity" that an automatic retry does not always cure, so a live run can be lost to it: replay it after a few minutes. Only the "Cash Flow Dashboard" request has the rules fallback; other requests show the Retry notice.
+- **Parallel subagents** (`ORCHESTRATOR_PARALLEL_TOOL_CALLS` in `agent/models.py`) ship off; the parallel variant is not measured.
 - **Windows only** for the stub stack launcher; validated at 1280x720, no mobile layout.
 
 ## When something fails

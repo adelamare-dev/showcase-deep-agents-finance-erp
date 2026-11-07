@@ -61,6 +61,8 @@ A scenario scripts the model with `h.stubScript([...])`. Each model call takes t
 | any step with `delayMs: 3000` | the stub waits that long before it answers |
 | any answer step with `hold: true` | the stream stays open after its first chunk until `h.stubRelease()` |
 
+`stub.figures.js` (6 cases) scripts closing texts with correct and invented amounts: a wrong amount is retried and never shown, a wrong amount twice shows the `unverified-figure` badge, a correct one is not badged, "Checking figures…" shows while the reply is prepared (also after a tool result), and an old reply is not badged after an approval changes the books. `stub.parallel.js` scripts one assistant message carrying two tool calls (`toolCalls`) and checks two subagent cards. `stub.fallback.js` (3 cases) scripts a 429 that survives the retry on the reference request, on the orchestrator and inside a subagent, and checks the dashboard built from rules; a 429 on another request still shows Retry. `specs/figure-guard.unit.spec.ts` (titles start `offline.`) runs the TypeScript figure rule on `agent/tests/data/figure_cases.json`, the same cases as pytest.
+
 ### Scenarios about failures
 
 `stub.failures.js` plays scripted 429 and 500 answers and blocked snapshot requests on the plain stub stack. `stub.agent-down.js` needs the agent stopped, which a scenario cannot do, so the runner plays it three times and the file reads which step it is in:
