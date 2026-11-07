@@ -139,6 +139,16 @@ These counts were measured on e1a735f, before the aggregate tools and the prompt
 
 Counts vary between replays: an earlier series on mixed versions gave other counts (for example Cash Position 0 of 3, then 3 of 3), so read these as one sample of three, not as a rate.
 
+## Security
+
+Dependencies follow a strict policy: a 7-day release cooldown, `trustPolicy: no-downgrade`, no exotic or build-script dependencies, and `pnpm audit` at the `high` level.
+An exception is always exact and commented; a rule is never loosened. `@copilotkit/*` stays on 1.80.0.
+`pnpm audit` currently reports 8 high alerts, all in transitive dependencies of `@copilotkit/runtime`, none fixable within the ranges its dependents accept:
+
+- `undici` 5.29.0 (5 advisories) and `@fastify/busboy` 2.1.1: not reachable. The WebSocket, TLS and multipart code is never loaded; the patched versions are 6.x/3.x majors.
+- `graphql-scalars` 1.26.0 (PhoneNumber ReDoS): not reachable. Only `GraphQLJSONObject` is used; the fix is a 2.x major.
+- `zod` 3.25.76 (memory exhaustion on oversized collections): no compatible fix (4.x major). Input comes only from the local browser and agent in this demo.
+
 ## Known limits
 
 - **Approve Payments** (0 of 3, measured with the old message and the old tool, where the model chose the bill ids) listed the bills due this week and left off the one bill already overdue ($1,850). The code now selects the bills from a scope that includes overdue ones, but this has not been measured again. The total on the card is right and rejecting changes nothing.
