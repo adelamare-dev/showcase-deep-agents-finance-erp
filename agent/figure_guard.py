@@ -47,7 +47,7 @@ _MONEY_RE = re.compile(
     r"|" + _CURRENCY + r"\b))",
     re.IGNORECASE,
 )
-_PERCENT_RE = re.compile(r"(?<![\w.,])(\d+(?:\.\d+)?)\s?%")
+_PERCENT_RE = re.compile(r"(?<![\w.,])(" + _NUMBER + r")(?:\s?%|\s(?:percent)\b)", re.IGNORECASE)
 _COUNT_RE = re.compile(
     r"(?<![\w.,$])(?P<n>" + _NUMBER + r")(?:\s(?P<s>thousand|million|billion))?"
     r"\s+(?:[A-Za-z]+\s+)?" + _ENTITY + r"\b",
@@ -170,7 +170,7 @@ def is_allowed(fig: Figure, allowed: set[float]) -> bool:
     if fig.kind == "money":
         return _money_allowed(fig, allowed)
     if fig.kind == "percent":
-        decimals = _decimals(fig.raw.rstrip("% ").strip())
+        decimals = _decimals(re.match(r"[\d,.]+", fig.raw).group(0))
         return any(
             _within(v, fig.value, decimals) or (v <= 1 and _within(v * 100, fig.value, decimals))
             for v in allowed

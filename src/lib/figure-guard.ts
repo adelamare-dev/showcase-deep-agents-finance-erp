@@ -31,7 +31,7 @@ const ENTITY_AHEAD = String.raw`(?!\s+(?:[A-Za-z]+\s+)?${ENTITY}\b)`;
 const MONEY =
   String.raw`(?:(?:\$|USD\s?)\s?(?<n1>${NUMBER})(?:\s?(?<s1>thousand|million|billion|[KMB])\b)?` +
   String.raw`|(?<![\w.,$])(?<n2>${NUMBER})\s?(?:(?<s2>thousand|million|billion)\b${ENTITY_AHEAD}(?:\s${CURRENCY}\b)?|${CURRENCY}\b))`;
-const PERCENT = String.raw`(?<![\w.,])(\d+(?:\.\d+)?)\s?%`;
+const PERCENT = String.raw`(?<![\w.,])(${NUMBER})(?:\s?%|\s(?:percent)\b)`;
 const COUNT = String.raw`(?<![\w.,$])(?<n>${NUMBER})(?:\s(?<s>thousand|million|billion))?\s+(?:[A-Za-z]+\s+)?${ENTITY}\b`;
 const ANY_NUMBER = String.raw`\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?`;
 
@@ -63,7 +63,7 @@ function scan(text: string): Array<{ start: number; end: number; fig: Figure }> 
       fig: { raw: text.slice(start, end), kind: "money", value: Math.round(toFloat(g.n1 ?? g.n2) * scale * 1e6) / 1e6 },
     });
   }
-  for (const m of hidden.matchAll(new RegExp(PERCENT, "g"))) {
+  for (const m of hidden.matchAll(new RegExp(PERCENT, "gi"))) {
     found.push({ start: m.index!, end: m.index! + m[0].length, fig: { raw: m[0], kind: "percent", value: toFloat(m[1]) } });
   }
   for (const m of hidden.matchAll(new RegExp(COUNT, "gi"))) {
@@ -133,7 +133,7 @@ export function isAllowed(fig: Figure, allowed: Set<number>): boolean {
   if (fig.kind === "money") return moneyAllowed(fig, allowed);
   const values = [...allowed];
   if (fig.kind === "percent") {
-    const decimals = decimalsOf(fig.raw.replace(/[%\s]+$/, ""));
+    const decimals = decimalsOf(/^[\d,.]+/.exec(fig.raw)![0]);
     return values.some((v) => within(v, fig.value, decimals) || (v <= 1 && within(v * 100, fig.value, decimals)));
   }
   return values.some((v) => same(v, fig.value));

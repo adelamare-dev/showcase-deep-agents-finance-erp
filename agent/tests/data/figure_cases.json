@@ -47,5 +47,12 @@
   {"name": "a count with one adjective", "text": "There are 4 overdue bills.", "tools": ["{\"n\": 4}"], "userText": "", "expectUnverified": []},
   {"name": "a count with one adjective, wrong", "text": "There are 5 overdue bills.", "tools": ["{\"n\": 4}"], "userText": "", "expectUnverified": ["5 overdue bills"]},
   {"name": "a count with another adjective", "text": "Review 3 open invoices.", "tools": ["{\"n\": 3}"], "userText": "", "expectUnverified": []},
-  {"name": "durations next to a count", "text": "Within 30 days, the 4 open bills and 6 quarters ahead, from Q4 2026.", "tools": ["{\"n\": 4}"], "userText": "", "expectUnverified": []}
+  {"name": "durations next to a count", "text": "Within 30 days, the 4 open bills and 6 quarters ahead, from Q4 2026.", "tools": ["{\"n\": 4}"], "userText": "", "expectUnverified": []},
+  {"name": "a percent word is a percentage, admitted", "text": "Margin is 12 percent.", "tools": ["{\"m\": 12}"], "userText": "", "expectUnverified": []},
+  {"name": "a percent word is a percentage, refused", "text": "Margin is 12 percent.", "tools": ["{\"m\": 15}"], "userText": "", "expectUnverified": ["12 percent"]},
+  {"name": "a decimal percent word in capitals, admitted", "text": "Margin is 12.5 PERCENT.", "tools": ["{\"m\": 0.125}"], "userText": "", "expectUnverified": []},
+  {"name": "a decimal percent word, refused", "text": "Margin is 12.5 Percent.", "tools": ["{\"m\": 0.2}"], "userText": "", "expectUnverified": ["12.5 Percent"]},
+  {"name": "a percentage with a thousands separator, admitted", "text": "Growth is 1,092%.", "tools": ["{\"g\": 1092}"], "userText": "", "expectUnverified": []},
+  {"name": "a percentage with a thousands separator, refused", "text": "Growth is 1,092%.", "tools": ["{\"g\": 92}"], "userText": "", "expectUnverified": ["1,092%"]},
+  {"name": "the word percentage is not a figure", "text": "Take a percentage of revenue, 12 percentage points.", "tools": ["{\"n\": 1}"], "userText": "", "expectUnverified": []}
 ]
