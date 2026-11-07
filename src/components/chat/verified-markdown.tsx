@@ -68,7 +68,7 @@ function Badge({ children }: { children?: React.ReactNode }) {
 // Each mark becomes a link to a fixed fragment, which the renderer below draws
 // as the badge. Brackets in the figure are escaped so they cannot end the link.
 const asBadgeLink = (marked: string) =>
-  marked.replace(MARK_RE, (_all, raw: string) => `[${raw.replace(/([\[\]])/g, "\$1")}](${BADGE_HREF})`);
+  marked.replace(MARK_RE, (_all, raw: string) => `[${raw.replace(/([\[\]])/g, "\\$1")}](${BADGE_HREF})`);
 
 const components = {
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) =>
