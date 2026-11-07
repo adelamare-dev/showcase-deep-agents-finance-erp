@@ -16,6 +16,12 @@ import { useEffect } from "react";
 import type React from "react";
 import { ToolCard } from "@/components/chat/tool-card";
 import { RunErrorBanner } from "@/components/chat/run-error-banner";
+import { FigureCheckStatus } from "@/components/chat/figure-check-status";
+import {
+  FigureTurnContext,
+  VerifiedMarkdown,
+  turnOf,
+} from "@/components/chat/verified-markdown";
 import { cn } from "@/lib/utils";
 import { SUBAGENT_STEP_EVENT, recordSubagentStep } from "@/lib/subagent-steps";
 import { useRenderChatVisual } from "@/hooks/use-render-chat-visual";
@@ -78,12 +84,15 @@ function HoverToolbarAssistantMessage(
   const isLatest =
     messages !== undefined && messages[messages.length - 1]?.id === message.id;
   return (
-    <CopilotChatAssistantMessage
-      {...props}
-      toolbarVisible={isLatest}
-      className={cn(className, "group")}
-      toolbar="opacity-0 group-hover:opacity-100 transition-opacity"
-    />
+    <FigureTurnContext.Provider value={turnOf(messages, message)}>
+      <CopilotChatAssistantMessage
+        {...props}
+        markdownRenderer={VerifiedMarkdown}
+        toolbarVisible={isLatest}
+        className={cn(className, "group")}
+        toolbar="opacity-0 group-hover:opacity-100 transition-opacity"
+      />
+    </FigureTurnContext.Provider>
   );
 }
 
@@ -93,6 +102,7 @@ function InputWithRunError(
 ) {
   return (
     <div>
+      <FigureCheckStatus />
       <RunErrorBanner />
       <CopilotChatInput {...props} />
     </div>

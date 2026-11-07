@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/context/dashboard-context";
 import { fetchSnapshot, resetErpData, type ErpSnapshot } from "@/lib/erp-api";
+import { forgetFigureVerdicts } from "@/lib/figure-verdicts";
 import { forgetToolCalls } from "@/lib/handled-tool-calls";
 import { clearSubagentSteps } from "@/lib/subagent-steps";
 
@@ -117,6 +118,7 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
     await resetErpData();
     clearSubagentSteps();
     forgetToolCalls();
+    forgetFigureVerdicts();
     if (clearTimer.current) clearTimeout(clearTimer.current);
     setHighlights({});
     await resetDashboards();

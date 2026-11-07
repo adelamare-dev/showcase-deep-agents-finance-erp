@@ -138,3 +138,21 @@ export function isAllowed(fig: Figure, allowed: Set<number>): boolean {
   }
   return values.some((v) => same(v, fig.value));
 }
+
+/**
+ * Wraps every figure of `text` that is not allowed in a mark, like the agent
+ * does. Figures already inside a mark are left alone.
+ */
+export function markUnverified(text: string, allowed: Set<number>): string {
+  const hidden = blankMarks(text);
+  let out = "";
+  let cursor = 0;
+  for (const fig of extractFigures(text)) {
+    if (isAllowed(fig, allowed)) continue;
+    const at = hidden.indexOf(fig.raw, cursor);
+    if (at < 0) continue;
+    out += text.slice(cursor, at) + `⟦unverified:${fig.raw}⟧`;
+    cursor = at + fig.raw.length;
+  }
+  return out + text.slice(cursor);
+}

@@ -20,6 +20,8 @@
 //   { text: "...", toolCall: { name, args } }    both, text first
 //   { status: 429, retryAfter: 2, message: "" }  an HTTP error, with an optional
 //                                                Retry-After header (seconds)
+// Any step also accepts `delayMs: 3000`: the stub waits that long before it
+// answers (the request is already logged).
 // Any answer step also accepts `hold: true`: the stream stays open after its
 // first chunk until POST /__release (or until the client disconnects).
 import { createServer } from "node:http";
@@ -138,6 +140,7 @@ async function chatCompletions(req, res) {
   if (!step) {
     return sendJson(res, 500, { message: "The Mistral stub has no scripted answer left." });
   }
+  if (step.delayMs) await new Promise((resolve) => setTimeout(resolve, step.delayMs));
   if (step.status) {
     const headers = step.retryAfter === undefined ? {} : { "Retry-After": String(step.retryAfter) };
     return sendJson(res, step.status, { message: step.message ?? `Scripted error ${step.status}` }, headers);

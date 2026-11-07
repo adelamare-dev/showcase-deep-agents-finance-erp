@@ -71,3 +71,8 @@ export const approvalReceiptText = {
   approved: (count: number, noun: "bill" | "item", total: string) =>
     `Approved by you · ${count} ${noun}${count === 1 ? "" : "s"} · ${total}`,
 } as const;
+
+export const figureCheckText = {
+  checking: "Checking figures…",
+  unverified: "unverified",
+} as const;
