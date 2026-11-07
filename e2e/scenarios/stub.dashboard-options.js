@@ -146,23 +146,21 @@ async (page, h) => {
     const types = (await h.scanDashboard()).widgets.map((w) => w.type);
     h.assertEqual(types, ["metric-cards", "ar-aging-gauge", "outstanding-invoices", "custom-chart"], "exactly the widgets given, in order");
     h.assert((await h.chatText()).includes("Replacing dashboard with"), "the tool card says the dashboard is replaced");
-    // The two KPI cards show on load; the gauge and the bills list sit one row
-    // below, and the three rows together fit one screen of the scroll area (the
-    // toolbar above them is the only reason the second row starts low).
+    // The whole reference layout sits in the first screen of the scroll area:
+    // the KPI cards, then the gauge and the bills list beside each other.
     const view = await page.evaluate(() => {
       const main = document.querySelector("main");
-      const mainTop = main.getBoundingClientRect().top;
+      const area = main.getBoundingClientRect();
       const box = (q) => {
         const el = document.querySelector(q);
         if (!el) return null;
         const r = el.getBoundingClientRect();
-        return { top: r.top - mainTop, bottom: r.bottom - mainTop };
+        return { top: r.top, bottom: r.bottom };
       };
-      const wrapper = document.querySelector("[data-widget-type]").parentElement.parentElement;
       return {
-        height: main.clientHeight,
+        areaTop: area.top,
+        areaBottom: area.top + main.clientHeight,
         scrollTop: main.scrollTop,
-        budget: main.clientHeight - parseFloat(getComputedStyle(wrapper).paddingTop),
         cash: box("[data-testid='kpi-Cash']"),
         payables: box("[data-testid='kpi-Accounts Payable']"),
         gauge: box("[data-widget-type='ar-aging-gauge']"),
@@ -170,15 +168,11 @@ async (page, h) => {
       };
     });
     h.assertEqual(view.scrollTop, 0, "the dashboard was not scrolled");
-    for (const name of ["cash", "payables"]) {
-      h.assert(view[name] && view[name].top >= 0 && view[name].bottom <= view.height, `the ${name} KPI is visible without scrolling: ${JSON.stringify(view[name])}`);
+    for (const name of ["cash", "payables", "gauge", "bills"]) {
+      const b = view[name];
+      h.assert(b, `the ${name} widget is on the dashboard`);
+      h.assert(b.top >= view.areaTop && b.bottom <= view.areaBottom, `the ${name} widget is entirely visible without scrolling: ${JSON.stringify(view)}`);
     }
-    h.assert(view.gauge && view.bills, "the gauge and the bills list are on the dashboard");
-    for (const name of ["gauge", "bills"]) {
-      h.assert(view[name].top < view.height, `the ${name} starts inside the visible scroll area: ${JSON.stringify(view[name])}`);
-    }
-    const extent = Math.max(view.gauge.bottom, view.bills.bottom) - Math.min(view.cash.top, view.payables.top);
-    h.assert(extent <= view.budget, `the KPIs, the gauge and the bills list fit one screen: extent ${extent}, budget ${view.budget}`);
     const inView = view;
     await h.stubReset();
     return { types, inView };

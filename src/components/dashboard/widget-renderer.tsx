@@ -159,6 +159,10 @@ function RecentTransactionsSection({ config }: { config: { limit?: number } }) {
   );
 }
 
+// The bills list sits beside the receivables gauge in half width: a few rows
+// keep the pair within one screen, and "View all" opens the full list.
+const BILLS_SHOWN = 3;
+
 function OutstandingInvoicesSection({
   config,
 }: {
@@ -227,7 +231,7 @@ function OutstandingInvoicesSection({
                 accessor: (row) => <StatusBadge status={row.status} />,
               },
             ]}
-            data={dueBills}
+            data={dueBills.slice(0, BILLS_SHOWN)}
           />
         ) : (
         <DataTable<Invoice>
