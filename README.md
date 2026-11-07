@@ -143,11 +143,11 @@ Counts vary between replays: an earlier series on mixed versions gave other coun
 
 Dependencies follow a strict policy: a 7-day release cooldown, `trustPolicy: no-downgrade`, no exotic or build-script dependencies, and `pnpm audit` at the `high` level.
 An exception is always exact and commented; a rule is never loosened. `@copilotkit/*` stays on 1.80.0.
-`pnpm audit` currently reports 8 high alerts, all in transitive dependencies of `@copilotkit/runtime`, none fixable within the ranges its dependents accept:
+`pnpm audit` currently reports 8 high alerts, all in transitive dependencies of `@copilotkit/*`, none fixable with a safe override:
 
 - `undici` 5.29.0 (5 advisories) and `@fastify/busboy` 2.1.1: not reachable. The WebSocket, TLS and multipart code is never loaded; the patched versions are 6.x/3.x majors.
 - `graphql-scalars` 1.26.0 (PhoneNumber ReDoS): not reachable. Only `GraphQLJSONObject` is used; the fix is a 2.x major.
-- `zod` 3.25.76 (memory exhaustion on oversized collections): no compatible fix (4.x major). Input comes only from the local browser and agent in this demo.
+- `zod` 3.25.76 (memory exhaustion on oversized collections): no safe override (4.x major): `@ag-ui/client` and `zod-to-json-schema` need the same zod 3 instance as the schemas they inspect. Input comes only from the local browser and agent in this demo.
 
 ## Known limits
 
