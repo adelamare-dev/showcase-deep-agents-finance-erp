@@ -33,9 +33,13 @@ def test_wrong_then_right_is_retried_once():
     model, messages = run([AIMessage("Cash is $43,000."), AIMessage("Cash is $1,092,000.")])
     assert messages[-1].content == "Cash is $1,092,000."
     assert len(model.calls) == 2
-    # The retry saw the correction; the wrong reply is gone.
-    assert "$43,000" in model.calls[1][-1].content
-    assert all("Cash is $43,000." != m.content for m in messages)
+    # The retry saw the wrong reply, then the correction, in that order.
+    seen = model.calls[1]
+    assert [type(m).__name__ for m in seen] == ["HumanMessage", "AIMessage", "HumanMessage"]
+    assert seen[1].content == "Cash is $43,000."
+    assert "$43,000" in seen[2].content
+    # Neither is left in the final state.
+    assert all("$43,000" not in str(m.content) for m in messages)
 
 
 def test_correction_is_not_left_in_the_thread():
@@ -59,6 +63,11 @@ def test_text_before_a_tool_call_is_checked():
     )
     model, messages = run([wrong, right, AIMessage("Cash is $1,092,000.")])
     assert len(model.calls) == 3
+    # The retry thread keeps the wrong text but not its tool call, so no call
+    # is left without an answer.
+    retry_thread = model.calls[1]
+    assert [type(m).__name__ for m in retry_thread] == ["HumanMessage", "AIMessage", "HumanMessage"]
+    assert retry_thread[1].tool_calls == []
     assert messages[-1].content == "Cash is $1,092,000."
     assert not any("$43,000" in str(m.content) for m in messages)
     # The tool ran once, for the accepted call only.
@@ -73,6 +82,7 @@ def test_text_before_a_tool_call_is_marked_after_two_failures():
     assert len(model.calls) == 3
     marked = [m for m in messages if isinstance(m, AIMessage) and m.tool_calls]
     assert marked[0].content == "Checking ⟦unverified:$43,000⟧."
+    assert sum("Checking" in str(m.content) for m in messages) == 1
     assert any(isinstance(m, ToolMessage) for m in messages)
 
 

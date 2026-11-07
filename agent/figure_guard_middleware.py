@@ -3,8 +3,11 @@
 It runs after each model call. A text whose figures no tool result, store
 number or user number backs gets one retry with a correction message; a text
 that still fails keeps its words, with the unbacked figures marked. The
-correction never survives the turn: the message that carries it is removed as
-soon as the retry has been judged, so no snapshot of the thread shows it.
+retry runs on the thread `... tool, ai(wrong), user(correction)`, which keeps
+the roles in an order the provider accepts (the wrong message loses its tool
+calls, so none is left unanswered). Once the retry has been judged, whether it
+passes or is marked, both the wrong message and the correction are removed, so
+no snapshot of the thread shows either.
 
 The orchestrator's text is not streamed (the endpoint config turns message
 emission off): the checked message reaches the chat in the final messages of
@@ -90,7 +93,13 @@ class FigureGuardMiddleware(AgentMiddleware):
         )
         turn = messages[start:]
         corrections = [m for m in turn if _is_correction(m)]
-        cleanup = [RemoveMessage(id=m.id) for m in corrections]
+        # The wrong message of a retry sits right before its correction.
+        discarded = [
+            turn[i - 1]
+            for i, m in enumerate(turn)
+            if _is_correction(m) and i > 0 and isinstance(turn[i - 1], AIMessage)
+        ]
+        cleanup = [RemoveMessage(id=m.id) for m in (*discarded, *corrections) if m.id]
 
         text = _text_of(ai.content)
         if not text.strip():
@@ -110,7 +119,7 @@ class FigureGuardMiddleware(AgentMiddleware):
             raws = ", ".join(dict.fromkeys(fig.raw for fig in bad))
             return {
                 "messages": [
-                    RemoveMessage(id=ai.id),
+                    ai.model_copy(update={"tool_calls": [], "invalid_tool_calls": []}),
                     HumanMessage(
                         content=CORRECTION.format(raws=raws),
                         id=f"{CORRECTION_ID_PREFIX}{uuid.uuid4().hex}",

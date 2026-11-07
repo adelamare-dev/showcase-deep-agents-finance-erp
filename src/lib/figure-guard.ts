@@ -103,11 +103,9 @@ function moneyAllowed(fig: Figure, allowed: Set<number>): boolean {
   const m = new RegExp(`^${MONEY}$`).exec(fig.raw.replace(/^[-(]+|[)]+$/g, "").trim());
   const suffix = m?.groups && (m.groups.s1 ?? m.groups.s2);
   if (!m?.groups || !suffix) return false;
-  const digits = m.groups.n1 ?? m.groups.n2;
   const scale = SCALES[suffix.toLowerCase()];
-  const decimals = digits.includes(".") ? digits.split(".")[1].length : 0;
-  const written = toFloat(digits);
-  return values.some((v) => same(roundTo(v / scale, decimals), written));
+  const written = toFloat(m.groups.n1 ?? m.groups.n2);
+  return values.some((v) => same(roundTo(v / scale, 1), written));
 }
 
 /** Whether `fig` equals an allowed value, allowing for display rounding. */

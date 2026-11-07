@@ -135,11 +135,9 @@ def _money_allowed(fig: Figure, allowed: set[float]) -> bool:
     suffix = m and (m.group("s1") or m.group("s2"))
     if not m or not suffix:
         return False
-    digits = m.group("n1") or m.group("n2")
     scale = _SCALES[suffix.lower()]
-    decimals = len(digits.split(".")[1]) if "." in digits else 0
-    written = _to_float(digits)
-    return any(_same(round(v / scale, decimals), written) for v in allowed)
+    written = _to_float(m.group("n1") or m.group("n2"))
+    return any(_same(round(v / scale, 1), written) for v in allowed)
 
 
 def is_allowed(fig: Figure, allowed: set[float]) -> bool:
