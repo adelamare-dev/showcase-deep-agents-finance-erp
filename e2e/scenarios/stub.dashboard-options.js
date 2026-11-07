@@ -90,6 +90,35 @@ async (page, h) => {
     return { before, after };
   });
 
+  await h.test("a replace carrying an unknown widget type changes nothing", async () => {
+    await h.stubReset();
+    await h.resetDemo();
+    await h.open("/");
+    const before = (await h.scanDashboard()).widgets.map((w) => w.type);
+    await h.stubScript([
+      {
+        toolCall: {
+          name: "update_dashboard",
+          args: {
+            replace: true,
+            widgets: [
+              { type: "metric_cards", config: { metrics: ["Cash"] } },
+              { type: "pie_of_doom", config: {} },
+            ],
+          },
+        },
+      },
+      { text: "Done." },
+    ]);
+    await h.sendPrompt("Build the pie dashboard");
+    await h.waitForRunEnd();
+    await page.waitForTimeout(1000);
+    const after = (await h.scanDashboard()).widgets.map((w) => w.type);
+    h.assertEqual(after, before, "the default widgets are all still there");
+    await h.stubReset();
+    return { before, after };
+  });
+
   await h.test("an accepted replace leaves exactly the reference widgets in view", async () => {
     await h.stubReset();
     await h.resetDemo();

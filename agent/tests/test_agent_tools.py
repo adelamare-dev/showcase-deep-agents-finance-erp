@@ -14,7 +14,7 @@ import erp_store
 import isolated_subagents
 from agent import build_agent
 from erp_datasets import build_dataset
-from frontend_tools import render_chat_visual
+from frontend_tools import WIDGET_TYPES, render_chat_visual, update_dashboard
 from tests.fakes import ScriptedToolCaller, tool_names
 
 ORIGINAL_DUMPS = json.dumps
@@ -129,3 +129,16 @@ def test_context_objects_reach_the_prompt_without_global_patch():
     )
     assert "Current page" in note and "invoices" in note
     assert json.dumps is ORIGINAL_DUMPS
+
+
+def test_update_dashboard_refuses_an_unknown_widget_type():
+    valid = {"type": "metric_cards", "config": {"metrics": ["Cash"]}}
+    unknown = {"type": "pie_of_doom"}
+    out = json.loads(update_dashboard.invoke({"widgets": [valid, unknown], "replace": True}))
+    assert out["updated"] is False
+    assert out["problems"] == [{"index": 1, "type": "pie_of_doom", "reason": "unknown widget type"}]
+
+
+def test_update_dashboard_docstring_lists_the_accepted_widget_types():
+    for name in WIDGET_TYPES:
+        assert f"'{name}'" in update_dashboard.description

@@ -235,6 +235,13 @@ def request_approval(
 # ---------------------------------------------------------------------------
 
 
+# The widget types the web can place; the tool docstring below lists the same ones.
+WIDGET_TYPES = (
+    "kpi_cards", "revenue_chart", "expense_breakdown", "transactions", "invoices", "custom_chart",
+    "cash_waterfall", "ar_aging_gauge", "budget_variance", "spend_heatmap", "revenue_forecast", "metric_cards",
+)
+
+
 @tool
 def update_dashboard(widgets: list, replace: bool = False) -> str:
     """Add or update one or more dashboard widgets in a single call.
@@ -277,6 +284,8 @@ def update_dashboard(widgets: list, replace: bool = False) -> str:
     for index, w in enumerate(widgets):
         config = w.get("config") or {}
         reasons = []
+        if w.get("type") not in WIDGET_TYPES:
+            reasons.append("unknown widget type")
         if "scenarios" in config or "comparisonData" in config:
             reasons.append("widgets must not carry figures")
         if w.get("type") == "custom_chart":
