@@ -164,6 +164,7 @@ function RecentTransactionsSection({ config }: { config: { limit?: number } }) {
 // "View all (n)" counts the full list. Every row stays in the DOM; the card's
 // own width decides, so a wide card lists them all.
 const BILLS_SHOWN_NARROW = "@max-md:[&_tbody_tr:nth-child(n+4)]:hidden";
+// Tailwind needs literal classes: the selector above encodes this same number.
 const BILLS_SHOWN_COUNT = 3;
 
 function OutstandingInvoicesSection({

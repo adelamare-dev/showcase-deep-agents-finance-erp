@@ -173,13 +173,15 @@ async (page, h) => {
       h.assert(b, `the ${name} widget is on the dashboard`);
       h.assert(b.top >= view.areaTop && b.bottom <= view.areaBottom, `the ${name} widget is entirely visible without scrolling: ${JSON.stringify(view)}`);
     }
-    // Half width: three of the five open bills show, and the link counts them all.
+    // Half width: the first three open bills show, and the link counts them all.
     const visibleRows = (sel) =>
       page.evaluate((q) => [...document.querySelectorAll(q + " tbody tr")].filter((tr) => tr.getBoundingClientRect().height > 0).length, sel);
     const bills = "[data-widget-type='outstanding-invoices']";
-    h.assertEqual(await visibleRows(bills), 3, "the half-width bills card shows three rows");
+    const openBills = (await h.snapshot()).bills.filter((b) => b.status === "pending" || b.status === "overdue").length;
+    h.assert(openBills > 3, `the store has more than three open bills: ${openBills}`);
+    h.assertEqual(await visibleRows(bills), Math.min(3, openBills), "the half-width bills card shows three rows");
     const hint = (await page.locator(bills + " [data-testid='bills-total']").innerText()).trim();
-    h.assertEqual(hint, "(5)", "the half-width link counts every open bill");
+    h.assertEqual(hint, `(${openBills})`, "the half-width link counts every open bill");
     const inView = view;
     await h.stubReset();
     return { types, inView };
@@ -214,8 +216,9 @@ async (page, h) => {
       };
     });
     await page.setViewportSize({ width: 1280, height: 720 });
-    h.assertEqual(result.visible, result.rows, `every bill row shows at full width: ${JSON.stringify(result)}`);
-    h.assert(result.rows > 3, `the list has more than three open bills: ${JSON.stringify(result)}`);
+    const openBills = (await h.snapshot()).bills.filter((b) => b.status === "pending" || b.status === "overdue").length;
+    h.assertEqual(result.rows, openBills, `the card lists every open bill: ${JSON.stringify(result)}`);
+    h.assertEqual(result.visible, openBills, `every bill row shows at full width: ${JSON.stringify(result)}`);
     h.assertEqual(result.hint, 0, "no count hint at full width");
     await h.stubReset();
     return result;
