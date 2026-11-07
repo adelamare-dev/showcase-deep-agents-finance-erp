@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { stepLabel, useSubagentSteps } from "@/lib/subagent-steps";
+import { builtFromRulesTitle } from "@/content/ui-text";
 import {
   Check,
   ChevronDown,
@@ -63,6 +64,11 @@ const TOOL_CONFIG: Record<
       return `Projecting: ${q.slice(0, 60)}${q.length > 60 ? "..." : ""}`;
     },
     getResultSummary: () => "Completed projections",
+  },
+  build_reference_dashboard: {
+    icon: LayoutDashboard,
+    getDisplayText: () => builtFromRulesTitle,
+    getResultSummary: () => "Built from the books, no model call",
   },
   navigate_and_filter: {
     icon: ArrowRight,
@@ -187,7 +193,9 @@ function SpecializedToolCard({
 }: SpecializedToolCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isSubagent = name === "do_research" || name === "do_projections";
-  const steps = useSubagentSteps(isSubagent ? toolCallId : undefined);
+  // The recipe card lists the steps the code ran, like a subagent card does.
+  const showsSteps = isSubagent || name === "build_reference_dashboard";
+  const steps = useSubagentSteps(showsSteps ? toolCallId : undefined);
   const isComplete = status === "complete";
   const isExecuting = status === "inProgress" || status === "executing";
 
@@ -256,7 +264,7 @@ function SpecializedToolCard({
       </div>
 
       {/* Subagent steps, live while the tool runs and kept once it is done */}
-      {isSubagent && steps.length > 0 && (
+      {showsSteps && steps.length > 0 && (
         <ul className="mt-2 space-y-1 border-t border-border pt-2">
           {steps.map((step, index) => (
             <li

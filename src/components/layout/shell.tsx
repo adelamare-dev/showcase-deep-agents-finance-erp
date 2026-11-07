@@ -38,6 +38,8 @@ import {
   chatTitle,
   demoSuggestions,
   followUpSuggestions,
+  heroSuggestion,
+  referenceRequestContext,
   welcomeTitle,
 } from "@/content/ui-text";
 
@@ -185,6 +187,13 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   useAgentContext({
     description: "Assistant instructions",
     value: assistantInstructions,
+  });
+
+  // The text of the reference suggestion, so the agent can tell that request
+  // (clicked or typed) without the text living in a second place.
+  useAgentContext({
+    description: referenceRequestContext,
+    value: heroSuggestion.message,
   });
 
   // Lightweight context — detailed data is available via backend research tools

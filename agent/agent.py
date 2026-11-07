@@ -20,6 +20,7 @@ from frontend_tools import frontend_tools
 from isolated_subagents import do_research, do_projections
 from models import orchestrator_chat_model
 from prompts import ORCHESTRATOR_PROMPT
+from reference_fallback import ReferenceFallbackMiddleware
 from tools import aggregate_tools
 
 # Deep Agents adds a virtual filesystem and a `task` tool by default. The demo
@@ -43,6 +44,12 @@ def build_agent():
         model=orchestrator_chat_model(),
         tools=[*frontend_tools, *aggregate_tools, do_research, do_projections],
         system_prompt=ORCHESTRATOR_PROMPT,
-        middleware=[CopilotKitMiddleware(), FigureGuardMiddleware()],
+        # The fallback sits after CopilotKit (it reads the context CopilotKit puts in
+        # the state) and before the figure guard, which then checks its closing text.
+        middleware=[
+            CopilotKitMiddleware(),
+            ReferenceFallbackMiddleware(),
+            FigureGuardMiddleware(),
+        ],
         checkpointer=MemorySaver(),
     )

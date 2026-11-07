@@ -31,6 +31,14 @@ export const heroSuggestion: Suggestion = {
     "Build me a cash flow risk dashboard: Cash and Accounts Payable KPIs, AR aging, supplier bills due, and a quarterly cash projection",
 };
 
+// Name under which the web sends the reference request text to the agent, which
+// compares it with what the user typed (see agent/reference_dashboard.py).
+export const referenceRequestContext = "Reference dashboard request";
+
+// Title of the card shown when the agent built the reference dashboard from
+// rules because the model was unavailable.
+export const builtFromRulesTitle = "Model unavailable — built from rules";
+
 export const demoSuggestions: Suggestion[] = [
   heroSuggestion,
   {

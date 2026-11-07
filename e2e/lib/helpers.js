@@ -379,12 +379,15 @@
       if (bills) {
         const statuses = new Set(bills.rows.map((r) => (r[3] || "").toLowerCase()));
         const wanted = snap.bills.filter((b) => statuses.has(b.status)).map((b) => b.number).sort();
-        const shownNumbers = bills.rows.map((r) => r[0].split("\n")[0].trim()).sort();
+        // A row hidden by a narrow card reads without its line break, so the bill
+        // number is the leading "BILL-0001"-style token of the cell.
+        const numberOf = (cell) => cell.trim().match(/^[A-Za-z]+-\d+/)?.[0] ?? cell.split("\n")[0].trim();
+        const shownNumbers = bills.rows.map((r) => numberOf(r[0])).sort();
         check(bills.rows.length > 0, "the bills widget lists rows");
         check(JSON.stringify(shownNumbers) === JSON.stringify(wanted), `bills listed ${shownNumbers.join(",")} equal the store's ${[...statuses].join("/")} bills`);
         for (const row of bills.rows) {
-          const bill = snap.bills.find((b) => b.number === row[0].split("\n")[0].trim());
-          check(!!bill && row[1] === usd(bill.amount) && row[0].includes(bill.supplier), `bill row ${row[0].split("\n")[0]} matches the store`);
+          const bill = snap.bills.find((b) => b.number === numberOf(row[0]));
+          check(!!bill && row[1] === usd(bill.amount) && row[0].includes(bill.supplier), `bill row ${numberOf(row[0])} matches the store`);
         }
       }
       for (const w of [ar, found.cashProjection]) {

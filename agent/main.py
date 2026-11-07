@@ -34,6 +34,7 @@ from erp_api import router as erp_router
 from frontend_tools import ui_tools, hitl_tools
 from isolated_subagents import do_research, do_projections
 from models import ORCHESTRATOR_RECURSION_LIMIT
+from reference_fallback import build_reference_dashboard_tool
 
 app = FastAPI(title="Finance ERP Agent")
 
@@ -57,7 +58,7 @@ agent_graph = build_agent()
 _emit_tool_names = (
     [t.name for t in ui_tools]
     + [t.name for t in hitl_tools]
-    + [do_research.name, do_projections.name]
+    + [do_research.name, do_projections.name, build_reference_dashboard_tool.name]
 )
 agui_config = copilotkit_customize_config(
     emit_tool_calls=_emit_tool_names,
