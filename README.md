@@ -1,6 +1,6 @@
 # Deep Agents Finance ERP
 
-A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The amounts it writes in the chat are checked against the store (an amount that cannot be matched is badged "unverified"), and some free questions still fail (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
+A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. Cards and charts show only ERP figures; the figures it writes in the chat text come from the books or from tool results (a subagent's written text counts as a tool result, so a figure a subagent invented and the orchestrator repeats is admitted), and one that cannot be matched is badged "unverified", and some free questions still fail (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
 
 **Status.** A working base for a demo, not a finished one. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, then ask a follow-up question) has not passed five times in a row yet. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
 
@@ -160,6 +160,7 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 - **Removed suggestions.** "Cost Control Dashboard" (2 of 3: one comment quoted a figure the store does not hold) and "Reorder Inventory" (2 of 3: one item left off the card) are no longer offered on the first screen; both can still be typed.
 - **Not covered** (the model wrote a figure the store does not hold, or named the wrong record): which client owes the most (it picks a draft invoice), the cash and payables follow-up (once showed the overdue receivables as payables), a what-if over 6 quarters (rounded or truncated values), and headcount and payroll (sums of its own). The percentages the model writes in a comment are not checked and vary from run to run.
 - **Free-tier capacity.** The free tier now allows 2 requests per minute and often answers a 429 "not enough capacity" that an automatic retry does not always cure, so a live run can be lost to it: replay it after a few minutes. Only the "Cash Flow Dashboard" request has the rules fallback; other requests show the Retry notice.
+- **Figure-guard retries.** Each retry of a reply that cites an unmatched figure is one more model request; at 2 requests per minute it can end on a 429 and the Retry banner.
 - **Parallel subagents** (`ORCHESTRATOR_PARALLEL_TOOL_CALLS` in `agent/models.py`) ship off; the parallel variant is not measured.
 - **Windows only** for the stub stack launcher; validated at 1280x720, no mobile layout.
 
