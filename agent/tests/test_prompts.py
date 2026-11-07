@@ -1,13 +1,46 @@
 from __future__ import annotations
 
-from prompts import ORCHESTRATOR_PROMPT, PROJECTIONS_AGENT_PROMPT, RESEARCH_AGENT_PROMPT
+import pytest
+
+import models
+from prompts import (
+    ORCHESTRATOR_PROMPT,
+    PROJECTIONS_AGENT_PROMPT,
+    RESEARCH_AGENT_PROMPT,
+    build_orchestrator_prompt,
+)
 
 
-def test_a_dashboard_makes_one_research_and_one_projections_call():
-    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Dashboard / overview"))
+def _dashboard_rule(parallel: bool) -> str:
+    prompt = build_orchestrator_prompt(parallel)
+    return next(line for line in prompt.splitlines() if line.startswith("- Dashboard / overview"))
+
+
+def test_the_shipped_prompt_follows_the_parallel_switch():
+    assert ORCHESTRATOR_PROMPT == build_orchestrator_prompt(models.ORCHESTRATOR_PARALLEL_TOOL_CALLS)
+
+
+def test_a_sequential_dashboard_makes_one_research_then_one_projections_call():
+    rule = _dashboard_rule(False)
     assert "ONE do_research" in rule
-    assert "ONE do_projections" in rule
+    assert "then ONE do_projections" in rule
     assert "ONE update_dashboard" in rule
+    assert "together" not in rule
+
+
+def test_a_parallel_dashboard_asks_for_both_subagents_in_one_message():
+    rule = _dashboard_rule(True)
+    assert "call do_research and do_projections together in ONE message, then ONE update_dashboard" in rule
+    assert "then ONE do_projections" not in rule
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_dashboard_never_repeats_a_subagent_and_keeps_the_widget_rules(parallel):
+    rule = _dashboard_rule(parallel)
+    assert "Never call do_research or do_projections twice for the same dashboard" in rule
+    assert "@@" not in build_orchestrator_prompt(parallel)
+    assert "Its single update_dashboard call passes replace true" in rule
+    assert 'metric_cards (metrics ["Cash", "Accounts Payable"])' in rule
 
 
 def test_a_dashboard_that_lists_its_widgets_replaces_the_layout():

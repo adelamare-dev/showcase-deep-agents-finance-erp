@@ -17,6 +17,8 @@
 // A step is one of:
 //   { text: "..." }                              a streamed text answer
 //   { toolCall: { name, args } }                 a streamed tool call (args: object)
+//   { toolCalls: [{ name, args }, ...] }         several tool calls in ONE assistant
+//                                                message (text may come first)
 //   { text: "...", toolCall: { name, args } }    both, text first
 //   { status: 429, retryAfter: 2, message: "" }  an HTTP error, with an optional
 //                                                Retry-After header (seconds)
@@ -73,14 +75,15 @@ const chunk = (delta, finishReason = null, extra = {}) => ({
 
 const USAGE = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 };
 
-const toolCallDelta = (call) => ({
-  tool_calls: [
-    {
-      id: toolCallId(),
-      index: 0,
-      function: { name: call.name, arguments: JSON.stringify(call.args ?? {}) },
-    },
-  ],
+// The tool calls a step carries: `toolCalls` (several) or `toolCall` (one).
+const callsOf = (step) => step.toolCalls ?? (step.toolCall ? [step.toolCall] : []);
+
+const toolCallDelta = (calls) => ({
+  tool_calls: calls.map((call, index) => ({
+    id: toolCallId(),
+    index,
+    function: { name: call.name, arguments: JSON.stringify(call.args ?? {}) },
+  })),
 });
 
 // Resolves when the held stream is released or the client goes away.
@@ -104,8 +107,9 @@ async function answerStreaming(res, step) {
     if (i === 0 && step.hold) await held(res);
   }
   if (step.hold && words.length === 0) await held(res);
-  if (step.toolCall) {
-    send(chunk(toolCallDelta(step.toolCall), "tool_calls", { usage: USAGE }));
+  const calls = callsOf(step);
+  if (calls.length) {
+    send(chunk(toolCallDelta(calls), "tool_calls", { usage: USAGE }));
   } else {
     send(chunk({ content: "" }, "stop", { usage: USAGE }));
   }
@@ -116,13 +120,14 @@ async function answerStreaming(res, step) {
 async function answerWhole(res, step) {
   if (step.hold) await held(res);
   const message = { role: "assistant", content: step.text ?? "" };
-  if (step.toolCall) message.tool_calls = toolCallDelta(step.toolCall).tool_calls;
+  const calls = callsOf(step);
+  if (calls.length) message.tool_calls = toolCallDelta(calls).tool_calls;
   sendJson(res, 200, {
     id: "cmpl-stub",
     object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
     model: MODEL,
-    choices: [{ index: 0, message, finish_reason: step.toolCall ? "tool_calls" : "stop" }],
+    choices: [{ index: 0, message, finish_reason: calls.length ? "tool_calls" : "stop" }],
     usage: USAGE,
   });
 }

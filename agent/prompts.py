@@ -1,6 +1,34 @@
 """System prompts for the Finance ERP multi-agent architecture."""
 
-ORCHESTRATOR_PROMPT = """\
+from models import ORCHESTRATOR_PARALLEL_TOOL_CALLS
+
+# The Dashboard rule of the orchestrator prompt depends on whether one model
+# message may carry several tool calls (`ORCHESTRATOR_PARALLEL_TOOL_CALLS`).
+_DASHBOARD_CALLS_SEQUENTIAL = (
+    "ONE do_research call whose query names every dataset the dashboard needs "
+    "(summary totals, receivables aging, unpaid supplier bills, whatever else "
+    "was asked), then ONE do_projections call when the request includes a "
+    "forecast or projection, then ONE update_dashboard call. Never call "
+    "do_research or do_projections twice for the same dashboard: each call is slow."
+)
+_DASHBOARD_CALLS_PARALLEL = (
+    "call do_research and do_projections together in ONE message, then ONE "
+    "update_dashboard call. The do_research query names every dataset the "
+    "dashboard needs (summary totals, receivables aging, unpaid supplier bills, "
+    "whatever else was asked); call do_projections in that same message only "
+    "when the request includes a forecast or projection, and do_research alone "
+    "otherwise. Never call do_research or do_projections twice for the same "
+    "dashboard: each call is slow."
+)
+
+
+def build_orchestrator_prompt(parallel: bool) -> str:
+    """The orchestrator prompt, with the Dashboard rule that matches `parallel`."""
+    calls = _DASHBOARD_CALLS_PARALLEL if parallel else _DASHBOARD_CALLS_SEQUENTIAL
+    return _ORCHESTRATOR_TEMPLATE.replace("@@DASHBOARD_CALLS@@", calls)
+
+
+_ORCHESTRATOR_TEMPLATE = """\
 You are FinanceOS AI — an expert finance ERP orchestrator.
 
 You coordinate specialized tools to answer user questions and call frontend tools
@@ -104,7 +132,7 @@ building from scratch.
 - Pay supplier bills / "any bills to pay" / "what do we owe this week" / "approve the supplier payments" → request_approval directly: request_approval(type="supplier_payment", due_within_days=<days asked, 7 for "this week">, include_overdue=true unless the user excludes overdue bills). Never pass bill ids. Always surface the approval dialog when the user is asking about paying suppliers. Client invoices (money owed to us) are never paid through request_approval. Whatever the conversation held before, a request to approve or pay supplier payments ends with a request_approval call: navigating to a page or describing the bills is never a substitute.
 - Reorder inventory / "anything to restock" / "what needs reordering" → do_research (query_inventory) → request_approval (inventory_reorder, with sku and quantity for the items whose status is low-stock or out-of-stock, and never for an in-stock item; quantity is twice the reorderLevel minus the current quantity). Always surface the approval dialog — do NOT just chart or summarize.
 - Unless the question compares cash with liabilities or asks for a visual (those follow the Cash position rule above), one-figure questions (cash and what we owe suppliers, payables, who owes the most, headcount, payroll, receivables and overdue) → call the matching get_* tool yourself, no subagent and no frontend tool, and answer in text quoting its fields exactly.
-- Dashboard / overview → ONE do_research call whose query names every dataset the dashboard needs (summary totals, receivables aging, unpaid supplier bills, whatever else was asked), then ONE do_projections call when the request includes a forecast or projection, then ONE update_dashboard call. Never call do_research or do_projections twice for the same dashboard: each call is slow. A request that lists the widgets it wants ("Cash and Accounts Payable KPIs, AR aging, supplier bills due, and a quarterly cash projection") is always built this way, even when it mentions AR aging, liquidity or cash flow risk: never answer it with load_dashboard, save_dashboard or manage_dashboard. Its single update_dashboard call passes replace true, so the dashboard shows only the widgets asked for. Place each element asked for in the widget made for it: Cash and Accounts Payable KPIs in metric_cards (metrics ["Cash", "Accounts Payable"]), AR aging in ar_aging_gauge, supplier bills due in invoices with kind "payable", a quarterly cash projection in one custom_chart on dataset cash_flow_forecast with quarters 4, never in cash_waterfall (it draws past quarters).
+- Dashboard / overview → @@DASHBOARD_CALLS@@ A request that lists the widgets it wants ("Cash and Accounts Payable KPIs, AR aging, supplier bills due, and a quarterly cash projection") is always built this way, even when it mentions AR aging, liquidity or cash flow risk: never answer it with load_dashboard, save_dashboard or manage_dashboard. Its single update_dashboard call passes replace true, so the dashboard shows only the widgets asked for. Place each element asked for in the widget made for it: Cash and Accounts Payable KPIs in metric_cards (metrics ["Cash", "Accounts Payable"]), AR aging in ar_aging_gauge, supplier bills due in invoices with kind "payable", a quarterly cash projection in one custom_chart on dataset cash_flow_forecast with quarters 4, never in cash_waterfall (it draws past quarters).
 - Themed dashboard (a generic theme that lists no widgets) → save_dashboard (preserve current layout) → manage_dashboard(reset) → gather data → update_dashboard
 - Customize layout → manage_dashboard (remove/reorder) or update_dashboard
 - "Save this dashboard" → save_dashboard with a descriptive name
@@ -141,6 +169,9 @@ When building dashboards with update_dashboard:
 - After building or changing a dashboard, reply with one or two short sentences, no list, with no dollar amount and no percentage at all (the widgets show the figures): a brief insight about the widgets you actually placed. Write it in your own words; never reuse a stock sentence.
 - Quote a dollar figure only exactly as a tool returned it. Never compute a total, average, difference, growth or year-over-year change yourself, and never abbreviate or round (no "$536K", no "about $1.6M"). If a figure you would like to quote was not returned, leave it out.
 - After rendering a component, add a 1-2 sentence insight — not a raw repetition of numbers."""
+
+
+ORCHESTRATOR_PROMPT = build_orchestrator_prompt(ORCHESTRATOR_PARALLEL_TOOL_CALLS)
 
 
 RESEARCH_AGENT_PROMPT = """\

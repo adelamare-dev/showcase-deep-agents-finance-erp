@@ -55,6 +55,11 @@ from langchain_mistralai import ChatMistralAI
 ORCHESTRATOR_MODEL = "ministral-14b-2512"
 SUBAGENT_MODEL = "ministral-14b-2512"
 
+# Whether one orchestrator message may carry several tool calls. When true the
+# dashboard rule of the orchestrator prompt asks for `do_research` and
+# `do_projections` together; when false they run one after the other.
+ORCHESTRATOR_PARALLEL_TOOL_CALLS = False
+
 REQUEST_TIMEOUT_S = 45
 MAX_RETRIES = 1
 
@@ -268,18 +273,18 @@ def _chunk(*calls: Any) -> ChatGenerationChunk:
 
 
 def orchestrator_chat_model() -> ChatMistralAI:
-    """Build the orchestrator's client: tool calls re-chunked, one at a time.
+    """Build the orchestrator's client: tool calls re-chunked.
 
-    `parallel_tool_calls: false` is a documented Mistral chat-completions
-    parameter. It keeps one model message from carrying two tool calls, which
-    would render two cards for a single turn.
+    `parallel_tool_calls` is a documented Mistral chat-completions parameter,
+    set from `ORCHESTRATOR_PARALLEL_TOOL_CALLS`. When false it keeps one model
+    message from carrying two tool calls.
     """
     return _StreamingToolCallMistral(
         model_name=ORCHESTRATOR_MODEL,
         temperature=0,
         max_retries=MAX_RETRIES,
         timeout=REQUEST_TIMEOUT_S,
-        model_kwargs={"parallel_tool_calls": False},
+        model_kwargs={"parallel_tool_calls": ORCHESTRATOR_PARALLEL_TOOL_CALLS},
         callbacks=[_TokenUsageLog(ORCHESTRATOR_MODEL)],
     )
 

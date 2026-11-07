@@ -55,6 +55,7 @@ A scenario scripts the model with `h.stubScript([...])`. Each model call takes t
 |---|---|
 | `{ text }` | a streamed text answer |
 | `{ toolCall: { name, args } }` | a streamed tool call; `args` is an object |
+| `{ toolCalls: [{ name, args }, …] }` | several tool calls in one assistant message |
 | `{ text, toolCall }` | both, text first |
 | `{ status: 429, retryAfter: 2, message }` | an HTTP error with an optional `Retry-After` (seconds); without it the agent waits 2 s before its one retry |
 | any step with `delayMs: 3000` | the stub waits that long before it answers |
