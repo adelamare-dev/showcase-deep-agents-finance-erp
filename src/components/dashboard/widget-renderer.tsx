@@ -66,7 +66,7 @@ export function WidgetRenderer({ widget: stored }: { widget: DashboardWidget }) 
     case "recent-transactions":
       return <RecentTransactionsSection config={widget.config} />;
     case "outstanding-invoices":
-      return <OutstandingInvoicesSection config={widget.config} colSpan={widget.colSpan} />;
+      return <OutstandingInvoicesSection config={widget.config} />;
     case "custom-chart":
       return (
         <DashboardCustomChart config={widget.config} colSpan={widget.colSpan} />
@@ -159,15 +159,16 @@ function RecentTransactionsSection({ config }: { config: { limit?: number } }) {
   );
 }
 
-// Below full width the bills list sits beside another widget: a few rows keep
-// the pair within one screen, and "View all (n)" counts and opens the full list.
-const BILLS_SHOWN_COMPACT = 3;
+// In a card narrower than 28rem the bills list sits beside another widget: it
+// shows its first rows only, which keeps the pair within one screen, and
+// "View all (n)" counts the full list. Every row stays in the DOM; the card's
+// own width decides, so a wide card lists them all.
+const BILLS_SHOWN_NARROW = "@max-md:[&_tbody_tr:nth-child(n+4)]:hidden";
+const BILLS_SHOWN_COUNT = 3;
 
 function OutstandingInvoicesSection({
   config,
-  colSpan,
 }: {
-  colSpan: number;
   config: {
     kind?: "receivable" | "payable";
     statuses?: ("pending" | "overdue")[];
@@ -180,10 +181,9 @@ function OutstandingInvoicesSection({
     statuses.includes(status as "pending" | "overdue");
   const filtered = invoices.filter((inv) => open(inv.status));
   const dueBills = bills.filter((bill) => open(bill.status));
-  const shownBills = colSpan < 4 ? dueBills.slice(0, BILLS_SHOWN_COMPACT) : dueBills;
-  const hiddenBills = dueBills.length - shownBills.length;
 
   return (
+    <div className="@container">
     <Card>
       <CardHeader className="border-b">
         <div className="flex items-center justify-between">
@@ -194,12 +194,17 @@ function OutstandingInvoicesSection({
             href={payable ? "/invoices?filter=supplier" : "/invoices"}
             className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
           >
-            View all{payable && hiddenBills > 0 ? ` (${dueBills.length})` : ""}{" "}
+            View all
+            {payable && dueBills.length > BILLS_SHOWN_COUNT && (
+              <span data-testid="bills-total" className="@md:hidden">
+                ({dueBills.length})
+              </span>
+            )}
             <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className={`p-0 ${payable ? BILLS_SHOWN_NARROW : ""}`}>
         {payable ? (
           <DataTable<Bill>
             keyExtractor={(row) => row.id}
@@ -236,7 +241,7 @@ function OutstandingInvoicesSection({
                 accessor: (row) => <StatusBadge status={row.status} />,
               },
             ]}
-            data={shownBills}
+            data={dueBills}
           />
         ) : (
         <DataTable<Invoice>
@@ -277,5 +282,6 @@ function OutstandingInvoicesSection({
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

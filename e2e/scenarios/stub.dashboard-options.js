@@ -173,9 +173,52 @@ async (page, h) => {
       h.assert(b, `the ${name} widget is on the dashboard`);
       h.assert(b.top >= view.areaTop && b.bottom <= view.areaBottom, `the ${name} widget is entirely visible without scrolling: ${JSON.stringify(view)}`);
     }
+    // Half width: three of the five open bills show, and the link counts them all.
+    const visibleRows = (sel) =>
+      page.evaluate((q) => [...document.querySelectorAll(q + " tbody tr")].filter((tr) => tr.getBoundingClientRect().height > 0).length, sel);
+    const bills = "[data-widget-type='outstanding-invoices']";
+    h.assertEqual(await visibleRows(bills), 3, "the half-width bills card shows three rows");
+    const hint = (await page.locator(bills + " [data-testid='bills-total']").innerText()).trim();
+    h.assertEqual(hint, "(5)", "the half-width link counts every open bill");
     const inView = view;
     await h.stubReset();
     return { types, inView };
+  });
+
+  await h.test("a full-width bills card lists every open bill", async () => {
+    await h.stubReset();
+    await h.resetDemo();
+    await h.open("/");
+    await h.stubScript([
+      {
+        toolCall: {
+          name: "update_dashboard",
+          args: { replace: true, widgets: [{ type: "invoices", colSpan: 4, config: { kind: "payable" } }] },
+        },
+      },
+      { text: "Done." },
+    ]);
+    await h.sendPrompt("Show the bills");
+    await h.waitForRunEnd();
+    await page.waitForTimeout(1000);
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.waitForTimeout(500);
+    const result = await page.evaluate(() => {
+      const card = document.querySelector("[data-widget-type='outstanding-invoices']");
+      const rows = [...card.querySelectorAll("tbody tr")];
+      return {
+        rows: rows.length,
+        visible: rows.filter((tr) => tr.getBoundingClientRect().height > 0).length,
+        hint: [...card.querySelectorAll("[data-testid='bills-total']")].filter((e) => e.getBoundingClientRect().width > 0).length,
+        width: card.getBoundingClientRect().width,
+      };
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    h.assertEqual(result.visible, result.rows, `every bill row shows at full width: ${JSON.stringify(result)}`);
+    h.assert(result.rows > 3, `the list has more than three open bills: ${JSON.stringify(result)}`);
+    h.assertEqual(result.hint, 0, "no count hint at full width");
+    await h.stubReset();
+    return result;
   });
 
   await h.test("metric cards show the change highlight after an approval", async () => {
