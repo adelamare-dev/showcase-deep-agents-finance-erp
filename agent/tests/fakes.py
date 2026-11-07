@@ -56,3 +56,27 @@ class ScriptedToolCaller(BaseChatModel):
         else:
             reply = AIMessage(content="")
         return ChatResult(generations=[ChatGeneration(message=reply)])
+
+
+class ScriptedReplies(BaseChatModel):
+    """Chat model that answers with the given messages, one per call.
+
+    Once the script is spent it repeats the last message. `calls` holds the
+    messages each call received.
+    """
+
+    replies: list[AIMessage]
+    calls: list = Field(default_factory=list)
+
+    @property
+    def _llm_type(self) -> str:
+        return "scripted-replies"
+
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        index = min(len(self.calls), len(self.replies) - 1)
+        self.calls.append(list(messages))
+        reply = self.replies[index].model_copy(deep=True)
+        return ChatResult(generations=[ChatGeneration(message=reply)])

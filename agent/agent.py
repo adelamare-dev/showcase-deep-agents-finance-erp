@@ -15,6 +15,7 @@ from deepagents import (
 )
 from langgraph.checkpoint.memory import MemorySaver
 
+from figure_guard_middleware import FigureGuardMiddleware
 from frontend_tools import frontend_tools
 from isolated_subagents import do_research, do_projections
 from models import orchestrator_chat_model
@@ -42,6 +43,6 @@ def build_agent():
         model=orchestrator_chat_model(),
         tools=[*frontend_tools, *aggregate_tools, do_research, do_projections],
         system_prompt=ORCHESTRATOR_PROMPT,
-        middleware=[CopilotKitMiddleware()],
+        middleware=[CopilotKitMiddleware(), FigureGuardMiddleware()],
         checkpointer=MemorySaver(),
     )

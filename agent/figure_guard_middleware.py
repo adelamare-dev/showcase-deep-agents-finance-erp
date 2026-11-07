@@ -1,0 +1,131 @@
+"""Middleware that checks every figure of the orchestrator's text.
+
+It runs after each model call. A text whose figures no tool result, store
+number or user number backs gets one retry with a correction message; a text
+that still fails keeps its words, with the unbacked figures marked. The
+correction never survives the turn: the message that carries it is removed as
+soon as the retry has been judged, so no snapshot of the thread shows it.
+
+The orchestrator's text is not streamed (the endpoint config turns message
+emission off): the checked message reaches the chat in the final messages of
+the run, while tool calls still stream.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Callable
+from typing import Any
+
+from langchain.agents.middleware import AgentMiddleware, hook_config
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    RemoveMessage,
+    ToolMessage,
+)
+
+from figure_guard import CORRECTION, allowed_values, mark, unverified
+
+CORRECTION_ID_PREFIX = "figure-guard-correction-"
+
+
+def _text_of(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            part if isinstance(part, str) else part.get("text", "")
+            for part in content
+            if isinstance(part, str) or (isinstance(part, dict) and part.get("type") == "text")
+        )
+    return ""
+
+
+def _is_correction(message: AnyMessage) -> bool:
+    return isinstance(message, HumanMessage) and (message.id or "").startswith(
+        CORRECTION_ID_PREFIX
+    )
+
+
+def _marked_content(content: Any, figures: list) -> Any:
+    if isinstance(content, str):
+        return mark(content, figures)
+    return [
+        {**part, "text": mark(part["text"], figures)}
+        if isinstance(part, dict) and part.get("type") == "text"
+        else part
+        for part in content
+    ]
+
+
+def _default_snapshot() -> dict:
+    from erp_store import get_store
+
+    return get_store().snapshot()
+
+
+class FigureGuardMiddleware(AgentMiddleware):
+    """Verify the figures of each model text against this turn's data."""
+
+    def __init__(self, snapshot: Callable[[], dict] | None = None) -> None:
+        super().__init__()
+        self._snapshot = snapshot or _default_snapshot
+
+    def _verdict(self, state: dict) -> dict[str, Any] | None:
+        messages: list[AnyMessage] = state["messages"]
+        ai = messages[-1] if messages else None
+        if not isinstance(ai, AIMessage):
+            return None
+
+        # The turn starts at the last message the user wrote.
+        start = max(
+            (
+                i
+                for i, m in enumerate(messages)
+                if isinstance(m, HumanMessage) and not _is_correction(m)
+            ),
+            default=0,
+        )
+        turn = messages[start:]
+        corrections = [m for m in turn if _is_correction(m)]
+        cleanup = [RemoveMessage(id=m.id) for m in corrections]
+
+        text = _text_of(ai.content)
+        if not text.strip():
+            return {"messages": cleanup} if cleanup else None
+
+        tool_texts = [
+            _text_of(m.content) for m in turn if isinstance(m, ToolMessage)
+        ]
+        user_text = _text_of(messages[start].content) if messages else ""
+        allowed = allowed_values(tool_texts, self._snapshot(), user_text)
+        bad = unverified(text, allowed)
+
+        if not bad:
+            return {"messages": cleanup} if cleanup else None
+
+        if not corrections and ai.id:
+            raws = ", ".join(dict.fromkeys(fig.raw for fig in bad))
+            return {
+                "messages": [
+                    RemoveMessage(id=ai.id),
+                    HumanMessage(
+                        content=CORRECTION.format(raws=raws),
+                        id=f"{CORRECTION_ID_PREFIX}{uuid.uuid4().hex}",
+                    ),
+                ],
+                "jump_to": "model",
+            }
+
+        marked = ai.model_copy(update={"content": _marked_content(ai.content, bad)})
+        return {"messages": [marked, *cleanup]}
+
+    @hook_config(can_jump_to=["model"])
+    def after_model(self, state, runtime) -> dict[str, Any] | None:
+        return self._verdict(state)
+
+    @hook_config(can_jump_to=["model"])
+    async def aafter_model(self, state, runtime) -> dict[str, Any] | None:
+        return self._verdict(state)

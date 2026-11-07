@@ -48,6 +48,9 @@ app.include_router(erp_router)
 
 agent_graph = build_agent()
 
+# The orchestrator's text is not streamed: `FigureGuardMiddleware` checks it
+# first, and the checked message reaches the chat in the run's final messages.
+# Tool calls keep streaming so their cards appear early.
 # Emit frontend tools + isolated subagent tools so their status shows in chat.
 # The `task` tool is excluded from the graph: subagents run as the isolated
 # `do_research` and `do_projections` tools instead.
@@ -58,7 +61,7 @@ _emit_tool_names = (
 )
 agui_config = copilotkit_customize_config(
     emit_tool_calls=_emit_tool_names,
-    emit_messages=True,
+    emit_messages=False,
 )
 agui_config["recursion_limit"] = ORCHESTRATOR_RECURSION_LIMIT
 

@@ -6,6 +6,15 @@ async (page, h) => {
   const byId = (id) => page.getByTestId(id);
   const inChat = (name) =>
     byId("copilot-message-list").getByRole("button", { name, exact: true });
+  // The orchestrator's text is not streamed, so a held answer shows nothing:
+  // the run is in progress once the model has been asked.
+  const waitForModelAsk = async () => {
+    for (let i = 0; i < 300; i++) {
+      if ((await h.stubRequests()).length >= 1) return;
+      await page.waitForTimeout(100);
+    }
+    throw new Error("the model was never asked");
+  };
   const chatCount = async () =>
     (await byId("copilot-user-message").count()) + (await byId("copilot-assistant-message").count());
   const storedDashboards = () => page.evaluate((key) => window.localStorage.getItem(key), DASHBOARDS_KEY);
@@ -79,7 +88,7 @@ async (page, h) => {
     await fresh();
     await h.stubScript([{ text: "Checking the books for you now.", hold: true }]);
     await h.sendPrompt("Give me a status update");
-    await h.expectVisible(page.getByText("Checking", { exact: false }).last(), 30000);
+    await waitForModelAsk();
 
     const item = await h.openSettings();
     h.assert(await item.isDisabled(), "Reset demo data is disabled during the run");
@@ -143,7 +152,7 @@ async (page, h) => {
     const input = byId("copilot-chat-textarea");
     await input.fill("Give me a status update");
     await input.press("Enter");
-    await h.expectVisible(page.getByText("Checking", { exact: false }).last(), 30000);
+    await waitForModelAsk();
     h.assert(await item.isVisible(), "the menu stayed open while the run started");
     h.assert(await item.isDisabled(), "the entry is disabled during the run");
     h.assertEqual((await item.innerText()).trim(), "Reset demo data", "the run disarmed the entry");
