@@ -104,8 +104,10 @@ function moneyAllowed(fig: Figure, allowed: Set<number>): boolean {
   const suffix = m?.groups && (m.groups.s1 ?? m.groups.s2);
   if (!m?.groups || !suffix) return false;
   const scale = SCALES[suffix.toLowerCase()];
-  const written = toFloat(m.groups.n1 ?? m.groups.n2);
-  return values.some((v) => same(roundTo(v / scale, 1), written));
+  const digits = m.groups.n1 ?? m.groups.n2;
+  const decimals = Math.max(digits.includes(".") ? digits.split(".")[1].length : 0, 1);
+  const written = toFloat(digits);
+  return values.some((v) => same(roundTo(v / scale, decimals), written));
 }
 
 /** Whether `fig` equals an allowed value, allowing for display rounding. */
