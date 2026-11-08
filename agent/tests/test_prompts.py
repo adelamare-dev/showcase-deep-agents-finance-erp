@@ -177,3 +177,7 @@ def test_prompt_routes_what_if_to_a_card():
             assert "what-if" not in line.lower() and "what if" not in line.lower(), line
     critical = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- CRITICAL: ALWAYS call do_research"))
     assert "Exception: a what-if growth question calls render_chat_visual directly" in critical
+
+
+def test_inventory_research_gives_the_skus_a_reorder_needs():
+    assert "sku, name, quantity, reorderLevel and status" in RESEARCH_AGENT_PROMPT

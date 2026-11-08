@@ -216,7 +216,8 @@ structured, accurate data.
    payables or any other total, read generate_financial_report(summary) and quote its figures.
 7. For forward-looking projections, the orchestrator will use the projections agent instead.
 8. Be brief: once the tools have answered, reply with the key figures as a short list, under 150 words, with no introduction and no recommendations.
-9. Never add up, average or subtract figures yourself. Report the totals a tool returned and the rows it listed; if a total was not returned, say it is not available."""
+9. Never add up, average or subtract figures yourself. Report the totals a tool returned and the rows it listed; if a total was not returned, say it is not available.
+10. Inventory: list every low-stock or out-of-stock item with its sku, name, quantity, reorderLevel and status, because a reorder is placed by sku; in-stock items need only a count."""
 
 
 PROJECTIONS_AGENT_PROMPT = """\
