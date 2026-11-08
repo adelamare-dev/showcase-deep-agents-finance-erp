@@ -148,7 +148,9 @@ def request_approval(
             up to this many days ahead, 0 to 31. Use 7 for "this week".
         include_overdue: (supplier_payment only) Also pay the unpaid bills already past due.
             Default true; false only when the user leaves overdue bills out.
-        items: (inventory_reorder only) Items to reorder. Each has sku and quantity.
+        items: (inventory_reorder only) Leave empty to reorder what needs restocking: the system
+            selects the low-stock and out-of-stock items with no order open and sets the quantities.
+            Pass items (each with sku and quantity) only for a reorder the user named item by item.
         action: Optional one-line description shown on the card.
     """
     store = get_store()
@@ -176,7 +178,9 @@ def request_approval(
             }
             count, total = len(preview["bills"]), preview["totalAmount"]
         else:
-            lines = [dict(line) for line in items or []]
+            lines = [dict(line) for line in items or []] or store.items_for_restock()
+            if not lines:
+                return _outcome("nothing", type, "No item needs restocking. Nothing was changed.")
             preview = store.preview_reorder(lines)
             card = {
                 "type": type,

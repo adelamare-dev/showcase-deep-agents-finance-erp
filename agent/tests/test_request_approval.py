@@ -194,7 +194,7 @@ def test_a_payment_the_operating_account_cannot_cover_shows_no_card(shared_store
 
 def test_no_scope_and_no_items_are_refused(shared_store, interrupt_spy):
     assert call(type="supplier_payment")["outcome"] == "refused"
-    assert call(type="inventory_reorder")["outcome"] == "refused"
+    assert call(type="inventory_reorder", items=[{"sku": "NOPE-1", "quantity": 5}])["outcome"] == "refused"
     assert interrupt_spy.calls == []
 
 
@@ -355,6 +355,20 @@ def test_reorder_marks_items_on_order_and_emits(shared_store, interrupt_spy, cus
     assert marked["onOrder"] == 5
     assert shared_store.totals() == before
     assert custom_events == [(ERP_DATA_CHANGED_EVENT, {"changes": []})]
+
+
+def test_reorder_without_items_restocks_what_is_low_or_out(shared_store, interrupt_spy, custom_events):
+    items = shared_store.snapshot()["inventoryItems"]
+    needed = {i["sku"]: 2 * i["reorderLevel"] - i["quantity"] for i in items if i["status"] != "in-stock"}
+    assert needed
+    result = call(type="inventory_reorder")
+    (sent,) = interrupt_spy.calls
+    assert {r["sku"]: r["reorderQty"] for r in sent["args"]["items"]} == needed
+    assert result["outcome"] == "approved" and result["count"] == len(needed)
+    after = {i["sku"]: i["onOrder"] for i in shared_store.snapshot()["inventoryItems"]}
+    assert {s: q for s, q in after.items() if q} == needed
+    # Everything is on order now: a second request has nothing to restock.
+    assert call(type="inventory_reorder")["outcome"] == "nothing"
 
 
 def test_reorder_rejection_changes_nothing(shared_store, interrupt_spy, custom_events):

@@ -340,6 +340,16 @@ class ErpStore:
             raise UnknownIds(f"Unknown SKU(s): {', '.join(unknown)}.")
         return list(lines.values())
 
+    def items_for_restock(self) -> list[dict]:
+        """The `[{sku, quantity}]` a restock order covers: every low-stock or out-of-stock
+        item with no order open, up to twice its reorder level, in catalogue order."""
+        with self._lock:
+            return [
+                {"sku": i["sku"], "quantity": 2 * i["reorderLevel"] - i["quantity"]}
+                for i in self._inventory(self._data["inventoryItems"])
+                if i["status"] != "in-stock" and not i["onOrder"]
+            ]
+
     def preview_reorder(self, items: list[dict]) -> dict:
         """The purchase order a reorder of `[{sku, quantity}]` would place. Changes nothing.
 

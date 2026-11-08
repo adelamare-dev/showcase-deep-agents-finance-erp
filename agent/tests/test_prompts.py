@@ -99,7 +99,7 @@ def test_payments_pass_a_scope_and_reorders_name_the_right_records():
     assert "include_overdue=true unless the user excludes overdue bills" in rule
     assert "Never pass bill ids" in rule
     assert "bill_ids" not in ORCHESTRATOR_PROMPT
-    assert "never for an in-stock item" in ORCHESTRATOR_PROMPT
+    assert 'request_approval(type="inventory_reorder") with no items' in ORCHESTRATOR_PROMPT
 
 
 def test_each_dashboard_element_has_its_widget():
