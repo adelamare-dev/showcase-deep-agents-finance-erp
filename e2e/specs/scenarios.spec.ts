@@ -30,7 +30,7 @@ for (const name of names) {
     const startedAt = new Date().toISOString();
     // run() throws when a case failed, with the full result in the message; the
     // live record below is printed first so a failed pass is recorded too.
-    let result: { passed: number; failed: string[]; cases: unknown[] };
+    let result: { passed: number; failed: unknown[]; cases: unknown[] };
     try {
       result = await loaded.run(page);
     } catch (e) {
