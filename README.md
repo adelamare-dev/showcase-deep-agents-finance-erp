@@ -23,18 +23,18 @@ A small finance ERP whose AI assistant orchestrates sub-agents you can watch, as
 
 - [Node.js](https://nodejs.org/) 20.9+ (`.nvmrc` pins 24) and [pnpm](https://pnpm.io/) 11
 - [uv](https://docs.astral.sh/uv/) 0.11+ (it provisions Python 3.12 for the agent)
-- A Mistral API key (free, see below)
+- A Mistral API key (see below: free mode is too limited for a live run)
 - Docker is **not** needed (the Postgres files in `templates/postgres/` are an archive, wired to nothing)
 
 On Windows, clone to a short path (for example `C:\dev\erp`): a deep path pushes files in `agent/.venv` past the 260-character `MAX_PATH` limit and `uv sync` fails.
 
-## Get a free Mistral key
+## Get a Mistral key
 
-1. Sign in to [console.mistral.ai](https://console.mistral.ai/). Free mode needs no credit card; usage and rate limits apply (checked 2026-11-04 on [docs.mistral.ai](https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key)).
+1. Sign in to [console.mistral.ai](https://console.mistral.ai/). Free mode needs no credit card (checked 2026-11-04 on [docs.mistral.ai](https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key)).
 2. Open **API Keys** ([console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)), choose **New key**, give it a name and an expiration date, and create it.
 3. Copy the key once; it is put in `agent/.env` below and nowhere else.
 
-Only the `ministral` family answers on a free account in this project's tests (`ministral-14b-2512` is used for every role), and the free tier often answers 429 "not enough capacity". See [Known limits](#known-limits).
+**Free mode or API pay-as-you-go.** Free mode includes about $10 of usage a month, renewing, but the API is held to the free-tier limits: since 2026-11-07, 2 requests per minute per `ministral` model, and a dashboard makes 8 to 10 model calls, so a live run is unusable (it often ends on a 429). To run the demo live, enable **API pay-as-you-go** in the Mistral console (billing; not "Pay-as-you-go for Vibe Code"). The API then consumes prepaid credits and its limits are those the demo needs: measured on 2026-11-08 on this project's key, `ministral-14b-2512` answered 120 requests and 1,500,000 tokens per minute, and `ministral-8b-2512` 750 requests per minute. Set a spending cap in the console. The project uses `ministral-14b-2512` for every role in both cases. See [Known limits](#known-limits).
 
 ## Quick start
 
@@ -100,20 +100,22 @@ For the plugin path, start the servers with `pnpm demo`, then run a built file w
 | Group | Needs |
 | --- | --- |
 | `offline.*` | `pnpm demo` with any non-empty `MISTRAL_API_KEY`; no model is called |
-| `live.*` | `pnpm demo` with a real key; spends free-tier quota, and a 429 loses the run |
+| `live.*` | `pnpm demo` with a real key; needs API pay-as-you-go (free mode is limited to 2 requests per minute), and a 429 loses the run |
 | `stub.*` | A local stand-in for the Mistral API, no credits: `node e2e/fixtures/stack.mjs` (Windows only, it stops processes with `taskkill`); `pnpm e2e` starts the same servers itself on any OS, except `stub.agent-down`, which only the plugin plays |
 
 See `e2e/README.md` for the details.
 
 ## Measured behaviour
 
-Models: `ministral-14b-2512` for the orchestrator and both subagents, free tier, dated ids only.
+Models: `ministral-14b-2512` for the orchestrator and both subagents, dated ids only. The measurements below are labelled with their date and plan; those before 2026-11-08 ran on free mode, and the 2026-11-07 ones at its 2 requests per minute.
 
-**Reference scenario** (`e2e/scenarios/live.reference.js`): a click on "Cash Flow Dashboard" must build the complete dashboard, with figures equal to the store, and the follow-up question must then be answered correctly. Result: **not proven, 0 of 5 consecutive passes.** The pass criterion is **60 s** from click to complete dashboard (the allowed fallback after reducing calls and trying a larger model, which this account cannot use); **45 s** remains the target and is not reliably met.
+**Reference scenario** (`e2e/scenarios/live.reference.js`): a click on "Cash Flow Dashboard" must build the complete dashboard, with figures equal to the store, and the follow-up question must then be answered correctly. Result: **not proven, 0 of 5 consecutive passes.** The pass criterion is **60 s** from click to complete dashboard (the allowed fallback after reducing calls and trying a larger model, which this account could not use in free mode); **45 s** remains the target and is not reliably met.
 
 Off-series live checks on 2026-11-06 (not counted), after the dashboard started to replace the default widgets with exactly the ones it needs (Cash and Accounts Payable cards, AR aging gauge, payable bills, cash flow forecast): the reference dashboard was complete in 12.8 to 14.4 s in 5 runs, and one full reference pass (dashboard, approval, follow-up) passed in 38.2 s. In 4 runs the model wrote an amount of its own in its closing text ("$58K", "$58,000", "$43,000"); the series would count those as wrong figures, and the figure guard, added since, marks such amounts and has not been measured live in a series.
 
-Spaced probe on 2026-11-07, after the figure guard and the rules fallback (not counted in the series): the free tier then answered `x-ratelimit-limit-req-minute=2` for `ministral-14b`, `8b` and `3b`, and a targeted live check lost every run to a 429 (code 1300). With 70 s between commands, 4 two-call questions passed: "Cash position and payables" in 19.0 s, "Which client owes us the most?" in 10.4 s, "Headcount and payroll" in 9.4 s and the what-if over 6 quarters in 14.9 s. The reference dashboard was built by the rules fallback in 8 s, equal to the store; the approval that followed was lost to a 429. The parallel-subagent variant (shipped off) could not be measured at this quota.
+Spaced probe on 2026-11-07, after the figure guard and the rules fallback (not counted in the series): free mode then answered `x-ratelimit-limit-req-minute=2` for `ministral-14b`, `8b` and `3b`, and a targeted live check lost every run to a 429 (code 1300). With 70 s between commands, 4 two-call questions passed: "Cash position and payables" in 19.0 s, "Which client owes us the most?" in 10.4 s, "Headcount and payroll" in 9.4 s and the what-if over 6 quarters in 14.9 s. The reference dashboard was built by the rules fallback in 8 s, equal to the store; the approval that followed was lost to a 429. The parallel-subagent variant (shipped off) could not be measured at this quota.
+
+On 2026-11-08, on API pay-as-you-go, the supplier-payment approval (selected in code, with overdue bills included) and the reorder approval (lines selected in code) passed live: `live.approval` 3 of 3 cases in 2 runs on the final fixes, `live.agent` 2 of 2, and the reorder question alone in 2 of 2 runs. `live.reference` passed 1 of 3 smoke runs: the model wrote sums of its own in the dashboard's closing text (for example the total of the four pending bills), which the figure guard marks as unverified. That is a known open defect, so the reference series is still 0 of 5.
 
 On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 1 to a read timeout, 1 that ended without a dashboard), 10 valid dashboards, all complete with figures equal to the store. Of the 10, 5 were within 45 s and the same 5 within 60 s; the time depends strongly on the model service's load, from 26 to 141 s. No run has yet passed from the dashboard through the follow-up question; in one run the follow-up said "$68,105 owed to suppliers" while the store held $11,050. Prompts were changed between runs, and each change reset the count.
 
@@ -159,8 +161,8 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 - **Cash Flow Dashboard** (2 of 3): in one run the model loaded a saved template instead of building the dashboard, which misses the Cash and Accounts Payable cards and the supplier bills.
 - **Removed suggestions.** "Cost Control Dashboard" (2 of 3: one comment quoted a figure the store does not hold) and "Reorder Inventory" (2 of 3: one item left off the card) are no longer offered on the first screen; both can still be typed.
 - **Not covered** (the model wrote a figure the store does not hold, or named the wrong record): which client owes the most (it picks a draft invoice), the cash and payables follow-up (once showed the overdue receivables as payables), a what-if over 6 quarters (rounded or truncated values), and headcount and payroll (sums of its own). The percentages the model writes in a comment are not checked and vary from run to run.
-- **Free-tier capacity.** The free tier now allows 2 requests per minute and often answers a 429 "not enough capacity" that an automatic retry does not always cure, so a live run can be lost to it: replay it after a few minutes. Only the "Cash Flow Dashboard" request has the rules fallback; other requests show the Retry notice.
-- **Figure-guard retries.** Each retry of a reply that cites an unmatched figure is one more model request; at 2 requests per minute it can end on a 429 and the Retry banner.
+- **Free-mode capacity.** Free mode allows 2 requests per minute per `ministral` model (since 2026-11-07) and often answers a 429 "not enough capacity" that an automatic retry does not always cure, so a live run is lost to it; enable API pay-as-you-go (see "Get a Mistral key"). On pay-as-you-go a 429 is rare (none seen in the live checks of 2026-11-08): replay it after a few minutes. Only the "Cash Flow Dashboard" request has the rules fallback; other requests show the Retry notice.
+- **Figure-guard retries.** Each retry of a reply that cites an unmatched figure is one more model request; in free mode it can end on a 429 and the Retry banner.
 - **Parallel subagents** (`ORCHESTRATOR_PARALLEL_TOOL_CALLS` in `agent/models.py`) ship off; the parallel variant is not measured.
 - **Windows only** for the stub stack launcher; validated at 1280x720, no mobile layout.
 

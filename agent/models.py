@@ -8,8 +8,9 @@ new model under our feet and change tool-calling behaviour with no code change.
 
 Both roles run on `ministral-14b-2512`. `mistral-small-2603` is the preferred
 model, but a probe (`scripts/probe_models.py`) on the free tier answered 429
-with a quota of 0 requests per minute, so it is unusable on this account.
-`ministral-14b-2512` answered 200 with a tool call, at 30 requests per minute.
+with a quota of 0 requests per minute, so it was unusable on this account.
+`ministral-14b-2512` answered 200 with a tool call (30 requests per minute on
+2026-11-02). With API pay-as-you-go (2026-11-08) the other models answer 200 too.
 Re-run the probe and switch the two constants if the quota changes.
 
 Each call makes one attempt. LangChain's `max_retries` counts attempts, so
