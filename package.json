@@ -25,7 +25,7 @@
     "e2e": "pnpm build && playwright test --project=offline --project=stub",
     "e2e:live": "playwright test --config e2e/playwright.live.config.ts",
     "e2e:build": "node e2e/build.mjs",
-    "postinstall": "cd agent && uv sync"
+    "postinstall": "node scripts/agent-sync.mjs"
   },
   "dependencies": {
     "@ag-ui/client": "1.0.2",

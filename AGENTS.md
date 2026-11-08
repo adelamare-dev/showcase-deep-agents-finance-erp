@@ -41,7 +41,7 @@ Standalone fork of the `CopilotKit/examples/showcases/deep-agents-finance-erp` s
 
 ## Commands
 
-- `pnpm install` installs the web app, then runs `uv sync` in `agent/` (postinstall).
+- `pnpm install` installs the web app, then runs `scripts/agent-sync.mjs` (postinstall), which runs `uv sync` in `agent/` and explains a malware check that cannot reach api.osv.dev.
 - `pnpm dev` runs web on `:3000` and agent on `:8123`, both with reload.
 - `pnpm demo` makes a production build, then runs both servers without reload. Mode for measurements and meetings.
 - `pnpm build` / `pnpm start` are web only. `pnpm dev:agent` / `pnpm start:agent` are agent only.

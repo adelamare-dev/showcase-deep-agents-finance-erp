@@ -168,6 +168,8 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 
 A failed answer (rate limit, model service error, agent not reachable) is shown above the chat input in plain words, with a **Retry** that runs the assistant again on the same conversation without adding a message. A model rate limit is retried once automatically per model call, after the `Retry-After` delay when it is 8 s or less, or after 2 s when Mistral sends none. If the figures cannot be reloaded, the page keeps the old ones and says they may be out of date, with a Retry.
 
+`pnpm install` fails with "The malware check could not reach api.osv.dev": uv checks every package against OSV before installing it, and the check is on purpose. Nothing was installed. Check your network or proxy (`HTTPS_PROXY`), then run `pnpm install` again.
+
 The app opens with the chat panel open and "Cash Flow Dashboard" as the first suggestion. Close it with the panel's Close button.
 
 ## Replaying the demo
