@@ -35,6 +35,12 @@ def test_query_bills_filters_by_status(tool_store):
     assert json.loads(tools.query_bills.invoke({"status": "paid"}))
 
 
+def test_query_bills_unpaid_returns_pending_and_overdue(tool_store):
+    rows = json.loads(tools.query_bills.invoke({"status": "unpaid"}))
+    assert rows == [b for b in tool_store.snapshot()["bills"] if b["status"] != "paid"]
+    assert {b["status"] for b in rows} == {"pending", "overdue"}
+
+
 def test_query_filters_on_other_datasets(tool_store):
     snap = tool_store.snapshot()
     overdue = json.loads(tools.query_invoices.invoke({"status": "overdue"}))

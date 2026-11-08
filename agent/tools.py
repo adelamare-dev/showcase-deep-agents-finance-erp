@@ -37,9 +37,15 @@ def query_invoices(status: str | None = None) -> str:
 
 @tool
 def query_bills(status: str | None = None) -> str:
-    """Query supplier bills (money we owe) as JSON. Optionally filter by status (paid, pending, overdue)."""
+    """Query supplier bills (money we owe) as JSON. Optionally filter by status (paid, pending, overdue).
+
+    Status "unpaid" returns every bill not yet paid, pending and overdue together: use it for
+    "unpaid" or "open" bills instead of querying pending and overdue separately.
+    """
     bills = _snapshot()["bills"]
-    if status:
+    if status == "unpaid":
+        bills = [b for b in bills if b["status"] != "paid"]
+    elif status:
         bills = [b for b in bills if b["status"] == status]
     return json.dumps(bills, indent=2)
 
