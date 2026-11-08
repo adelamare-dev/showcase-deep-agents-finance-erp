@@ -4,11 +4,11 @@ import { spawn } from "node:child_process";
 import { basename, dirname, resolve } from "node:path";
 
 export function explainSyncFailure(stderr) {
-  if (!/malware check|osv/i.test(stderr)) return null;
+  if (!/malware check failed due to an error from osv|api\.osv\.dev/i.test(stderr)) return null;
   return [
     "",
     "The malware check could not reach api.osv.dev, so uv stopped and nothing was installed.",
-    "The check stays on. Check your network or proxy settings, then run `pnpm install` again.",
+    "The check stays on. Check your network or proxy settings, then run `pnpm install` again (or `pnpm run postinstall`).",
     "",
   ].join("\n");
 }
@@ -19,6 +19,7 @@ function run(script) {
     cwd: agentDir,
     stdio: ["inherit", "inherit", "pipe"],
   });
+  child.stderr.setEncoding("utf8");
   let stderr = "";
   child.stderr.on("data", (chunk) => {
     stderr += chunk;
