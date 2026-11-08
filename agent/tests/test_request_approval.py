@@ -26,16 +26,23 @@ def interrupt_spy(monkeypatch):
         calls: list = []
         answer: object = {"approved": True, "message": "ok"}
         echo_bill_ids: bool = True
+        echo_items: bool = True
+        before_answer: object = None
 
     spy = Spy()
     spy.calls = []
 
     def fake(message=None, action=None, args=None):
         spy.calls.append({"action": action, "args": args})
+        if spy.before_answer:
+            spy.before_answer()
         answer = spy.answer
         # The web card sends back the bill ids it was shown; mirror that unless a test opts out.
         if spy.echo_bill_ids and isinstance(answer, dict) and "billIds" in (args or {}):
             answer = {"billIds": args["billIds"], **answer}
+        # The reorder card does the same with the lines it was shown.
+        if spy.echo_items and isinstance(answer, dict) and "estimatedTotal" in (args or {}):
+            answer = {"items": [{"sku": i["sku"], "quantity": i["reorderQty"]} for i in args["items"]], **answer}
         return json.dumps(answer), answer
 
     monkeypatch.setattr(frontend_tools, "copilotkit_interrupt", fake)
@@ -369,6 +376,62 @@ def test_reorder_without_items_restocks_what_is_low_or_out(shared_store, interru
     assert {s: q for s, q in after.items() if q} == needed
     # Everything is on order now: a second request has nothing to restock.
     assert call(type="inventory_reorder")["outcome"] == "nothing"
+
+
+def shown_then(shared_store, interrupt_spy, change):
+    """Answer with the lines a card showed first, then change the store before the resume.
+
+    The graph re-runs the tool body on resume, so the selection is computed again
+    against the changed store.
+    """
+    interrupt_spy.echo_items = False
+    interrupt_spy.answer = {"approved": True, "items": shared_store.items_for_restock()}
+    change()
+
+
+def set_item(store, sku, **fields):
+    for item in store._data["inventoryItems"]:
+        if item["sku"] == sku:
+            item.update(fields)
+
+
+def test_a_wider_selection_at_resume_orders_nothing(shared_store, interrupt_spy, custom_events):
+    extra = next(i for i in shared_store.snapshot()["inventoryItems"] if i["status"] == "in-stock")
+    # Another item falls out of stock after the card is shown.
+    shown_then(shared_store, interrupt_spy, lambda: set_item(shared_store, extra["sku"], quantity=0))
+    result = call(type="inventory_reorder")
+    assert result["outcome"] == "nothing" and "nothing was ordered" in result["message"]
+    assert not any(i["onOrder"] for i in shared_store.snapshot()["inventoryItems"])
+    assert custom_events == []
+
+
+def test_a_changed_quantity_at_resume_orders_nothing(shared_store, interrupt_spy):
+    target = next(i for i in shared_store.snapshot()["inventoryItems"] if i["status"] != "in-stock")
+    shown_then(shared_store, interrupt_spy, lambda: set_item(shared_store, target["sku"], reorderLevel=target["reorderLevel"] + 1))
+    assert call(type="inventory_reorder")["outcome"] == "nothing"
+    assert not any(i["onOrder"] for i in shared_store.snapshot()["inventoryItems"])
+
+
+def test_a_narrower_selection_at_resume_orders_only_the_shown_items(shared_store, interrupt_spy):
+    needed = [i["sku"] for i in shared_store.snapshot()["inventoryItems"] if i["status"] != "in-stock"]
+    shown_then(shared_store, interrupt_spy, lambda: set_item(shared_store, needed[0], onOrder=1))
+    result = call(type="inventory_reorder")
+    assert result["outcome"] == "approved" and result["count"] == len(needed) - 1
+    orders = {i["sku"]: i["onOrder"] for i in shared_store.snapshot()["inventoryItems"] if i["onOrder"]}
+    assert set(orders) == set(needed) and orders[needed[0]] == 1  # the one ordered elsewhere keeps its own order
+
+
+def test_an_answer_without_the_shown_items_orders_nothing(shared_store, interrupt_spy):
+    interrupt_spy.echo_items = False
+    assert call(type="inventory_reorder")["outcome"] == "nothing"
+    assert not any(i["onOrder"] for i in shared_store.snapshot()["inventoryItems"])
+
+
+def test_an_item_that_would_be_ordered_at_zero_is_left_out(shared_store):
+    shared_store._data["inventoryItems"][0].update(quantity=0, reorderLevel=0, onOrder=0)
+    skus = [line["sku"] for line in shared_store.items_for_restock()]
+    assert shared_store._data["inventoryItems"][0]["sku"] not in skus
+    assert all(line["quantity"] > 0 for line in shared_store.items_for_restock())
 
 
 def test_reorder_rejection_changes_nothing(shared_store, interrupt_spy, custom_events):

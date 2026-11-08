@@ -342,13 +342,15 @@ class ErpStore:
 
     def items_for_restock(self) -> list[dict]:
         """The `[{sku, quantity}]` a restock order covers: every low-stock or out-of-stock
-        item with no order open, up to twice its reorder level, in catalogue order."""
+        item with no order open, up to twice its reorder level, in catalogue order.
+        An item whose quantity would be zero or less is left out."""
         with self._lock:
-            return [
+            lines = [
                 {"sku": i["sku"], "quantity": 2 * i["reorderLevel"] - i["quantity"]}
                 for i in self._inventory(self._data["inventoryItems"])
                 if i["status"] != "in-stock" and not i["onOrder"]
             ]
+        return [line for line in lines if line["quantity"] > 0]
 
     def preview_reorder(self, items: list[dict]) -> dict:
         """The purchase order a reorder of `[{sku, quantity}]` would place. Changes nothing.

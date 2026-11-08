@@ -178,7 +178,7 @@ def request_approval(
             }
             count, total = len(preview["bills"]), preview["totalAmount"]
         else:
-            lines = [dict(line) for line in items or []] or store.items_for_restock()
+            lines = store.items_for_restock() if items is None else [dict(line) for line in items]
             if not lines:
                 return _outcome("nothing", type, "No item needs restocking. Nothing was changed.")
             preview = store.preview_reorder(lines)
@@ -218,6 +218,16 @@ def request_approval(
             )
             result = _outcome("approved", type, message, paid, done["totalPaid"])
         else:
+            # The card sends back the lines it showed. Ordering a line it did not
+            # show, or at another quantity, is not what the user approved.
+            shown = answer.get("items")
+            shown_lines = (
+                {(str(s.get("sku")), s.get("quantity")) for s in shown if isinstance(s, dict)}
+                if isinstance(shown, list)
+                else set()
+            )
+            if not lines or not {(l["sku"], l["quantity"]) for l in lines} <= shown_lines:
+                return _outcome("nothing", type, "The selection changed; nothing was ordered. Ask again.")
             done = store.reorder(lines)
             if not done["orderedSkus"]:
                 return _outcome(

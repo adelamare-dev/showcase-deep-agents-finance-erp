@@ -46,7 +46,12 @@ export function InventoryReorderCard(props: Props) {
   const answer = (result: { approved: boolean; message: string }) => {
     if (answered || props.status !== ToolCallStatus.Executing) return;
     setAnswered(true);
-    void props.respond(result);
+    // The lines shown travel back with the decision: the agent orders only
+    // what the card listed.
+    void props.respond({
+      ...result,
+      items: props.args.items.map((item) => ({ sku: item.sku, quantity: item.reorderQty })),
+    });
   };
 
   if (status === ToolCallStatus.InProgress) {
