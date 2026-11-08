@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { basename, dirname, resolve } from "node:path";
 
 export function explainSyncFailure(stderr) {
-  if (!/malware check failed due to an error from osv|api\.osv\.dev/i.test(stderr)) return null;
+  if (!/malware check failed due to an error from osv/i.test(stderr)) return null;
   return [
     "",
     "The malware check could not reach api.osv.dev, so uv stopped and nothing was installed.",

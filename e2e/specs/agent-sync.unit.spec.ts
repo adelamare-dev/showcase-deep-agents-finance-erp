@@ -27,6 +27,12 @@ error: Malware check found a known malicious package: foo==1.0 (MAL-2024-1234)
   expect(explainSyncFailure(found)).toBeNull();
 });
 
+test("offline.agent-sync stays silent when malware is found and the message cites the OSV url", () => {
+  const found = `error: Malware check found a known malicious package: foo==1.0 (see https://api.osv.dev/v1/vulns/MAL-2024-1234)
+`;
+  expect(explainSyncFailure(found)).toBeNull();
+});
+
 test("offline.agent-sync stays silent on other errors", () => {
   const resolution = `error: No solution found when resolving dependencies:
   Because there is no version of nonexistent-package==1.0 and your project depends on it, we can conclude that your project's requirements are unsatisfiable.

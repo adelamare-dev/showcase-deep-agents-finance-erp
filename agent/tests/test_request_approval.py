@@ -378,6 +378,21 @@ def test_reorder_without_items_restocks_what_is_low_or_out(shared_store, interru
     assert call(type="inventory_reorder")["outcome"] == "nothing"
 
 
+def test_an_explicit_empty_item_list_restocks_like_an_omitted_one(shared_store, interrupt_spy, custom_events):
+    needed = {i["sku"] for i in shared_store.snapshot()["inventoryItems"] if i["status"] != "in-stock"}
+    result = call(type="inventory_reorder", items=[])
+    assert result["outcome"] == "approved" and result["count"] == len(needed)
+    assert {r["sku"] for r in interrupt_spy.calls[0]["args"]["items"]} == needed
+
+
+def test_a_sku_typed_in_another_case_is_ordered(shared_store, interrupt_spy, custom_events):
+    item = next(i for i in shared_store.snapshot()["inventoryItems"] if not i["onOrder"])
+    result = call(type="inventory_reorder", items=[{"sku": item["sku"].lower(), "quantity": 5}])
+    assert result["outcome"] == "approved" and result["count"] == 1
+    after = {i["sku"]: i["onOrder"] for i in shared_store.snapshot()["inventoryItems"]}
+    assert after[item["sku"]] == 5
+
+
 def shown_then(shared_store, interrupt_spy, change):
     """Answer with the lines a card showed first, then change the store before the resume.
 

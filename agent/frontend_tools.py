@@ -178,7 +178,7 @@ def request_approval(
             }
             count, total = len(preview["bills"]), preview["totalAmount"]
         else:
-            lines = store.items_for_restock() if items is None else [dict(line) for line in items]
+            lines = store.items_for_restock() if not items else [dict(line) for line in items]
             if not lines:
                 return _outcome("nothing", type, "No item needs restocking. Nothing was changed.")
             preview = store.preview_reorder(lines)
@@ -226,7 +226,8 @@ def request_approval(
                 if isinstance(shown, list)
                 else set()
             )
-            if not lines or not {(l["sku"], l["quantity"]) for l in lines} <= shown_lines:
+            shown_lines = {(sku.lower(), quantity) for sku, quantity in shown_lines}
+            if not lines or not {(str(l["sku"]).strip().lower(), l["quantity"]) for l in lines} <= shown_lines:
                 return _outcome("nothing", type, "The selection changed; nothing was ordered. Ask again.")
             done = store.reorder(lines)
             if not done["orderedSkus"]:

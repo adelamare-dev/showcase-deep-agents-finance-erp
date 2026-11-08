@@ -274,7 +274,8 @@
       ...countsIn(text)
         .filter((c) => {
           if (typedNumbers.includes(c.value) || extraCounts.includes(c.value)) return false;
-          const exact = fields.adjectives[c.noun]?.[c.adjective];
+          const byNoun = fields.adjectives[c.noun];
+          const exact = byNoun && Object.hasOwn(byNoun, c.adjective) ? byNoun[c.adjective] : undefined;
           return exact ? !exact.includes(c.value) : !fields.counts[c.noun].includes(c.value);
         })
         .map((c) => c.text),
