@@ -21,7 +21,7 @@ async (page, h) => {
   const byId = (id) => page.getByTestId(id);
   const inChat = (name) => byId("copilot-message-list").getByRole("button", { name, exact: true });
   const sum = (rows, pick) => rows.reduce((total, row) => total + pick(row), 0);
-  const { amountsIn, matches, moneyFields, strangers, dueSoonest } = h;
+  const { amountsIn, matches, moneyFields, strangers } = h;
 
   // Subagent cards on screen: title, completed or not, and step labels.
   const readCards = () =>
@@ -84,7 +84,8 @@ async (page, h) => {
       const byBill = Object.fromEntries(before.bills.map((b) => [b.id, b]));
       h.assert(ids.length > 0, "the card lists bills");
       h.assert(ids.every((id) => byBill[id] && byBill[id].status !== "paid"), "every listed bill is an unpaid supplier bill in the store");
-      h.assertEqual(dueSoonest(before.bills, ids), [], "unpaid supplier bills due earlier than a listed bill, left off the card");
+      const expectedIds = h.billsForApproval(before, 7, true).map((b) => b.id);
+      h.assertEqual([...ids].sort(), [...expectedIds].sort(), "listed bills equal the store's selection for the next 7 days and overdue");
       h.assertEqual(cardTotal, sum(ids, (id) => byBill[id].amount), "card total = sum of the listed bills");
       h.assert(cardTotal <= before.totals.cash, "the account can cover the card total");
 
@@ -110,6 +111,12 @@ async (page, h) => {
       h.assertEqual(cashDelta, "−" + h.formatUsd(cardTotal), "Cash delta shown");
       h.assertEqual(payablesDelta, "−" + h.formatUsd(cardTotal), "Accounts Payable delta shown");
       await h.waitForRunEnd();
+
+      // The card stays in the thread as a receipt for the same bills and total.
+      const receipt = byId("approval-receipt");
+      await h.expectVisible(receipt, 15000);
+      h.assertEqual(Number(await receipt.first().getAttribute("data-count")), ids.length, "receipt count");
+      h.assertEqual(Number(await receipt.first().getAttribute("data-amount")), cardTotal, "receipt total");
 
       const after = await h.snapshot();
       h.assertEqual(before.totals.cash - after.totals.cash, cardTotal, "Cash fell by the total");
@@ -156,6 +163,8 @@ async (page, h) => {
       ].filter((v) => !storeAfter.includes(Math.abs(v)) && !singleBills.includes(Math.abs(v)));
       h.assertEqual(stated.filter((a) => stale.some((v) => matches(a, v))).map((a) => a.text), [], "the follow-up states a value the approval changed at its old amount");
       h.assertEqual(strangers(chatNow, fieldsAfter), [], "chat amounts after the follow-up that are not money fields of this pass");
+      h.assertEqual(await byId("unverified-figure").count(), 0, "unverified figures shown in the chat");
+      h.assertEqual(h.unexplainedFigures(chatNow, finalSnap, seg.catalogBodies, FOLLOW_UP, [ids.length]), [], "percentages or counts in the chat that are not fields of the store or the catalog");
       data.followUp = { answer: lastAnswer.slice(0, 400) };
 
       // 4. Subagent steps: each card showed a step before it completed.

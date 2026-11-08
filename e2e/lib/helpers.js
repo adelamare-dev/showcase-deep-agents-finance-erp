@@ -137,6 +137,11 @@
       ...leaves(snap.totals),
       // cashAfterPayables of get_cash_and_payables.
       snap.totals.cash - snap.totals.accountsPayable,
+      // The aggregates the receivables and payables tools return: open and overdue
+      // receivables (drafts left out), overdue supplier bills.
+      snap.invoices.filter((i) => i.status === "pending" || i.status === "overdue").reduce((t, i) => t + i.amount, 0),
+      snap.invoices.filter((i) => i.status === "overdue").reduce((t, i) => t + i.amount, 0),
+      snap.bills.filter((b) => b.status === "overdue").reduce((t, b) => t + b.amount, 0),
       ...snap.kpis.flatMap((k) => moneyIn(k.value)),
       ...leaves(ar),
       ...snap.bills.map((b) => b.amount),
@@ -172,6 +177,86 @@
     return snap.bills
       .filter((b) => b.status !== "paid" && ((includeOverdue && b.dueDate < today) || (b.dueDate >= today && b.dueDate <= last)))
       .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : a.number < b.number ? -1 : a.number > b.number ? 1 : 0));
+  };
+
+  // The lines a restock order covers when the model names none: low-stock or
+  // out-of-stock items with no open order, up to twice their reorder level; a
+  // line with nothing to order is skipped. Sorted by SKU for comparison.
+  const itemsForRestock = (snap) =>
+    snap.inventoryItems
+      .filter((i) => i.status !== "in-stock" && !i.onOrder)
+      .map((i) => ({ sku: i.sku, quantity: 2 * i.reorderLevel - i.quantity }))
+      .filter((line) => line.quantity > 0)
+      .sort((a, b) => (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
+
+  // ---- Percentages and counts in a reply -------------------------------------
+  // Checked from the data, on purpose not from the figure guard's own rule: a
+  // percentage or a count the reply writes must be a field of the snapshot or of
+  // the catalog answers the run fetched, a ratio of two of its amounts, or a
+  // number the user typed. Years, "30 days" and "6 quarters" are not facts, and
+  // numbers spelled in words are not read.
+  const COUNT_NOUNS = "employees|bills|invoices|clients|customers|suppliers|items";
+  const percentsIn = (text) =>
+    [...text.matchAll(/(?<![\w.])(\d+(?:\.(\d+))?)\s?%/g)].map((m) => ({ text: m[0], value: Number(m[1]), decimals: m[2] ? m[2].length : 0 }));
+  const countsIn = (text) =>
+    [...text.matchAll(new RegExp(`(?<![\\w$.,])(\\d+)\\s+(?:[A-Za-z-]+\\s+)?(${COUNT_NOUNS})\\b`, "gi"))]
+      .map((m) => ({ text: m[0], value: Number(m[1]), noun: m[2].toLowerCase() }))
+      .filter((c) => !/^(19|20)\d\d$/.test(String(c.value)));
+
+  // Every number a percentage may equal, and the counts each noun may take.
+  const figureFields = (snap, bodies = []) => {
+    const sums = (rows, key, pick = (r) => r.amount) => Object.values(rows.reduce((o, r) => ({ ...o, [r[key]]: (o[r[key]] ?? 0) + pick(r) }), {}));
+    const total = (rows, pick = (r) => r.amount) => rows.reduce((t, r) => t + pick(r), 0);
+    const shares = (parts, whole) => (whole ? parts.map((p) => (p / whole) * 100) : []);
+    const t = snap.totals;
+    const active = snap.employees.filter((e) => e.status === "active");
+    const open = (rows) => rows.filter((r) => r.status === "pending" || r.status === "overdue");
+    const overdue = (rows) => rows.filter((r) => r.status === "overdue");
+    const aging = leaves({ ...snap.arAging, collectionRate: 0 });
+    const percents = [
+      ...snap.kpis.map((k) => k.change), ...snap.expenseBreakdown.map((e) => e.percentage), snap.arAging.collectionRate * 100,
+      ...bodies.flatMap(leaves).flatMap((v) => (Math.abs(v) <= 1 ? [v, v * 100] : [v])),
+      // Shares of a whole: payroll per department, expenses per category, receivables and payables per status or bucket.
+      ...shares(sums(active, "department", (e) => e.salary), total(active, (e) => e.salary)),
+      ...shares(snap.expenseBreakdown.map((e) => e.amount), total(snap.expenseBreakdown)),
+      ...shares(aging, snap.arAging.total),
+      ...shares(sums(snap.invoices, "status"), total(open(snap.invoices))), ...shares(sums(snap.invoices, "status"), total(snap.invoices)),
+      ...shares([total(overdue(snap.invoices))], total(open(snap.invoices))), ...shares([total(overdue(snap.invoices))], t.accountsReceivable),
+      ...shares(sums(snap.bills, "status"), total(snap.bills)), ...shares([total(overdue(snap.bills))], t.accountsPayable),
+      ...shares([t.expenses, t.netProfit], t.revenue), ...shares([t.liabilities, t.equity, t.cash], t.assets),
+      ...snap.budgetVsActual.filter((r) => r.budget).flatMap((r) => [(r.variance / r.budget) * 100, (r.actual / r.budget) * 100]),
+    ];
+    // Counts per category-like field only: dates, ids and names are not categories.
+    const KEYS = ["status", "department", "category", "client", "supplier", "location", "type"];
+    const tally = (rows) => {
+      const out = [rows.length, rows.filter((r) => r.status !== "paid").length, rows.filter((r) => r.status === "pending" || r.status === "overdue").length];
+      for (const key of KEYS) for (const value of new Set(rows.map((r) => r[key]))) out.push(rows.filter((r) => r[key] === value).length);
+      return out;
+    };
+    const distinct = (rows, key) => [new Set(rows.map((r) => r[key])).size, ...["overdue", "pending"].map((s) => new Set(rows.filter((r) => r.status === s).map((r) => r[key])).size)];
+    const integers = bodies.flatMap(leaves).filter((v) => Number.isInteger(v) && v >= 0 && v < 1000);
+    const counts = {
+      employees: tally(snap.employees), bills: tally(snap.bills), invoices: tally(snap.invoices), items: tally(snap.inventoryItems),
+      clients: distinct(snap.invoices, "client"), customers: distinct(snap.invoices, "client"), suppliers: distinct(snap.bills, "supplier"),
+    };
+    return { percents, counts, integers };
+  };
+
+  // The percentages and counts of a text that nothing explains. `typed` is what the
+  // user wrote, `extraCounts` the numbers a card in the chat computed itself.
+  const unexplainedFigures = (text, snap, bodies = [], typed = "", extraCounts = []) => {
+    const typedNumbers = (typed.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+    const fields = figureFields(snap, bodies);
+    const near = (v, p) => {
+      const scale = 10 ** p.decimals;
+      return Math.round(v * scale) / scale === p.value || Math.floor(v * scale) / scale === p.value;
+    };
+    return [
+      ...percentsIn(text).filter((p) => !typedNumbers.includes(p.value) && !fields.percents.some((v) => near(v, p))).map((p) => p.text),
+      ...countsIn(text)
+        .filter((c) => !typedNumbers.includes(c.value) && !extraCounts.includes(c.value) && !fields.counts[c.noun].includes(c.value) && !fields.integers.includes(c.value))
+        .map((c) => c.text),
+    ];
   };
 
   // Restores the seeded data on the agent, then reloads the app on it.
@@ -345,6 +430,8 @@
       // The money values the catalog drew during the run, for callers that check
       // the amounts the model quotes afterwards: the chart values of a currency
       // chart and the cash position amounts. Counts, years and shares are left out.
+      // Not enumerable: callers that record the whole result do not carry the bodies.
+      Object.defineProperty(result, "catalogBodies", { value: catalog.map((r) => r.body).filter(Boolean), enumerable: false });
       result.catalogMoney = [...new Set(catalog.flatMap((r) => catalogMoneyOf(r.body)))];
       result.widgets = scan.widgets.map((w) => (w.dataset ? `${w.type}:${w.dataset}` : w.type));
       result.shown = shown ?? finalShown;
@@ -436,7 +523,7 @@
     assert, assertEqual, expectVisible, byId,
     STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds, billsForApproval,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
-    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
+    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, itemsForRestock, percentsIn, countsIn, unexplainedFigures, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
   };
   return h;
 }

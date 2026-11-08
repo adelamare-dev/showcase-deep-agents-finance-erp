@@ -27,7 +27,24 @@ for (const name of names) {
     }
     const loaded = loadScenario(name, { only });
     if (!loaded) throw new Error(only ? `scenario ${name} not found or takes no entry selection (unset E2E_ONLY)` : `scenario ${name} not found`);
-    const result = await loaded.run(page);
+    const startedAt = new Date().toISOString();
+    // run() throws when a case failed, with the full result in the message; the
+    // live record below is printed first so a failed pass is recorded too.
+    let result: { passed: number; failed: string[]; cases: unknown[] };
+    try {
+      result = await loaded.run(page);
+    } catch (e) {
+      const message = String((e as Error)?.message ?? e);
+      const json = message.startsWith("Failed cases: ") ? message.slice("Failed cases: ".length) : null;
+      if (name.startsWith("live.")) {
+        const failedResult = json ? JSON.parse(json) : { passed: 0, failed: [name], cases: [{ name, ok: false, error: message }] };
+        console.log("live-result " + JSON.stringify({ scenario: name, startedAt, endedAt: new Date().toISOString(), only: onlyRaw ?? null, ...failedResult }));
+      }
+      throw e;
+    }
+    if (name.startsWith("live.")) {
+      console.log("live-result " + JSON.stringify({ scenario: name, startedAt, endedAt: new Date().toISOString(), only: onlyRaw ?? null, passed: result.passed, failed: result.failed, cases: result.cases }));
+    }
     console.log(`${name}: ${result.passed}/${result.cases.length} cases passed`);
     expect(result.failed).toEqual([]);
   });

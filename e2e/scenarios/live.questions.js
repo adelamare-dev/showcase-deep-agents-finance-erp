@@ -21,8 +21,10 @@
 // instead of typing), kind, expected(snap, ds) -> amounts allowed besides the
 // money fields (`ds(path)` reads a catalog route), states(snap) -> amounts the
 // reply must state, mentions / mentionsAny / mentionsNone(snap) -> strings,
-// orUrl (a page the app may move to instead of naming a record), effect:
-// cashCard | chart | visual | widgets | forecast.
+// statesCounts(snap) -> counts the reply must state, orUrl (a page the app may
+// move to instead of naming a record), effect: cashCard | chart | visual | widgets |
+// forecast. Every run also requires no unverified-figure badge, and every
+// percentage and count written in the chat to be a field of the run.
 async (page, h) => {
   const ONLY = null; // replaced by `--only` at build time
   const byId = (id) => page.getByTestId(id);
@@ -60,7 +62,8 @@ async (page, h) => {
   ];
   const expenseFigures = (s) => [...s.expenseBreakdown.map((e) => e.amount), sum(s.expenseBreakdown, (e) => e.amount)];
   const budgetFigures = (s) => [...h.leaves(s.budgetVsActual), ...expenseFigures(s)];
-  const restockNeeded = (s) => s.inventoryItems.filter((i) => i.status !== "in-stock" && !i.onOrder);
+  const topClientAmount = (s) => Math.max(...Object.values(groupSums(unpaid(s.invoices), "client")));
+  const activePayroll = (s) => sum(s.employees.filter((e) => e.status === "active"), (e) => e.salary);
 
   const ENTRIES = [
     { name: "Cash Flow Dashboard", kind: "dashboard" },
@@ -102,6 +105,8 @@ async (page, h) => {
         const top = Math.max(...Object.values(sums));
         return Object.keys(sums).filter((c) => sums[c] === top);
       },
+      // Receivables leave drafts out: the top client's total is the largest of pending and overdue invoices.
+      states: (s) => [topClientAmount(s)],
     },
     {
       name: "Cash position and payables",
@@ -126,7 +131,9 @@ async (page, h) => {
       name: "Headcount and payroll",
       prompt: "How many employees do we have, and what is our total payroll?",
       expected: hrFigures,
-      mentionsAny: (s) => [String(s.employees.length), String(s.employees.filter((e) => e.status === "active").length)],
+      // Headcount counts active employees and payroll is their annual salaries.
+      states: (s) => [activePayroll(s)],
+      statesCounts: (s) => [s.employees.filter((e) => e.status === "active").length],
     },
     {
       name: "Low stock",
@@ -149,7 +156,8 @@ async (page, h) => {
       name: "Receivables and overdue",
       prompt: "What is our total accounts receivable, and how much of it is overdue?",
       expected: invoiceFigures,
-      states: (s) => [s.totals.accountsReceivable],
+      // Receivables leave drafts out: the KPI, the open invoices and the overdue ones agree.
+      states: (s) => [s.totals.accountsReceivable, sum(unpaid(s.invoices)), sum(s.invoices.filter((i) => i.status === "overdue"))],
     },
     { name: "ESG score", prompt: "What is our ESG score?", noData: true },
   ];
@@ -157,6 +165,14 @@ async (page, h) => {
   // The chat as text, without the user message and the chart axes (their tick
   // labels are drawn by the chart library, not written by the assistant).
   const readChat = () => h.chatText([".recharts-wrapper", "[data-testid='copilot-user-message']"]);
+
+  // No unverified badge is shown, and every percentage and count written in the
+  // chat is a field of the snapshot or of the catalog answers the run fetched, or
+  // a number the user typed (see unexplainedFigures in the helpers).
+  const checkFigures = async (text, snap, bodies, typed, extraCounts = []) => {
+    h.assertEqual(await byId("unverified-figure").count(), 0, "unverified figures shown in the chat");
+    h.assertEqual(h.unexplainedFigures(text, snap, bodies, typed, extraCounts), [], "percentages or counts in the chat that are not fields of the store or the catalog");
+  };
 
   // A run that ended on a notice is not a verdict on the code when the cause is
   // the model service: the runner discards it and replays.
@@ -189,6 +205,7 @@ async (page, h) => {
     await h.resetDemo();
     const seg = await h.runDashboardSegment(page);
     await discardIfNotice("after the dashboard run");
+    await checkFigures(await readChat(), await h.snapshot(), seg.catalogBodies, "");
     const data = { seconds: seg.seconds, runSeconds: seg.runSeconds, widgets: seg.widgets, shown: seg.shown, mismatches: seg.mismatches, notices: seg.notices };
     if (!seg.complete || seg.mismatches.length) {
       throw new Error("FAILED the dashboard is incomplete or differs from the store: " + JSON.stringify({ missing: seg.missing, ...data }));
@@ -232,7 +249,9 @@ async (page, h) => {
       const byBill = Object.fromEntries(before.bills.map((b) => [b.id, b]));
       h.assert(ids.length > 0, "the card lists bills");
       h.assert(ids.every((id) => byBill[id] && byBill[id].status !== "paid"), "every listed bill is an unpaid supplier bill in the store");
-      data.leftOff = h.dueSoonest(before.bills, ids);
+      // The card covers exactly the unpaid bills due within 7 days or already overdue.
+      const expectedIds = h.billsForApproval(before, 7, true).map((b) => b.id);
+      h.assertEqual([...ids].sort(), [...expectedIds].sort(), "listed bills equal the store's selection for the next 7 days and overdue");
       h.assertEqual(total, sum(ids, (id) => byBill[id].amount), "card total = sum of the listed bills");
       h.assert(total <= before.totals.cash, "the account can cover the card total");
       Object.assign(data, { ids, total });
@@ -241,17 +260,17 @@ async (page, h) => {
       const rows = await byId("reorder-approval-row").evaluateAll((els) => els.map((r) => ({ sku: r.dataset.sku, quantity: Number(r.dataset.quantity) })));
       const total = Number(await byId("reorder-approval-total").getAttribute("data-amount"));
       const item = Object.fromEntries(before.inventoryItems.map((i) => [i.sku, i]));
-      const needed = restockNeeded(before).map((i) => i.sku).sort();
+      const needed = h.itemsForRestock(before);
       h.assert(rows.length > 0, "the card lists items");
       h.assert(rows.every((r) => item[r.sku] && item[r.sku].status !== "in-stock" && !item[r.sku].onOrder), "every listed item is low or out of stock and not on order: " + JSON.stringify(rows.map((r) => ({ sku: r.sku, status: item[r.sku]?.status, onOrder: item[r.sku]?.onOrder }))));
-      h.assertEqual(rows.map((r) => r.sku).sort(), needed, "listed SKUs equal the store's items needing a restock");
-      h.assert(rows.every((r) => r.quantity > 0 && item[r.sku].quantity + r.quantity >= item[r.sku].reorderLevel), "each quantity brings the stock to at least its reorder level: " + JSON.stringify(rows.map((r) => ({ sku: r.sku, ordered: r.quantity, stock: item[r.sku].quantity, reorderLevel: item[r.sku].reorderLevel }))));
+      h.assertEqual([...rows].sort((a, b) => (a.sku < b.sku ? -1 : 1)), needed, "card lines (sku, quantity) equal the store's restock selection");
       h.assertEqual(total, sum(rows, (r) => r.quantity * item[r.sku].unitCost), "card total = sum of quantity x unit cost");
       Object.assign(data, { rows, total });
       allowed = [total, ...rows.map((r) => r.quantity * item[r.sku].unitCost), ...stockFigures(before)];
     }
     const fields = [...(await h.moneyFields(before, [])), ...allowed.map(Math.abs)];
     h.assertEqual(h.strangers(await readChat(), fields), [], "chat amounts that are not money fields of this run");
+    await checkFigures(await readChat(), before, [], "", [data.ids?.length ?? data.rows.length]);
 
     // Reject: nothing may change.
     await inChat(isBills ? "Reject" : "Skip Reorder").click();
@@ -262,8 +281,6 @@ async (page, h) => {
     h.assertEqual(after.totals, before.totals, "totals unchanged by the rejection");
     h.assertEqual(after.bills, before.bills, "bills unchanged by the rejection");
     h.assertEqual(after.inventoryItems, before.inventoryItems, "inventory unchanged by the rejection");
-    // Judged last so the rest of the card and the rejection are still exercised and recorded.
-    if (isBills) h.assertEqual(data.leftOff, [], "unpaid supplier bills due earlier than a listed bill, left off the card (card: " + JSON.stringify(data) + ")");
     return data;
   };
 
@@ -324,6 +341,10 @@ async (page, h) => {
     ];
     const fields = [...(await h.moneyFields(snap, catalogMoney)), ...cardFigures, ...(await entry.expected(snap, ds)).map(Math.abs)];
     h.assertEqual(h.strangers(reply, fields), [], "chat amounts that are not in the store or the catalog");
+    await checkFigures(reply, snap, catalog.seen.map((r) => r.body).filter(Boolean), entry.prompt ?? "", [reorderRows.length]);
+    for (const n of entry.statesCounts ? entry.statesCounts(snap) : []) {
+      h.assert(h.countsIn(reply).some((c) => c.value === n), `the reply does not state a count of ${n}: ` + reply.slice(0, 400));
+    }
     for (const v of entry.states ? entry.states(snap) : []) {
       h.assert(h.amountsIn(reply).some((a) => h.matches(a, Math.abs(v))), `the reply does not state ${h.formatUsd(v)}: ` + reply.slice(0, 400));
     }
@@ -345,9 +366,10 @@ async (page, h) => {
     if (entry.effect === "visual") h.assert(charts > 0 || cashCard > 0, "no chart or Cash Position card in the chat");
     if (entry.effect === "forecast") {
       h.assert(charts > 0, "no chart card in the chat");
-      const asked = catalog.seen.map((r) => Number(new URL(r.url).searchParams.get("quarters") ?? 0));
-      data.quarters = asked;
-      h.assert(asked.some((q) => q >= 5), "no catalog request for more than 4 quarters: " + JSON.stringify(asked));
+      // The question asks for 6 quarters: a revenue forecast card drawn with 6 points.
+      const forecasts = catalog.seen.filter((r) => /\/datasets\/(revenue_forecast|cash_flow_forecast)$/.test(new URL(r.url).pathname));
+      data.quarters = forecasts.map((r) => [new URL(r.url).pathname.split("/").pop(), Number(new URL(r.url).searchParams.get("quarters") ?? 0), r.body?.data?.length ?? null]);
+      h.assert(forecasts.some((r) => new URL(r.url).searchParams.get("quarters") === "6" && r.body?.data?.length === 6), "no forecast card for 6 quarters: " + JSON.stringify(data.quarters));
     }
     if (entry.effect === "widgets") {
       const widgets = (await h.scanDashboard()).widgets;
