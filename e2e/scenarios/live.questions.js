@@ -12,7 +12,7 @@
 // store must not change; the no-data question passes on "I don't have this data"
 // and no dollar amount.
 //
-// A run that ended on a rate-limit or model-side notice throws "DISCARDED ...":
+// A run that ended on a rate-limit notice throws "DISCARDED ...":
 // the runner replays it and does not count it. Select entries when building:
 // `pnpm e2e:build live.questions --only=3,5` inlines the indices (default:
 // every entry, which is long: run one entry per call).
@@ -181,7 +181,9 @@ async (page, h) => {
     if (!(await banner.count())) return;
     const kind = await banner.first().getAttribute("data-kind");
     const text = (await banner.first().innerText()).replace(/\s+/g, " ").trim();
-    const prefix = kind === "rate-limit" || kind === "model" ? "DISCARDED" : "FAILED";
+    // Only a rate limit that survived the retry is the service's doing; a provider
+    // error status or a timeout is a failure of the run.
+    const prefix = kind === "rate-limit" ? "DISCARDED" : "FAILED";
     throw new Error(`${prefix} ${kind} notice ${stage}: ${text}`);
   };
 

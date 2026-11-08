@@ -199,62 +199,84 @@
   const percentsIn = (text) =>
     [...text.matchAll(/(?<![\w.])(\d+(?:\.(\d+))?)\s?%/g)].map((m) => ({ text: m[0], value: Number(m[1]), decimals: m[2] ? m[2].length : 0 }));
   const countsIn = (text) =>
-    [...text.matchAll(new RegExp(`(?<![\\w$.,])(\\d+)\\s+(?:[A-Za-z-]+\\s+)?(${COUNT_NOUNS})\\b`, "gi"))]
-      .map((m) => ({ text: m[0], value: Number(m[1]), noun: m[2].toLowerCase() }))
+    [...text.matchAll(new RegExp(`(?<![\\w$.,])(\\d{1,3}(?:,\\d{3})+|\\d+)\\s+(?:([A-Za-z-]+)\\s+)?(${COUNT_NOUNS})\\b`, "gi"))]
+      .map((m) => ({ text: m[0], value: Number(m[1].replace(/,/g, "")), adjective: (m[2] ?? "").toLowerCase(), noun: m[3].toLowerCase() }))
       .filter((c) => !/^(19|20)\d\d$/.test(String(c.value)));
 
-  // Every number a percentage may equal, and the counts each noun may take.
+  // The numbers a catalog answer holds under a key, with the key: [key, value].
+  const keyed = (v, key = "") =>
+    typeof v === "number" ? [[key, v]] : v && typeof v === "object" ? Object.entries(v).flatMap(([k, x]) => keyed(x, Array.isArray(v) ? key : k)) : [];
+
+  // The percentages and the counts each noun may take. Percentages come from
+  // percent-typed fields only (names with pct, percent, rate, share, ratio, margin,
+  // change or growth) and from the shares the aggregate tools return; counts come
+  // from the matching records of the snapshot, whole and per status or group, and
+  // from catalog numbers whose key names the noun.
   const figureFields = (snap, bodies = []) => {
-    const sums = (rows, key, pick = (r) => r.amount) => Object.values(rows.reduce((o, r) => ({ ...o, [r[key]]: (o[r[key]] ?? 0) + pick(r) }), {}));
+    const PCT_KEY = /pct|percent|rate|share|ratio|margin|change|growth/i;
     const total = (rows, pick = (r) => r.amount) => rows.reduce((t, r) => t + pick(r), 0);
+    const sums = (rows, key, pick) => Object.values(rows.reduce((o, r) => ({ ...o, [r[key]]: (o[r[key]] ?? 0) + pick(r) }), {}));
     const shares = (parts, whole) => (whole ? parts.map((p) => (p / whole) * 100) : []);
-    const t = snap.totals;
     const active = snap.employees.filter((e) => e.status === "active");
-    const open = (rows) => rows.filter((r) => r.status === "pending" || r.status === "overdue");
-    const overdue = (rows) => rows.filter((r) => r.status === "overdue");
-    const aging = leaves({ ...snap.arAging, collectionRate: 0 });
+    const open = snap.invoices.filter((i) => i.status === "pending" || i.status === "overdue");
+    const overdue = snap.invoices.filter((i) => i.status === "overdue");
     const percents = [
       ...snap.kpis.map((k) => k.change), ...snap.expenseBreakdown.map((e) => e.percentage), snap.arAging.collectionRate * 100,
-      ...bodies.flatMap(leaves).flatMap((v) => (Math.abs(v) <= 1 ? [v, v * 100] : [v])),
-      // Shares of a whole: payroll per department, expenses per category, receivables and payables per status or bucket.
+      ...bodies.flatMap((b) => keyed(b)).filter(([k]) => PCT_KEY.test(k)).flatMap(([k, v]) => (/rate|ratio/i.test(k) && Math.abs(v) <= 1 ? [v, v * 100] : [v])),
+      // The shares get_headcount_and_payroll and get_receivables_by_client return.
       ...shares(sums(active, "department", (e) => e.salary), total(active, (e) => e.salary)),
-      ...shares(snap.expenseBreakdown.map((e) => e.amount), total(snap.expenseBreakdown)),
-      ...shares(aging, snap.arAging.total),
-      ...shares(sums(snap.invoices, "status"), total(open(snap.invoices))), ...shares(sums(snap.invoices, "status"), total(snap.invoices)),
-      ...shares([total(overdue(snap.invoices))], total(open(snap.invoices))), ...shares([total(overdue(snap.invoices))], t.accountsReceivable),
-      ...shares(sums(snap.bills, "status"), total(snap.bills)), ...shares([total(overdue(snap.bills))], t.accountsPayable),
-      ...shares([t.expenses, t.netProfit], t.revenue), ...shares([t.liabilities, t.equity, t.cash], t.assets),
-      ...snap.budgetVsActual.filter((r) => r.budget).flatMap((r) => [(r.variance / r.budget) * 100, (r.actual / r.budget) * 100]),
-    ];
-    // Counts per category-like field only: dates, ids and names are not categories.
-    const KEYS = ["status", "department", "category", "client", "supplier", "location", "type"];
+      ...shares([total(overdue)], total(open)),
+    ].map(Math.abs);
+    const KEYS = ["status", "department", "category", "client", "supplier", "location"];
     const tally = (rows) => {
-      const out = [rows.length, rows.filter((r) => r.status !== "paid").length, rows.filter((r) => r.status === "pending" || r.status === "overdue").length];
-      for (const key of KEYS) for (const value of new Set(rows.map((r) => r[key]))) out.push(rows.filter((r) => r[key] === value).length);
+      const out = [rows.length];
+      if (rows.some((r) => r.status === "paid")) out.push(rows.filter((r) => r.status !== "paid").length, rows.filter((r) => r.status === "pending" || r.status === "overdue").length);
+      if (rows.some((r) => r.status === "in-stock")) out.push(rows.filter((r) => r.status !== "in-stock").length);
+      for (const key of KEYS) for (const value of new Set(rows.map((r) => r[key]))) if (value !== undefined) out.push(rows.filter((r) => r[key] === value).length);
       return out;
     };
-    const distinct = (rows, key) => [new Set(rows.map((r) => r[key])).size, ...["overdue", "pending"].map((s) => new Set(rows.filter((r) => r.status === s).map((r) => r[key])).size)];
-    const integers = bodies.flatMap(leaves).filter((v) => Number.isInteger(v) && v >= 0 && v < 1000);
+    const distinct = (rows, key) => [new Set(rows.map((r) => r[key])).size, ...["overdue", "pending"].map((st) => new Set(rows.filter((r) => r.status === st).map((r) => r[key])).size)];
+    const fromCatalog = (re) => bodies.flatMap((b) => keyed(b)).filter(([k, v]) => re.test(k) && Number.isInteger(v)).map(([, v]) => v);
     const counts = {
-      employees: tally(snap.employees), bills: tally(snap.bills), invoices: tally(snap.invoices), items: tally(snap.inventoryItems),
-      clients: distinct(snap.invoices, "client"), customers: distinct(snap.invoices, "client"), suppliers: distinct(snap.bills, "supplier"),
+      employees: [...tally(snap.employees), ...fromCatalog(/headcount|employee/i)],
+      bills: [...tally(snap.bills), ...fromCatalog(/bill/i)],
+      invoices: [...tally(snap.invoices), ...fromCatalog(/invoice/i)],
+      items: [...tally(snap.inventoryItems), ...fromCatalog(/item|sku/i)],
+      clients: [...distinct(snap.invoices, "client"), ...fromCatalog(/client|customer/i)],
+      customers: [...distinct(snap.invoices, "client"), ...fromCatalog(/client|customer/i)],
+      suppliers: [...distinct(snap.bills, "supplier"), ...fromCatalog(/supplier|vendor/i)],
     };
-    return { percents, counts, integers };
+    // A count with a status adjective ("4 overdue invoices") must be that status's count.
+    const by = (rows, key, st) => rows.filter((r) => r[key ?? "status"] === st).length;
+    const named = (rows, nounKey) => ({
+      overdue: [by(rows, "status", "overdue"), ...(nounKey ? [distinct(rows, nounKey)[1]] : [])],
+      pending: [by(rows, "status", "pending"), ...(nounKey ? [distinct(rows, nounKey)[2]] : [])],
+      paid: [by(rows, "status", "paid")], draft: [by(rows, "status", "draft")], active: [by(rows, "status", "active")],
+      unpaid: [rows.filter((r) => r.status !== "paid").length, rows.filter((r) => r.status === "pending" || r.status === "overdue").length],
+      open: [rows.filter((r) => r.status !== "paid").length, rows.filter((r) => r.status === "pending" || r.status === "overdue").length],
+    });
+    const adjectives = {
+      invoices: named(snap.invoices), bills: named(snap.bills), employees: named(snap.employees),
+      clients: named(snap.invoices, "client"), customers: named(snap.invoices, "client"), suppliers: named(snap.bills, "supplier"),
+    };
+    return { percents, counts, adjectives };
   };
 
   // The percentages and counts of a text that nothing explains. `typed` is what the
-  // user wrote, `extraCounts` the numbers a card in the chat computed itself.
+  // user wrote, `extraCounts` the numbers a card in the chat computed itself. A
+  // percentage is compared by absolute value ("a 3.2% decline" matches -3.2) and
+  // to one decimal, the display rounding of the app.
   const unexplainedFigures = (text, snap, bodies = [], typed = "", extraCounts = []) => {
     const typedNumbers = (typed.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
     const fields = figureFields(snap, bodies);
-    const near = (v, p) => {
-      const scale = 10 ** p.decimals;
-      return Math.round(v * scale) / scale === p.value || Math.floor(v * scale) / scale === p.value;
-    };
     return [
-      ...percentsIn(text).filter((p) => !typedNumbers.includes(p.value) && !fields.percents.some((v) => near(v, p))).map((p) => p.text),
+      ...percentsIn(text).filter((p) => !typedNumbers.includes(p.value) && !fields.percents.some((v) => Math.abs(p.value - v) <= 0.05 + 1e-9)).map((p) => p.text),
       ...countsIn(text)
-        .filter((c) => !typedNumbers.includes(c.value) && !extraCounts.includes(c.value) && !fields.counts[c.noun].includes(c.value) && !fields.integers.includes(c.value))
+        .filter((c) => {
+          if (typedNumbers.includes(c.value) || extraCounts.includes(c.value)) return false;
+          const exact = fields.adjectives[c.noun]?.[c.adjective];
+          return exact ? !exact.includes(c.value) : !fields.counts[c.noun].includes(c.value);
+        })
         .map((c) => c.text),
     ];
   };
