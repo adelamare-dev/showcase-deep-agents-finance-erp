@@ -54,7 +54,7 @@ from langchain_core.outputs import ChatGenerationChunk, ChatResult, LLMResult
 from langchain_mistralai import ChatMistralAI
 
 ORCHESTRATOR_MODEL = "ministral-14b-2512"
-SUBAGENT_MODEL = "ministral-8b-2512"
+SUBAGENT_MODEL = "ministral-14b-2512"
 
 # Whether one orchestrator message may carry several tool calls. When true the
 # dashboard rule of the orchestrator prompt asks for `do_research` and
