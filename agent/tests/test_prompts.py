@@ -121,6 +121,18 @@ def test_a_request_listing_its_widgets_is_built_not_loaded_from_a_template():
     assert "without listing the widgets" in lines[templates]
 
 
+def test_a_themed_dashboard_is_one_replacing_update_without_save_or_reset():
+    lines = ORCHESTRATOR_PROMPT.splitlines()
+    themed = next(line for line in lines if line.startswith("- Themed dashboard"))
+    practice = next(line for line in lines if "When building a themed dashboard" in line)
+    for line in (themed, practice):
+        assert "replace true" in line
+        assert "Never call save_dashboard or manage_dashboard" in line or "Do not call save_dashboard or manage_dashboard" in line
+        assert 'manage_dashboard(reset)' not in line and 'manage_dashboard(action="reset")' not in line
+        assert "ALWAYS call save_dashboard" not in line
+    assert "Mention the saved name" not in ORCHESTRATOR_PROMPT
+
+
 def test_the_quarterly_cash_projection_goes_on_the_forecast_chart_not_the_waterfall():
     rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- Dashboard / overview"))
     assert 'a quarterly cash projection in one custom_chart on dataset cash_flow_forecast with quarters 4' in rule
