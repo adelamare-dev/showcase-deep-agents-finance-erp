@@ -185,7 +185,7 @@ def test_a_figure_before_the_dashboard_call_keeps_the_usual_rule():
     model, messages = run_dashboard([first, AIMessage("Done.")], snapshot={})
     # The text sits in the same message as the call: it is not after the call.
     # $1,092,000 is not backed (no snapshot, no tool text yet): the usual retry runs.
-    assert "figures not returned" in model.calls[1][-1].content
+    assert "exactly as a tool returned it" in model.calls[1][-1].content
 
 
 def test_a_figure_backed_by_a_tool_before_the_dashboard_call_is_admitted():
@@ -245,7 +245,7 @@ def run_subagent(final_text: str, sources: list[str]):
 
 def test_a_figure_only_the_subagent_prose_holds_is_retried_then_marked():
     model, messages = run_subagent("Growth is 50% next year.", ['{"growth_pct": 49.15}'])
-    assert "figures not returned" in model.calls[-1][-1].content
+    assert "exactly as a tool returned it" in model.calls[-1][-1].content
     assert "⟦unverified:50%⟧" in messages[-1].content
 
 
@@ -268,3 +268,23 @@ def test_a_tool_message_without_an_artifact_keeps_its_content_as_a_source():
     result = asyncio.run(agent.ainvoke({"messages": [HumanMessage("Cash?")]}))
     assert result["messages"][-1].content == "Cash is $1,092,000."
     assert len(model.calls) == 2
+
+
+def test_the_message_kept_for_the_retry_has_no_tool_call_anywhere():
+    from langchain_mistralai.chat_models import _convert_message_to_mistral_chat_message as convert
+
+    raw = [{"id": "c1", "index": 0, "function": {"name": "update_dashboard", "arguments": "{}"}}]
+    ai = AIMessage(
+        "Revenue is $43,000.",
+        id="a1",
+        tool_calls=[{"id": "c1", "name": "update_dashboard", "args": {}}],
+        additional_kwargs={"tool_calls": raw, "other": "kept"},
+    )
+    state = {"messages": [HumanMessage("budget?", id="h"), ai]}
+    out = FigureGuardMiddleware(snapshot=lambda: {})._verdict(state)
+    kept = out["messages"][0]
+    assert kept.tool_calls == []
+    assert "tool_calls" not in kept.additional_kwargs
+    assert kept.additional_kwargs["other"] == "kept"
+    # The payload built from the retry thread holds no call without a response.
+    assert "tool_calls" not in convert(kept)

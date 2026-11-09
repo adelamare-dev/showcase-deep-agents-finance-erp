@@ -82,6 +82,18 @@ def _marked_content(content: Any, figures: list) -> Any:
     ]
 
 
+def _without_tool_calls(ai: AIMessage) -> AIMessage:
+    """Copy of a message with no tool call left anywhere.
+
+    A streamed message also carries its calls in `additional_kwargs`, and the
+    provider client re-sends those when `tool_calls` is empty.
+    """
+    extra = {k: v for k, v in ai.additional_kwargs.items() if k != "tool_calls"}
+    return ai.model_copy(
+        update={"tool_calls": [], "invalid_tool_calls": [], "additional_kwargs": extra}
+    )
+
+
 def _called_dashboard(messages: list[AnyMessage]) -> bool:
     return any(
         isinstance(m, AIMessage) and any(c["name"] == update_dashboard.name for c in m.tool_calls)
@@ -151,7 +163,7 @@ class FigureGuardMiddleware(AgentMiddleware):
             raws = ", ".join(dict.fromkeys(fig.raw for fig in bad))
             return {
                 "messages": [
-                    ai.model_copy(update={"tool_calls": [], "invalid_tool_calls": []}),
+                    _without_tool_calls(ai),
                     HumanMessage(
                         content=(DASHBOARD_CORRECTION if closing else CORRECTION).format(raws=raws),
                         id=f"{CORRECTION_ID_PREFIX}{uuid.uuid4().hex}",
