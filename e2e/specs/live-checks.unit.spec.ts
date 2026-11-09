@@ -7,6 +7,7 @@ const helpers = new Function(`return (${readFileSync("e2e/lib/helpers.js", "utf8
   projectRevenue: (snap: unknown, quarters?: number, method?: string) => { revenue: number; expenses: number; profit: number }[];
   projectCashFlow: (snap: unknown, quarters?: number) => { operating: number; investing: number; financing: number; net: number; balance: number }[];
   projectedMoney: (snap: unknown) => number[];
+  projectionPercents: (snap: unknown) => number[];
   strangers: (text: string, fields: number[]) => string[];
 };
 
@@ -112,4 +113,18 @@ test("offline.live-checks a projected amount is admitted, a wrong one is not", (
   const fields = helpers.projectedMoney(projSnap);
   expect(helpers.strangers("Revenue reaches $586,197 and profit $180,644.", fields)).toEqual([]);
   expect(helpers.strangers("Revenue reaches $586,198.", fields)).toEqual(["$586,198"]);
+});
+
+// The growth percentages of the same fixture: projectionPercents' order, printed by
+// the Python (project_revenue and project_cash_flow, horizon 8, on this fixture):
+// quarter-over-quarter growth, its average and volatility, operating growth, then the
+// four seasonal year-over-year rows.
+const pyPercents = [4.5, 4.5, 0.2, 4.5, 20.1, 20.4, 18.3, 19.2];
+const projFull = { ...snap, quarterlyRevenue: projSnap.quarterlyRevenue, cashFlowData: projSnap.cashFlowData, totals: { ...snap.totals, cash: 905_000 } };
+test("offline.live-checks growth percentages of the forecast tools equal the Python", () => {
+  expect(helpers.projectionPercents(projSnap)).toEqual(pyPercents);
+});
+test("offline.live-checks a forecast growth percentage is admitted, a wrong one is not", () => {
+  for (const v of pyPercents) expect(helpers.unexplainedFigures(`growth of ${v}% expected`, projFull)).toEqual([]);
+  expect(helpers.unexplainedFigures("Revenue expected to grow by 11.9% quarter-over-quarter.", projFull)).toEqual(["11.9%"]);
 });

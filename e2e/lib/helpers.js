@@ -249,6 +249,27 @@
     ...["linear", "seasonal"].flatMap((method) => projectRevenue(snap, 8, method).flatMap((r) => [r.revenue, r.expenses, r.profit])),
     ...projectCashFlow(snap, 8).flatMap((r) => [r.operating, r.investing, r.financing, r.net, r.balance]),
   ];
+  // Every growth percentage those tools can print, rounded to one decimal as the
+  // tools round them, in this order: the linear quarter-over-quarter growth (the same
+  // on every row), its average and volatility over the last quarters, the cash-flow
+  // operating growth, then the four seasonal year-over-year rows.
+  const projectionPercents = (snap) => {
+    const data = snap.quarterlyRevenue;
+    const round1 = (x) => pyRound(x * 10) / 10;
+    const revenues = data.map((q) => q.revenue);
+    const operating = snap.cashFlowData.map((q) => q.operating);
+    const recentRates = growthRates(revenues.slice(-4));
+    const mean = recentRates.length ? recentRates.reduce((t, r) => t + r, 0) / recentRates.length : 0;
+    const variance = recentRates.length > 1 ? recentRates.reduce((t, r) => t + (r - mean) ** 2, 0) / recentRates.length : 0;
+    const seasonal = data.length >= 8 ? [4, 5, 6, 7].map((hist) => round1(((data[hist].revenue - data[hist - 4].revenue) / data[hist - 4].revenue) * 100)) : [];
+    return [
+      round1(recentAverage(growthRates(revenues)) * 100),
+      round1(mean * 100),
+      round1(Math.sqrt(variance) * 100),
+      round1(recentAverage(growthRates(operating)) * 100),
+      ...seasonal,
+    ];
+  };
 
   // ---- Percentages and counts in a reply -------------------------------------
   // Checked from the data, on purpose not from the figure guard's own rule: a
@@ -304,7 +325,8 @@
 
   // The percentages and the counts each noun may take. Percentages come from
   // percent-typed fields only (names with pct, percent, rate, share, ratio, margin,
-  // change or growth) and from the shares the aggregate tools return; counts come
+  // change or growth), from the shares the aggregate tools return and from the growth
+  // percentages of the forecast tools (projectionPercents); counts come
   // from the matching records of the snapshot, whole and per status or group, and
   // from catalog numbers whose key names the noun.
   const figureFields = (snap, bodies = []) => {
@@ -322,6 +344,7 @@
       ...shares(sums(active, "department", (e) => e.salary), total(active, (e) => e.salary)),
       ...shares([total(overdue)], total(open)),
       ...derivedPercents(snap).flat(),
+      ...projectionPercents(snap),
     ].map(Math.abs);
     // Only the collection rate and the cash-flow trend are printed as whole numbers.
     const wholePercents = derivedPercents(snap).slice(1, 3).flat().map((v) => Math.round(Math.abs(v)));
@@ -644,7 +667,7 @@
     assert, assertEqual, expectVisible, byId,
     STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds, billsForApproval,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
-    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, itemsForRestock, projectRevenue, projectCashFlow, projectedMoney, percentsIn, countsIn, unexplainedFigures, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
+    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, itemsForRestock, projectRevenue, projectCashFlow, projectedMoney, projectionPercents, percentsIn, countsIn, unexplainedFigures, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
   };
   return h;
 }
