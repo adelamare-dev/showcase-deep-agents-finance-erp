@@ -188,14 +188,17 @@ def test_a_figure_before_the_dashboard_call_keeps_the_usual_rule():
     assert "figures not returned" in model.calls[1][-1].content
 
 
-def test_a_figure_in_tool_texts_before_the_dashboard_is_still_admitted_in_earlier_text():
-    balance = AIMessage(
-        "Cash is $1,092,000.", tool_calls=[{"id": "c1", "name": "get_balance", "args": {}}]
+def test_a_figure_backed_by_a_tool_before_the_dashboard_call_is_admitted():
+    balance = AIMessage("", tool_calls=[{"id": "c1", "name": "get_balance", "args": {}}])
+    before = AIMessage(
+        "Cash is $1,092,000.",
+        tool_calls=[{"id": "dash1", "name": "update_dashboard", "args": {"widgets": []}}],
     )
-    model, messages = run_dashboard([balance, _dashboard_call(), AIMessage("Done.")], snapshot={})
-    # Text written before the dashboard call: the 1,092,000 of the tool is not
-    # known yet, so the first message is retried under the usual rule.
-    assert "figures not returned" in model.calls[1][-1].content
+    model, messages = run_dashboard([balance, before, AIMessage("Done.")], snapshot={})
+    # The text precedes the dashboard call, so today's rule applies: no retry.
+    assert len(model.calls) == 3
+    assert any(m.content == "Cash is $1,092,000." for m in messages if isinstance(m, AIMessage))
+    assert messages[-1].content == "Done."
 
 
 def test_a_turn_without_the_dashboard_call_is_unchanged():

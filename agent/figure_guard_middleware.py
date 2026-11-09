@@ -29,7 +29,13 @@ from langchain_core.messages import (
     ToolMessage,
 )
 
-from figure_guard import CORRECTION, DASHBOARD_CORRECTION, allowed_values, mark, unverified
+from figure_guard import (
+    CORRECTION,
+    DASHBOARD_CORRECTION,
+    allowed_values,
+    mark,
+    unverified,
+)
 from frontend_tools import update_dashboard
 
 CORRECTION_ID_PREFIX = "figure-guard-correction-"
