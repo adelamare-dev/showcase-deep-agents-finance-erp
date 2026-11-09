@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from typing import Any
+
 from copilotkit import CopilotKitMiddleware
 from deepagents import (
     GeneralPurposeSubagentProfile,
@@ -13,6 +15,7 @@ from deepagents import (
     create_deep_agent,
     register_harness_profile,
 )
+from langchain.agents.middleware import AgentMiddleware
 from langgraph.checkpoint.memory import MemorySaver
 
 from figure_guard_middleware import FigureGuardMiddleware
@@ -40,16 +43,19 @@ register_harness_profile(
 
 def build_agent():
     """Build the Finance ERP orchestrator with thread-isolated subagent tools."""
+    # The fallback sits after CopilotKit (it reads the context CopilotKit puts in
+    # the state) and before the figure guard, which then checks its closing text.
+    # Typed with `Any` state: CopilotKitMiddleware declares its own state schema,
+    # which the invariant `AgentMiddleware` parameter does not accept as `AgentState`.
+    middleware: list[AgentMiddleware[Any, Any, Any]] = [
+        CopilotKitMiddleware(),
+        ReferenceFallbackMiddleware(),
+        FigureGuardMiddleware(),
+    ]
     return create_deep_agent(
         model=orchestrator_chat_model(),
         tools=[*frontend_tools, *aggregate_tools, do_research, do_projections],
         system_prompt=ORCHESTRATOR_PROMPT,
-        # The fallback sits after CopilotKit (it reads the context CopilotKit puts in
-        # the state) and before the figure guard, which then checks its closing text.
-        middleware=[
-            CopilotKitMiddleware(),
-            ReferenceFallbackMiddleware(),
-            FigureGuardMiddleware(),
-        ],
+        middleware=middleware,
         checkpointer=MemorySaver(),
     )
