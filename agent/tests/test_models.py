@@ -11,9 +11,9 @@ def test_model_ids_are_dated():
     assert "latest" not in models.SUBAGENT_MODEL
 
 
-def test_parallel_tool_calls_are_off_in_the_shipped_state():
-    assert models.ORCHESTRATOR_PARALLEL_TOOL_CALLS is False
-    assert orchestrator_chat_model().model_kwargs["parallel_tool_calls"] is False
+def test_parallel_tool_calls_are_on_in_the_shipped_state():
+    assert models.ORCHESTRATOR_PARALLEL_TOOL_CALLS is True
+    assert orchestrator_chat_model().model_kwargs["parallel_tool_calls"] is True
 
 
 @pytest.mark.parametrize("enabled", [False, True])

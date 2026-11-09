@@ -59,7 +59,7 @@ SUBAGENT_MODEL = "ministral-14b-2512"
 # Whether one orchestrator message may carry several tool calls. When true the
 # dashboard rule of the orchestrator prompt asks for `do_research` and
 # `do_projections` together; when false they run one after the other.
-ORCHESTRATOR_PARALLEL_TOOL_CALLS = False
+ORCHESTRATOR_PARALLEL_TOOL_CALLS = True
 
 REQUEST_TIMEOUT_S = 45
 MAX_RETRIES = 1
