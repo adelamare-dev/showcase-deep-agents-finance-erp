@@ -58,6 +58,15 @@ export const demoSuggestions: Suggestion[] = [
     title: "Approve Payments",
     message: "Approve the supplier bills due this week, including any overdue ones",
   },
+  {
+    title: "Reorder Inventory",
+    message: "Check inventory levels and reorder anything that needs restocking",
+  },
+  {
+    title: "Cost Control Dashboard",
+    message:
+      "I'm concerned about the Marketing overspend — set up a cost control view with budget tracking and spending trends",
+  },
 ];
 
 // Static portion of the follow-up chips shown after the first message.

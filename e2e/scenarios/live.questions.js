@@ -83,10 +83,10 @@ async (page, h) => {
     },
     { name: "Cash Flow Chart", chip: "Cash Flow Chart", expected: () => [], effect: "chart" },
     { name: "Approve Payments", chip: "Approve Payments", kind: "bills" },
-    { name: "Reorder inventory", prompt: "Check inventory levels and reorder anything that needs restocking", kind: "reorder" },
+    { name: "Reorder inventory", chip: "Reorder Inventory", kind: "reorder" },
     {
       name: "Cost control dashboard",
-      prompt: "I'm concerned about the Marketing overspend — set up a cost control view with budget tracking and spending trends",
+      chip: "Cost Control Dashboard",
       expected: budgetFigures,
       effect: "widgets",
     },
