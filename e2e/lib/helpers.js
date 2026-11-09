@@ -207,6 +207,40 @@
   const keyed = (v, key = "") =>
     typeof v === "number" ? [[key, v]] : v && typeof v === "object" ? Object.entries(v).flatMap(([k, x]) => keyed(x, Array.isArray(v) ? key : k)) : [];
 
+  // The ratios the tools print as percentages, computed here from the snapshot
+  // with their own formulas: profit margin, collection rate, the cash-flow trend
+  // over any run of quarters, average quarter-over-quarter revenue growth and its
+  // volatility, the change of a projected total over the trailing four quarters
+  // (any horizon of 1 to 8 quarters), and each budget line's variance over its budget.
+  const derivedPercents = (snap) => {
+    const ratio = (part, whole) => (whole ? (part / whole) * 100 : 0);
+    const paid = snap.invoices.filter((i) => i.status === "paid").reduce((t, i) => t + i.amount, 0);
+    const open = snap.invoices.filter((i) => i.status === "pending" || i.status === "overdue").reduce((t, i) => t + i.amount, 0);
+    const nets = snap.cashFlowData.map((q) => q.net);
+    const trends = nets.slice(0, -1).filter((n) => n).map((n) => ratio(nets[nets.length - 1] - n, Math.abs(n)));
+    const recent = snap.quarterlyRevenue.slice(-4);
+    const rates = recent.slice(1).map((q, i) => (q.revenue - recent[i].revenue) / recent[i].revenue);
+    const mean = rates.length ? rates.reduce((t, r) => t + r, 0) / rates.length : 0;
+    const volatility = rates.length > 1 ? Math.sqrt(rates.reduce((t, r) => t + (r - mean) ** 2, 0) / rates.length) : 0.1;
+    const trailing = recent.reduce((t, q) => t + q.revenue, 0);
+    const outlookChanges = [];
+    let projected = recent.length ? recent[recent.length - 1].revenue : 0;
+    let total = 0;
+    for (let q = 1; q <= 8; q++) {
+      projected = Math.trunc(projected * (1 + mean));
+      total += projected;
+      outlookChanges.push(ratio(total - trailing, trailing));
+    }
+    return [
+      [ratio(snap.totals.netProfit, snap.totals.revenue)],
+      [ratio(paid, paid + open)],
+      trends,
+      [mean * 100, volatility * 100],
+      outlookChanges,
+      snap.budgetVsActual.map((b) => ratio(b.variance, b.budget)),
+    ];
+  };
+
   // The percentages and the counts each noun may take. Percentages come from
   // percent-typed fields only (names with pct, percent, rate, share, ratio, margin,
   // change or growth) and from the shares the aggregate tools return; counts come
@@ -222,11 +256,14 @@
     const overdue = snap.invoices.filter((i) => i.status === "overdue");
     const percents = [
       ...snap.kpis.map((k) => k.change), ...snap.expenseBreakdown.map((e) => e.percentage), snap.arAging.collectionRate * 100,
-      ...bodies.flatMap((b) => keyed(b)).filter(([k]) => PCT_KEY.test(k)).flatMap(([k, v]) => (/rate|ratio/i.test(k) && Math.abs(v) <= 1 ? [v, v * 100] : [v])),
+      ...bodies.flatMap((b) => keyed(b)).filter(([k]) => PCT_KEY.test(k)).flatMap(([k, v]) => (Math.abs(v) <= 1 ? [v, v * 100] : [v])),
       // The shares get_headcount_and_payroll and get_receivables_by_client return.
       ...shares(sums(active, "department", (e) => e.salary), total(active, (e) => e.salary)),
       ...shares([total(overdue)], total(open)),
+      ...derivedPercents(snap).flat(),
     ].map(Math.abs);
+    // The tool texts print some of these rounded to a whole number.
+    const wholePercents = derivedPercents(snap).flat().map((v) => Math.round(Math.abs(v)));
     const KEYS = ["status", "department", "category", "client", "supplier", "location"];
     const tally = (rows) => {
       const out = [rows.length];
@@ -259,7 +296,7 @@
       invoices: named(snap.invoices), bills: named(snap.bills), employees: named(snap.employees),
       clients: named(snap.invoices, "client"), customers: named(snap.invoices, "client"), suppliers: named(snap.bills, "supplier"),
     };
-    return { percents, counts, adjectives };
+    return { percents, wholePercents, counts, adjectives };
   };
 
   // The percentages and counts of a text that nothing explains. `typed` is what the
@@ -270,7 +307,7 @@
     const typedNumbers = (typed.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
     const fields = figureFields(snap, bodies);
     return [
-      ...percentsIn(text).filter((p) => !typedNumbers.includes(p.value) && !fields.percents.some((v) => Math.abs(p.value - v) <= 0.05 + 1e-9)).map((p) => p.text),
+      ...percentsIn(text).filter((p) => !typedNumbers.includes(p.value) && !fields.percents.some((v) => Math.abs(p.value - v) <= 0.05 + 1e-9) && !(p.decimals === 0 && fields.wholePercents.includes(p.value))).map((p) => p.text),
       ...countsIn(text)
         .filter((c) => {
           if (typedNumbers.includes(c.value) || extraCounts.includes(c.value)) return false;
