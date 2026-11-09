@@ -22,6 +22,11 @@ CORRECTION = (
     "Quote only figures returned by tools, exactly, or say you don't have this data."
 )
 
+DASHBOARD_CORRECTION = (
+    "The dashboard widgets already show every figure. Rewrite your reply without any "
+    "amount, percentage or count (you wrote: {raws}): name what the dashboard shows."
+)
+
 _SCALES = {
     "k": 1e3,
     "thousand": 1e3,

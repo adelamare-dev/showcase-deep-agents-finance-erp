@@ -123,3 +123,98 @@ def test_the_retry_budget_resets_on_a_new_question():
     )
     assert second["messages"][-1].content == "Cash is $1,092,000."
     assert len(model.calls) == 4
+
+
+@tool
+def update_dashboard(widgets: list) -> str:
+    """Place widgets."""
+    return '{"updated": true, "count": 1, "note": "cash 1092000"}'
+
+
+def run_dashboard(replies: list[AIMessage], question: str = "Build a dashboard", snapshot=SNAPSHOT):
+    model = ScriptedReplies(replies=replies)
+    agent = create_agent(
+        model,
+        tools=[get_balance, update_dashboard],
+        middleware=[FigureGuardMiddleware(snapshot=lambda: snapshot)],
+    )
+    result = asyncio.run(agent.ainvoke({"messages": [HumanMessage(question)]}))
+    return model, result["messages"]
+
+
+def _dashboard_call() -> AIMessage:
+    return AIMessage(
+        "", tool_calls=[{"id": "dash1", "name": "update_dashboard", "args": {"widgets": []}}]
+    )
+
+
+def test_a_backed_figure_after_the_dashboard_is_retried_with_the_dashboard_correction():
+    model, messages = run_dashboard(
+        [_dashboard_call(), AIMessage("Cash is $1,092,000."), AIMessage("The dashboard shows cash.")]
+    )
+    assert len(model.calls) == 3
+    correction = model.calls[2][-1]
+    assert "widgets already show every figure" in correction.content
+    assert "$1,092,000" in correction.content
+    assert messages[-1].content == "The dashboard shows cash."
+    assert all("$1,092,000" not in str(m.content) for m in messages if isinstance(m, AIMessage))
+    assert not any(isinstance(m, HumanMessage) and "widgets already" in str(m.content) for m in messages)
+
+
+def test_a_figure_after_the_dashboard_that_survives_the_retry_is_marked():
+    model, messages = run_dashboard(
+        [_dashboard_call(), AIMessage("Cash is $1,092,000."), AIMessage("Cash is $1,092,000.")]
+    )
+    assert len(model.calls) == 3
+    assert messages[-1].content == "Cash is ⟦unverified:$1,092,000⟧."
+    assert [type(m).__name__ for m in messages][-1] == "AIMessage"
+    assert not any(isinstance(m, HumanMessage) and "widgets already" in str(m.content) for m in messages)
+
+
+def test_a_dashboard_closing_text_without_figures_passes():
+    model, messages = run_dashboard([_dashboard_call(), AIMessage("The dashboard shows cash and bills.")])
+    assert len(model.calls) == 2
+    assert messages[-1].content == "The dashboard shows cash and bills."
+
+
+def test_a_figure_before_the_dashboard_call_keeps_the_usual_rule():
+    first = AIMessage(
+        "Cash is $1,092,000.",
+        tool_calls=[{"id": "dash1", "name": "update_dashboard", "args": {"widgets": []}}],
+    )
+    model, messages = run_dashboard([first, AIMessage("Done.")], snapshot={})
+    # The text sits in the same message as the call: it is not after the call.
+    # $1,092,000 is not backed (no snapshot, no tool text yet): the usual retry runs.
+    assert "figures not returned" in model.calls[1][-1].content
+
+
+def test_a_figure_in_tool_texts_before_the_dashboard_is_still_admitted_in_earlier_text():
+    balance = AIMessage(
+        "Cash is $1,092,000.", tool_calls=[{"id": "c1", "name": "get_balance", "args": {}}]
+    )
+    model, messages = run_dashboard([balance, _dashboard_call(), AIMessage("Done.")], snapshot={})
+    # Text written before the dashboard call: the 1,092,000 of the tool is not
+    # known yet, so the first message is retried under the usual rule.
+    assert "figures not returned" in model.calls[1][-1].content
+
+
+def test_a_turn_without_the_dashboard_call_is_unchanged():
+    call = AIMessage("", tool_calls=[{"id": "call1", "name": "get_balance", "args": {}}])
+    model, messages = run_dashboard([call, AIMessage("Cash is $1,092,000.")], snapshot={})
+    assert len(model.calls) == 2
+    assert messages[-1].content == "Cash is $1,092,000."
+
+
+def test_a_figure_the_user_typed_is_admitted_in_the_dashboard_closing_text():
+    model, messages = run_dashboard(
+        [_dashboard_call(), AIMessage("Built with 12% growth.")], "Dashboard with 12% growth"
+    )
+    assert len(model.calls) == 2
+    assert messages[-1].content == "Built with 12% growth."
+
+
+def test_the_rules_fallback_reply_carries_no_figure():
+    from figure_guard import extract_figures
+    from reference_fallback import FALLBACK_REPLY
+
+    assert extract_figures(FALLBACK_REPLY) == []

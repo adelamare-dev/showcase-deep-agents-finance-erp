@@ -29,7 +29,8 @@ from langchain_core.messages import (
     ToolMessage,
 )
 
-from figure_guard import CORRECTION, allowed_values, mark, unverified
+from figure_guard import CORRECTION, DASHBOARD_CORRECTION, allowed_values, mark, unverified
+from frontend_tools import update_dashboard
 
 CORRECTION_ID_PREFIX = "figure-guard-correction-"
 
@@ -61,6 +62,13 @@ def _marked_content(content: Any, figures: list) -> Any:
         else part
         for part in content
     ]
+
+
+def _called_dashboard(messages: list[AnyMessage]) -> bool:
+    return any(
+        isinstance(m, AIMessage) and any(c["name"] == update_dashboard.name for c in m.tool_calls)
+        for m in messages
+    )
 
 
 def _default_snapshot() -> dict:
@@ -109,7 +117,13 @@ class FigureGuardMiddleware(AgentMiddleware):
             _text_of(m.content) for m in turn if isinstance(m, ToolMessage)
         ]
         user_text = _text_of(messages[start].content) if messages else ""
-        allowed = allowed_values(tool_texts, self._snapshot(), user_text)
+        # After update_dashboard the widgets carry the figures: any figure in the
+        # closing text is unverified, whatever the tools returned.
+        closing = _called_dashboard(turn[:-1])
+        if closing:
+            allowed = allowed_values([], {}, user_text)
+        else:
+            allowed = allowed_values(tool_texts, self._snapshot(), user_text)
         bad = unverified(text, allowed)
 
         if not bad:
@@ -121,7 +135,7 @@ class FigureGuardMiddleware(AgentMiddleware):
                 "messages": [
                     ai.model_copy(update={"tool_calls": [], "invalid_tool_calls": []}),
                     HumanMessage(
-                        content=CORRECTION.format(raws=raws),
+                        content=(DASHBOARD_CORRECTION if closing else CORRECTION).format(raws=raws),
                         id=f"{CORRECTION_ID_PREFIX}{uuid.uuid4().hex}",
                     ),
                 ],
