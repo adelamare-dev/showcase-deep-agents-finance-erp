@@ -48,3 +48,16 @@ def test_mark_is_stable_on_a_marked_text():
 
 def test_correction_names_the_figures():
     assert "$43,000, 12%" in CORRECTION.format(raws="$43,000, 12%")
+
+
+def test_corrections_ask_for_exact_figures_and_a_reply_that_reads_as_the_first():
+    from figure_guard import DASHBOARD_CORRECTION
+
+    for text in (CORRECTION, DASHBOARD_CORRECTION):
+        low = text.format(raws="$1").lower()
+        assert "$1" in low
+        assert "as if it were the first" in low
+        assert "apolog" in low
+        assert "this check" in low
+    assert "exactly as a tool returned" in CORRECTION.lower()
+    assert "no rounding of your own" in CORRECTION.lower()

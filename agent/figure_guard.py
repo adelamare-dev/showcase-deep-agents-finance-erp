@@ -18,13 +18,17 @@ MARK_OPEN = "⟦unverified:"
 MARK_CLOSE = "⟧"
 
 CORRECTION = (
-    "Your reply cites figures not returned by this turn's tools: {raws}. "
-    "Quote only figures returned by tools, exactly, or say you don't have this data."
+    "The figures {raws} are not as the tools returned them. Write each figure exactly as a "
+    "tool returned it, with no rounding of your own, or leave it out (or say the data is "
+    "not available). Write the reply for the user as if it were the first one: do not "
+    "mention this check, and do not apologise or acknowledge a correction."
 )
 
 DASHBOARD_CORRECTION = (
-    "The dashboard widgets already show every figure. Rewrite your reply without any "
-    "amount, percentage or count (you wrote: {raws}): name what the dashboard shows."
+    "The dashboard widgets already show every figure, so the figures {raws} do not belong "
+    "in your reply: leave out every amount, percentage and count, and name what the "
+    "dashboard shows. Write the reply for the user as if it were the first one: do not "
+    "mention this check, and do not apologise or acknowledge a correction."
 )
 
 _SCALES = {
