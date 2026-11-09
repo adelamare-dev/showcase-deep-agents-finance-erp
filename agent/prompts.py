@@ -10,6 +10,7 @@ _DASHBOARD_CALLS_SEQUENTIAL = (
     "was asked), then ONE do_projections call when the request includes a "
     "forecast or projection, then ONE update_dashboard call. Never call "
     "do_research or do_projections twice for the same dashboard: each call is slow."
+    " After update_dashboard, the closing sentence states no figure (no amount, percentage or count, no sum of your own): the widgets carry them, so name what the dashboard shows."
 )
 _DASHBOARD_CALLS_PARALLEL = (
     "call do_research and do_projections together in ONE message, then ONE "
@@ -19,6 +20,7 @@ _DASHBOARD_CALLS_PARALLEL = (
     "when the request includes a forecast or projection, and do_research alone "
     "otherwise. Never call do_research or do_projections twice for the same "
     "dashboard: each call is slow."
+    " After update_dashboard, the closing sentence states no figure (no amount, percentage or count, no sum of your own): the widgets carry them, so name what the dashboard shows."
 )
 
 

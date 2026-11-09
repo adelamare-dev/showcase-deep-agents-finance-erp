@@ -181,3 +181,8 @@ def test_prompt_routes_what_if_to_a_card():
 
 def test_inventory_research_gives_the_skus_a_reorder_needs():
     assert "sku, name, quantity, reorderLevel and status" in RESEARCH_AGENT_PROMPT
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_dashboard_closing_sentence_states_no_figure(parallel):
+    assert "the closing sentence states no figure" in _dashboard_rule(parallel)
