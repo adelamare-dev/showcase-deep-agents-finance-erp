@@ -112,10 +112,8 @@ def _numbers_in(text: str) -> set[float]:
     values: set[float] = set()
     for m in _ANY_NUMBER_RE.finditer(text):
         token = m.group(0)
+        # "1,050,000" is one number: its comma groups are no numbers of their own.
         values.add(_to_float(token))
-        # "[5,123]" is a list of two numbers as often as it is 5,123.
-        if "," in token:
-            values.update(_to_float(part) for part in token.split(","))
     return values
 
 

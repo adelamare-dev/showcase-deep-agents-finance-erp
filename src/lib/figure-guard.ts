@@ -85,9 +85,8 @@ export function extractFigures(text: string): Figure[] {
 function numbersIn(text: string): number[] {
   const values: number[] = [];
   for (const m of text.matchAll(new RegExp(ANY_NUMBER, "g"))) {
+    // "1,050,000" is one number: its comma groups are no numbers of their own.
     values.push(toFloat(m[0]));
-    // "[5,123]" is a list of two numbers as often as it is 5,123.
-    if (m[0].includes(",")) values.push(...m[0].split(",").map(toFloat));
   }
   return values;
 }
