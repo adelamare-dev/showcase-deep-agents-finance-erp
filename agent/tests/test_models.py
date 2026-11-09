@@ -29,7 +29,7 @@ def test_subagent_client_uses_the_subagent_model(monkeypatch, model):
 
 
 def test_the_shipped_subagent_model_is_the_measured_one():
-    assert models.SUBAGENT_MODEL == "ministral-14b-2512"
+    assert models.SUBAGENT_MODEL == "ministral-8b-2512"
 
 
 def test_clients_make_a_single_bounded_attempt():
