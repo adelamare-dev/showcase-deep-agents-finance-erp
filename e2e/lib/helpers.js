@@ -262,8 +262,8 @@
       ...shares([total(overdue)], total(open)),
       ...derivedPercents(snap).flat(),
     ].map(Math.abs);
-    // The tool texts print some of these rounded to a whole number.
-    const wholePercents = derivedPercents(snap).flat().map((v) => Math.round(Math.abs(v)));
+    // Only the collection rate and the cash-flow trend are printed as whole numbers.
+    const wholePercents = derivedPercents(snap).slice(1, 3).flat().map((v) => Math.round(Math.abs(v)));
     const KEYS = ["status", "department", "category", "client", "supplier", "location"];
     const tally = (rows) => {
       const out = [rows.length];

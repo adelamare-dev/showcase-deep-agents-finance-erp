@@ -12,7 +12,7 @@ const snap = {
   totals: { revenue: 800_000, netProfit: 123_456 },
   kpis: [],
   expenseBreakdown: [],
-  arAging: { collectionRate: 0.61 },
+  arAging: { collectionRate: 0.5 },
   quarterlyRevenue: quarters.map((revenue) => ({ revenue })),
   cashFlowData: nets.map((net) => ({ net })),
   budgetVsActual: [{ category: "Rent", budget: 30_000, actual: 33_300, variance: -3_300 }],
@@ -39,6 +39,12 @@ test("offline.live-checks collection rate, whole number", () => {
   const rate = (61_400 / (61_400 + 39_600)) * 100;
   expect(bad(pct(Math.round(rate)))).toEqual([]);
   expect(bad(pct(Number(rate.toFixed(1))))).toEqual([]);
+});
+test("offline.live-checks a whole percent that only rounds another ratio is rejected", () => {
+  const margin = pct(Math.round((123_456 / 800_000) * 100));
+  expect(bad(margin)).toEqual([margin]);
+  expect(bad(pct(Math.round(mean * 100)))).toEqual([pct(Math.round(mean * 100))]);
+  expect(bad("61.0%")).not.toEqual([]);
 });
 test("offline.live-checks cash-flow trend, whole number", () => {
   const trend = ((nets[3] - nets[1]) / Math.abs(nets[1])) * 100;
