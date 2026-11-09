@@ -1,6 +1,6 @@
 [project]
 name = "finance-erp-agent"
-version = "0.5.0a5"
+version = "0.5.0a6"
 description = "Finance ERP deep agent powered by LangGraph and CopilotKit"
 requires-python = ">=3.12,<3.14"
 dependencies = [
