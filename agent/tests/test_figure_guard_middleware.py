@@ -221,3 +221,50 @@ def test_the_rules_fallback_reply_carries_no_figure():
     from reference_fallback import FALLBACK_REPLY
 
     assert extract_figures(FALLBACK_REPLY) == []
+
+
+def run_subagent(final_text: str, sources: list[str]):
+    @tool(response_format="content_and_artifact")
+    def do_research() -> tuple[str, dict]:
+        """Subagent stand-in."""
+        return final_text, {"sources": sources}
+
+    replies = [
+        AIMessage("", tool_calls=[{"id": "s1", "name": "do_research", "args": {}}]),
+        AIMessage("Your cash grows by 50% over the next year."),
+    ]
+    model = ScriptedReplies(replies=replies)
+    agent = create_agent(
+        model,
+        tools=[do_research],
+        middleware=[FigureGuardMiddleware(snapshot=lambda: {})],
+    )
+    result = asyncio.run(agent.ainvoke({"messages": [HumanMessage("Outlook?")]}))
+    return model, result["messages"]
+
+
+def test_a_figure_only_the_subagent_prose_holds_is_retried_then_marked():
+    model, messages = run_subagent("Growth is 50% next year.", ['{"growth_pct": 49.15}'])
+    assert "figures not returned" in model.calls[-1][-1].content
+    assert "⟦unverified:50%⟧" in messages[-1].content
+
+
+def test_a_figure_in_an_inner_tool_text_is_admitted():
+    model, messages = run_subagent("Growth is about half.", ['{"growth_pct": 50}'])
+    assert len(model.calls) == 2
+    assert messages[-1].content == "Your cash grows by 50% over the next year."
+
+
+def test_a_tool_message_without_an_artifact_keeps_its_content_as_a_source():
+    model = ScriptedReplies(
+        replies=[
+            AIMessage("", tool_calls=[{"id": "c1", "name": "get_balance", "args": {}}]),
+            AIMessage("Cash is $1,092,000."),
+        ]
+    )
+    agent = create_agent(
+        model, tools=[get_balance], middleware=[FigureGuardMiddleware(snapshot=lambda: {})]
+    )
+    result = asyncio.run(agent.ainvoke({"messages": [HumanMessage("Cash?")]}))
+    assert result["messages"][-1].content == "Cash is $1,092,000."
+    assert len(model.calls) == 2

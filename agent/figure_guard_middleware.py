@@ -53,6 +53,18 @@ def _text_of(content: Any) -> str:
     return ""
 
 
+def _source_texts(message: ToolMessage) -> list[str]:
+    """The texts a tool message backs figures with.
+
+    A subagent's reply is its own prose, so it carries the texts of the data
+    tools it called as an artifact: those back the figures, not the prose.
+    """
+    artifact = message.artifact
+    if isinstance(artifact, dict) and isinstance(artifact.get("sources"), list):
+        return [s for s in artifact["sources"] if isinstance(s, str)]
+    return [_text_of(message.content)]
+
+
 def _is_correction(message: AnyMessage) -> bool:
     return isinstance(message, HumanMessage) and (message.id or "").startswith(
         CORRECTION_ID_PREFIX
@@ -120,7 +132,7 @@ class FigureGuardMiddleware(AgentMiddleware):
             return {"messages": cleanup} if cleanup else None
 
         tool_texts = [
-            _text_of(m.content) for m in turn if isinstance(m, ToolMessage)
+            text for m in turn if isinstance(m, ToolMessage) for text in _source_texts(m)
         ]
         user_text = _text_of(messages[start].content) if messages else ""
         # After update_dashboard the widgets carry the figures: any figure in the

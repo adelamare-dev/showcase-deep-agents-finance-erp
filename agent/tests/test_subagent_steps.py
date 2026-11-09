@@ -131,3 +131,36 @@ def test_sends_are_awaited_when_the_subagent_thread_raises(monkeypatch, recwarn)
         )
     # The scheduled send ran to the end instead of being abandoned.
     assert delivered == ["query_invoices"]
+
+
+def _tool_message(monkeypatch, tool, subagent_model, name):
+    monkeypatch.setattr(
+        isolated_subagents, "subagent_chat_model", lambda: subagent_model
+    )
+    parent = create_agent(
+        model=ScriptedToolCaller(script=[(name, {"query": "q"})]),
+        tools=[tool],
+    )
+    out = asyncio.run(parent.ainvoke({"messages": [HumanMessage(content="hi")]}))
+    return next(m for m in out["messages"] if m.type == "tool")
+
+
+@pytest.mark.parametrize(
+    "tool, name, inner",
+    [
+        (isolated_subagents.do_research, "do_research", "query_invoices"),
+        (isolated_subagents.do_projections, "do_projections", "compute_cash_flow_forecast"),
+    ],
+)
+def test_the_result_keeps_the_text_and_carries_the_inner_tool_texts(
+    monkeypatch, tool, name, inner
+):
+    model = ScriptedToolCaller(script=[(inner, {})])
+    message = _tool_message(monkeypatch, tool, model, name)
+    # The content is the subagent's closing text (empty: the scripted model ends
+    # with ""); the artifact holds what its own tool returned, which is the
+    # tool message the subagent's model received on its second call.
+    assert message.content == ""
+    seen = next(m for m in model.calls[1] if m.type == "tool")
+    assert message.artifact == {"sources": [seen.content]}
+    assert message.artifact["sources"][0]

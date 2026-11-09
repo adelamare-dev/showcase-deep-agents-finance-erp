@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated, Callable
 
 from langchain_core.callbacks.manager import adispatch_custom_event
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolCallId, tool
 
@@ -44,8 +44,12 @@ def _stream_subagent(
     system_prompt: str,
     agent_tools: list,
     on_tool_call: Callable[[dict], None],
-) -> str:
-    """Create and run a deep agent in the current (isolated) thread."""
+) -> tuple[str, list[str]]:
+    """Create and run a deep agent in the current (isolated) thread.
+
+    Returns the subagent's final text and the text each of its own data tools
+    returned: the figures it can legitimately quote.
+    """
     from deepagents import create_deep_agent
 
     agent = create_deep_agent(
@@ -71,7 +75,25 @@ def _stream_subagent(
             for message in messages:
                 for call in getattr(message, "tool_calls", None) or []:
                     on_tool_call(call)
-    return final_state["messages"][-1].content
+    own_tools = {getattr(t, "name", None) or t.__name__ for t in agent_tools}
+    sources = [
+        _content_text(m.content)
+        for m in final_state["messages"]
+        if isinstance(m, ToolMessage) and m.name in own_tools
+    ]
+    return final_state["messages"][-1].content, sources
+
+
+def _content_text(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            part if isinstance(part, str) else part.get("text", "")
+            for part in content
+            if isinstance(part, str) or (isinstance(part, dict) and part.get("type") == "text")
+        )
+    return ""
 
 
 async def _emit_step(call: dict, config: RunnableConfig, tool_call_id: str) -> None:
@@ -90,7 +112,7 @@ async def _run_subagent(
     agent_tools: list,
     config: RunnableConfig,
     tool_call_id: str,
-) -> str:
+) -> tuple[str, list[str]]:
     """Run the subagent in its own thread and report each of its tool calls."""
     loop = asyncio.get_running_loop()
     sends: list = []
@@ -127,12 +149,12 @@ async def _run_subagent(
     return result
 
 
-@tool
+@tool(response_format="content_and_artifact")
 async def do_research(
     query: str,
     config: RunnableConfig,
     tool_call_id: Annotated[str, InjectedToolCallId],
-) -> str:
+) -> tuple[str, dict]:
     """Research the ERP database — invoices, accounts, transactions, inventory,
     employees, financial reports, cash flow analysis, and revenue forecasts.
 
@@ -142,19 +164,19 @@ async def do_research(
         query: The research question or data request.
     """
     print(f"[TOOL] do_research: query='{query}' (thread-isolated)")
-    result = await _run_subagent(
+    result, sources = await _run_subagent(
         query, RESEARCH_AGENT_PROMPT, research_tools, config, tool_call_id
     )
     print(f"[TOOL] do_research: completed ({len(result)} chars)")
-    return result
+    return result, {"sources": sources}
 
 
-@tool
+@tool(response_format="content_and_artifact")
 async def do_projections(
     query: str,
     config: RunnableConfig,
     tool_call_id: Annotated[str, InjectedToolCallId],
-) -> str:
+) -> tuple[str, dict]:
     """Compute financial projections — revenue forecasts, cash flow projections,
     scenario analysis, and trend analysis from historical data.
 
@@ -165,8 +187,8 @@ async def do_projections(
         query: The projection or forecast request.
     """
     print(f"[TOOL] do_projections: query='{query}' (thread-isolated)")
-    result = await _run_subagent(
+    result, sources = await _run_subagent(
         query, PROJECTIONS_AGENT_PROMPT, projections_tools, config, tool_call_id
     )
     print(f"[TOOL] do_projections: completed ({len(result)} chars)")
-    return result
+    return result, {"sources": sources}
