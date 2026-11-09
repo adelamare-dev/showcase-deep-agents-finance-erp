@@ -147,6 +147,8 @@
       ...snap.bills.map((b) => b.amount),
       ...leaves(snap.cashFlowData),
       ...leaves(cashPosition),
+      // The projections of the forecast tools (see projectedMoney).
+      ...projectedMoney(snap),
       ...catalogMoney,
     ].map(Math.abs);
   };
@@ -188,6 +190,65 @@
       .map((i) => ({ sku: i.sku, quantity: 2 * i.reorderLevel - i.quantity }))
       .filter((line) => line.quantity > 0)
       .sort((a, b) => (a.sku < b.sku ? -1 : a.sku > b.sku ? 1 : 0));
+
+  // The projections the forecast tools print (compute_revenue_forecast and
+  // compute_cash_flow_forecast), mirrored from the Python calculations in
+  // agent/erp_datasets.py with the same arithmetic: Python's round() goes half to
+  // even, int() truncates, growth rates skip a zero base and divide by its
+  // absolute value, a recent average covers at most four rates. Horizon 1 to 8.
+  const pyRound = (x) => {
+    const floor = Math.floor(x);
+    return x - floor === 0.5 ? (floor % 2 === 0 ? floor : floor + 1) : Math.round(x);
+  };
+  const growthRates = (values) => values.slice(1).flatMap((v, i) => (values[i] !== 0 ? [(v - values[i]) / Math.abs(values[i])] : []));
+  const recentAverage = (rates) => (rates.length ? rates.slice(-4).reduce((t, r) => t + r, 0) / Math.min(4, rates.length) : 0);
+  const projectForward = (last, growth, periods) => {
+    let current = last;
+    return Array.from({ length: periods }, () => pyRound((current = current * (1 + growth))));
+  };
+  // The rows of project_revenue: { revenue, expenses, profit } per projected quarter.
+  const projectRevenue = (snap, quarters = 4, method = "linear") => {
+    const data = snap.quarterlyRevenue;
+    const horizon = Math.max(1, Math.min(quarters, 8));
+    if (method === "seasonal" && data.length >= 8) {
+      return Array.from({ length: horizon }, (_, i) => {
+        const hist = 4 + (i % 4);
+        const yoy = (data[hist].revenue - data[hist - 4].revenue) / data[hist - 4].revenue;
+        const revenue = Math.trunc(data[hist].revenue * (1 + yoy));
+        const expenses = Math.trunc(data[hist].expenses * (1 + yoy * 0.7));
+        return { revenue, expenses, profit: revenue - expenses };
+      });
+    }
+    const revenues = data.map((q) => q.revenue);
+    const expenses = data.map((q) => q.expenses);
+    const rev = projectForward(revenues[revenues.length - 1], recentAverage(growthRates(revenues)), horizon);
+    const exp = projectForward(expenses[expenses.length - 1], recentAverage(growthRates(expenses)), horizon);
+    return rev.map((revenue, i) => ({ revenue, expenses: exp[i], profit: revenue - exp[i] }));
+  };
+  // The rows of project_cash_flow: operating, investing, financing, net and the
+  // projected cash balance per projected quarter.
+  const projectCashFlow = (snap, quarters = 4) => {
+    const flows = snap.cashFlowData;
+    const horizon = Math.max(1, Math.min(quarters, 8));
+    const last4 = (key) => flows.slice(-4).map((q) => q[key]);
+    const avgInv = last4("investing").reduce((t, v) => t + v, 0) / 4;
+    const avgFin = last4("financing").reduce((t, v) => t + v, 0) / 4;
+    const operating = flows.map((q) => q.operating);
+    const projected = projectForward(operating[operating.length - 1], recentAverage(growthRates(operating)), horizon);
+    let balance = snap.totals.cash;
+    return projected.map((op, i) => {
+      const investing = pyRound(avgInv * (1 + 0.05 * i));
+      const financing = pyRound(avgFin);
+      const net = op + investing + financing;
+      balance += net;
+      return { operating: op, investing, financing, net, balance };
+    });
+  };
+  // Every money value those tools can print, for horizons 1 to 8 and both methods.
+  const projectedMoney = (snap) => [
+    ...["linear", "seasonal"].flatMap((method) => projectRevenue(snap, 8, method).flatMap((r) => [r.revenue, r.expenses, r.profit])),
+    ...projectCashFlow(snap, 8).flatMap((r) => [r.operating, r.investing, r.financing, r.net, r.balance]),
+  ];
 
   // ---- Percentages and counts in a reply -------------------------------------
   // Checked from the data, on purpose not from the figure guard's own rule: a
@@ -583,7 +644,7 @@
     assert, assertEqual, expectVisible, byId,
     STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds, billsForApproval,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
-    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, itemsForRestock, percentsIn, countsIn, unexplainedFigures, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
+    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, itemsForRestock, projectRevenue, projectCashFlow, projectedMoney, percentsIn, countsIn, unexplainedFigures, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
   };
   return h;
 }

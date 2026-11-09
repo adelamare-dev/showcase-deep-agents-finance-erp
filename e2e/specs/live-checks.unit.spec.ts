@@ -4,6 +4,10 @@ import { readFileSync } from "node:fs";
 // The helpers are one expression that takes a page; the figure checks never use it.
 const helpers = new Function(`return (${readFileSync("e2e/lib/helpers.js", "utf8").trim().replace(/;+$/, "")}\n)`)()(null) as {
   unexplainedFigures: (text: string, snap: unknown, bodies?: unknown[], typed?: string, extra?: number[]) => string[];
+  projectRevenue: (snap: unknown, quarters?: number, method?: string) => { revenue: number; expenses: number; profit: number }[];
+  projectCashFlow: (snap: unknown, quarters?: number) => { operating: number; investing: number; financing: number; net: number; balance: number }[];
+  projectedMoney: (snap: unknown) => number[];
+  strangers: (text: string, fields: number[]) => string[];
 };
 
 const quarters = [100_000, 110_000, 125_000, 130_000];
@@ -74,4 +78,38 @@ test("offline.live-checks unrelated numbers stay rejected", () => {
   expect(bad("a 97% rate")).toEqual(["97%"]);
   expect(bad("7 overdue invoices")).toEqual(["7 overdue invoices"]);
   expect(bad("2 overdue invoices")).toEqual([]);
+});
+
+// Fixture for the projection mirrors. The expected rows were printed by the Python
+// calculations (project_revenue and project_cash_flow in agent/erp_datasets.py,
+// horizon 8) on this same fixture; they are not computed here.
+const REV = [410_000, 428_500, 455_250, 470_800, 492_300, 515_900, 538_400, 561_050];
+const EXP = [301_000, 309_400, 322_700, 331_900, 349_100, 362_800, 371_250, 389_600];
+const OP = [120_000, 131_500, 140_250, 152_000, 149_000, 163_800, 171_900, 180_400];
+const INV = [-30_000, -32_500, -28_000, -41_000, -35_500, -38_200, -36_000, -44_100];
+const FIN = [-12_000, -15_500, -9_000, -22_000, -14_000, -18_500, -16_000, -21_250];
+const projSnap = {
+  quarterlyRevenue: REV.map((revenue, i) => ({ revenue, expenses: EXP[i] })),
+  cashFlowData: OP.map((operating, i) => ({ operating, investing: INV[i], financing: FIN[i], net: operating + INV[i] + FIN[i] })),
+  totals: { cash: 905_000 },
+};
+const pyLinear = [[586197, 405553, 180644], [612472, 422159, 190313], [639924, 439444, 200480], [668606, 457438, 211168], [698575, 476168, 222407], [729886, 495666, 234220], [762601, 515961, 246640], [796782, 537088, 259694]];
+const pySeasonal = [[591120, 398152, 192968], [621126, 414599, 206527], [636737, 418715, 218022], [668600, 441879, 226721], [591120, 398152, 192968], [621126, 414599, 206527], [636737, 418715, 218022], [668600, 441879, 226721]];
+const pyCash = [[188450, -38450, -17438, 132562, 1037562], [196859, -40372, -17438, 139049, 1176611], [205643, -42295, -17438, 145910, 1322521], [214820, -44218, -17438, 153164, 1475685], [224405, -46140, -17438, 160827, 1636512], [234419, -48062, -17438, 168919, 1805431], [244879, -49985, -17438, 177456, 1982887], [255806, -51908, -17438, 186460, 2169347]];
+const rows = (r: { revenue: number; expenses: number; profit: number }[]) => r.map((p) => [p.revenue, p.expenses, p.profit]);
+
+test("offline.live-checks linear revenue projection equals the Python", () => {
+  expect(rows(helpers.projectRevenue(projSnap, 8, "linear"))).toEqual(pyLinear);
+  expect(rows(helpers.projectRevenue(projSnap, 3, "linear"))).toEqual(pyLinear.slice(0, 3));
+});
+test("offline.live-checks seasonal revenue projection equals the Python", () => {
+  expect(rows(helpers.projectRevenue(projSnap, 8, "seasonal"))).toEqual(pySeasonal);
+});
+test("offline.live-checks cash-flow projection equals the Python", () => {
+  expect(helpers.projectCashFlow(projSnap, 8).map((p) => [p.operating, p.investing, p.financing, p.net, p.balance])).toEqual(pyCash);
+});
+test("offline.live-checks a projected amount is admitted, a wrong one is not", () => {
+  const fields = helpers.projectedMoney(projSnap);
+  expect(helpers.strangers("Revenue reaches $586,197 and profit $180,644.", fields)).toEqual([]);
+  expect(helpers.strangers("Revenue reaches $586,198.", fields)).toEqual(["$586,198"]);
 });
