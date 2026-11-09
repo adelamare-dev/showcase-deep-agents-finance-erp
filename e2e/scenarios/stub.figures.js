@@ -131,4 +131,24 @@ async (page, h) => {
     h.assert(text.includes(h.formatUsd(cashBefore)), "the old reply still states the old cash: " + text);
     h.assertEqual(await byId("unverified-figure").count(), 0, "the old reply is still not badged");
   });
+
+  await h.test("A figure in the closing text after a dashboard is retried and never shown", async () => {
+    const snap = await fresh();
+    const cash = h.formatUsd(snap.totals.cash);
+    await h.stubScript([
+      { toolCall: { name: "update_dashboard", args: { replace: true, widgets: [{ type: "metric_cards", config: { metrics: ["Cash"] } }] } } },
+      { text: `The dashboard is ready, cash is ${cash}.` },
+      { text: "The dashboard is ready and shows the cash position." },
+    ]);
+    await watchChat(cash);
+    await h.sendPrompt("Build me a cash dashboard");
+    await h.expectVisible(byId("copilot-assistant-message"), 30000);
+    await h.waitForRunEnd();
+    const text = await h.chatText();
+    h.assert(text.includes("shows the cash position"), "the final reply is the one without figures: " + text);
+    h.assert(!(await seen()), "the figure of the first closing text was never in the chat");
+    h.assert(!text.includes(cash), "the figure is not in the chat now");
+    h.assertEqual(await byId("unverified-figure").count(), 0, "no badge");
+    h.assertEqual((await h.stubRequests()).length, 3, "the model was asked three times");
+  });
 }
