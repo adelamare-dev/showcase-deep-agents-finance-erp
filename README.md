@@ -1,6 +1,6 @@
 # Deep Agents Finance ERP
 
-A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. Cards and charts show only ERP figures; the figures it writes in the chat text come from the books or from tool results (a subagent's written text counts as a tool result, so a figure a subagent invented and the orchestrator repeats is admitted), and one that cannot be matched is badged "unverified", and some free questions still fail (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
+A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The figures it writes in the chat text come from the books or from tool results (a subagent's figures are judged by its data tools' outputs, not by its own prose), and one that cannot be matched is badged "unverified", and some free questions still fail (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
 
 **Status.** A working base for a demo, not a finished one. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, then ask a follow-up question) has not passed five times in a row yet. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
 
@@ -11,7 +11,7 @@ A small finance ERP whose AI assistant orchestrates sub-agents you can watch, as
 - 7 frontend tools (6 UI + 1 human-in-the-loop approval), all registered with `useRenderTool`
 - 12 dashboard widget types with 4 pre-built templates (Executive Summary, Cash Flow Risk, Cost Control, Revenue Overview)
 - Dashboard gallery (`/dashboards`) for browsing, loading, saving, and deleting layouts (saved layouts live in the browser's `localStorage` under a versioned key; dashboards saved under an older version are ignored)
-- Multi-agent orchestration: orchestrator (with 3 exact-aggregate tools for one-figure questions) + research subagent (17 tools) + projections subagent (6 tools), with each subagent step listed live on its card
+- Multi-agent orchestration: orchestrator (with 3 exact-aggregate tools for one-figure questions) + research subagent (17 tools) + projections subagent (6 tools) that the orchestrator can call in one message, with each subagent step listed live on its card
 - Human-in-the-loop approval that really pays supplier bills and marks reorders as on order, with the change highlighted on screen. Approve Payments covers the unpaid bills due within the next 7 days and the overdue ones, the code picks them, and the decision stays in the thread as a receipt
 - After a payment, the cash card already in the chat keeps its first figures struck through beside the new ones
 - A what-if on revenue or cash (growth and quarters) is answered with a forecast card whose figures come from the catalog
@@ -107,43 +107,60 @@ See `e2e/README.md` for the details.
 
 ## Measured behaviour
 
-Models: `ministral-14b-2512` for the orchestrator and both subagents, dated ids only. The measurements below are labelled with their date and plan; those before 2026-11-08 ran on free mode, and the 2026-11-07 ones at its 2 requests per minute.
+Models: `ministral-14b-2512` for the orchestrator and both subagents, dated ids only; the orchestrator calls the research and projections subagents in one message. The measurements below are labelled with their date; those before 2026-11-08 ran on free mode, and the 2026-11-07 ones at its 2 requests per minute. Everything from 2026-11-09 ran on API pay-as-you-go, with no 429 in any pass.
 
-**Reference scenario** (`e2e/scenarios/live.reference.js`): a click on "Cash Flow Dashboard" must build the complete dashboard, with figures equal to the store, and the follow-up question must then be answered correctly. Result: **not proven, 0 of 5 consecutive passes.** The pass criterion is **60 s** from click to complete dashboard (the allowed fallback after reducing calls and trying a larger model, which this account could not use in free mode); **45 s** remains the target and is not reliably met.
+**Reference scenario** (`e2e/scenarios/live.reference.js`): a click on "Cash Flow Dashboard" must build the complete dashboard, with figures equal to the store, and the follow-up question must then be answered correctly. Result: **not proven, 0 of 5 consecutive passes** (the series has not been run). The pass criterion is **60 s** from click to complete dashboard; **45 s** remains the target.
 
-Off-series live checks on 2026-11-06 (not counted), after the dashboard started to replace the default widgets with exactly the ones it needs (Cash and Accounts Payable cards, AR aging gauge, payable bills, cash flow forecast): the reference dashboard was complete in 12.8 to 14.4 s in 5 runs, and one full reference pass (dashboard, approval, follow-up) passed in 38.2 s. In 4 runs the model wrote an amount of its own in its closing text ("$58K", "$58,000", "$43,000"); the series would count those as wrong figures, and the figure guard, added since, marks such amounts and has not been measured live in a series.
+**Parallel subagents** (2026-11-09, `live.dashboard`, 10 valid runs per variant, no 429, every figure equal to the store). Both variants have the orchestrator call the two subagents in one message. With everything on `ministral-14b-2512`: dashboard in a median of 20.9 s (17.8 to 38.6 s), 7 model calls at the median (7 to 10). With the subagents on `ministral-8b-2512`: median 21.55 s (15.1 to 28.9 s), 8 model calls at the median (7 to 9). Both met the bar (at most 1 failure, median 45 s or less, none over 60 s, no wrong figure); the all-14b variant has the lower median and ships: the parallel call is on and every role uses `ministral-14b-2512`. The gap between medians (0.65 s) is within the noise of ten runs.
 
-Spaced probe on 2026-11-07, after the figure guard and the rules fallback (not counted in the series): free mode then answered `x-ratelimit-limit-req-minute=2` for `ministral-14b`, `8b` and `3b`, and a targeted live check lost every run to a 429 (code 1300). With 70 s between commands, 4 two-call questions passed: "Cash position and payables" in 19.0 s, "Which client owes us the most?" in 10.4 s, "Headcount and payroll" in 9.4 s and the what-if over 6 quarters in 14.9 s. The reference dashboard was built by the rules fallback in 8 s, equal to the store; the approval that followed was lost to a 429. The parallel-subagent variant (shipped off) could not be measured at this quota.
+**Suggestions and likely free questions** (`e2e/scenarios/live.questions.js`, 18 entries, 3 valid runs each on a fresh thread after a data reset, 2026-11-09). Figures on screen are compared with the store. Five full passes, each on the commit named, none with a 429:
 
-On 2026-11-08, on API pay-as-you-go, the supplier-payment approval (selected in code, with overdue bills included) and the reorder approval (lines selected in code) passed live: `live.approval` 3 of 3 cases in 2 runs on the final fixes, `live.agent` 2 of 2 on an earlier commit (before the reorder and unpaid-bills fixes, not re-run since), and the reorder question alone in 2 of 2 runs. `live.reference` passed 1 of 3 smoke runs: the model wrote sums of its own in the dashboard's closing text (for example the total of the four pending bills), which the figure guard marks as unverified. That is a known open defect, so the reference series is still 0 of 5.
+| Commit | Entries at 3 of 3 | Runs passed | Entries below 3 of 3 |
+| --- | --- | --- | --- |
+| `41b0900` | 16 of 18 | 51 of 54 | Cash Flow Dashboard (2), Cost Control Dashboard (1) |
+| `e5add81` | 17 of 18 | 53 of 54 | Cash Flow Chart (2) |
+| `6187546` | 16 of 18 | 52 of 54 | Cash Position (2), Budget (2) |
+| `8c636d3` | 17 of 18 | 53 of 54 | Budget (2) |
+| `d4da505` | 15 of 18 | 51 of 54 | Unpaid supplier bills (2), Biggest expense categories (2), Budget (2) |
 
-On 2026-11-03, across several prompt states: 21 live runs, 11 lost (9 to a 429, 1 to a read timeout, 1 that ended without a dashboard), 10 valid dashboards, all complete with figures equal to the store. Of the 10, 5 were within 45 s and the same 5 within 60 s; the time depends strongly on the model service's load, from 26 to 141 s. No run has yet passed from the dashboard through the follow-up question; in one run the follow-up said "$68,105 owed to suppliers" while the store held $11,050. Prompts were changed between runs, and each change reset the count.
+Two partial replays: `80e5ee1` ran entries 0 to 7 only (23 of 24 runs; Cost Control Dashboard 2 of 3), and `73ec40b` replayed Budget alone (3 of 3) on the same demo as `8c636d3`, after a fix to the check.
 
-**Suggestions and likely free questions** (`e2e/scenarios/live.questions.js`): each of the 18 entries run three times on 2026-11-04, on commit e1a735f, each on a fresh thread after a data reset, with no run lost to a 429. Figures on screen are compared with the store.
+The last full pass, on `d4da505`, per entry (passes out of 3):
 
 | Entry | Passes |
 | --- | --- |
-| Cash Flow Dashboard | 2 of 3 |
-| Cash position and liabilities and Cash Position Chart (both typed) | 3 of 3 each |
-| Overdue Invoices | 3 of 3 |
-| Cash Flow Chart | 3 of 3 |
-| Approve Payments | 0 of 3 |
-| Reorder Inventory (no longer offered) | 2 of 3 |
-| Cost Control Dashboard (no longer offered) | 2 of 3 |
-| Which supplier bills are still unpaid? | 3 of 3 |
-| Low stock | 3 of 3 |
-| Biggest expense categories | 3 of 3 |
-| Budget | 3 of 3 |
-| Receivables and overdue | 3 of 3 |
-| "What is our ESG score?" (answers "I don't have this data") | 3 of 3 |
-| Which client owes us the most? | 1 of 3 |
-| Cash position and payables | 2 of 3 |
-| What-if of 12% over 6 quarters | 1 of 3 |
-| Headcount and payroll | 1 of 3 |
+| Cash Flow Dashboard | 3 |
+| Cash Position | 3 |
+| Overdue Invoices | 3 |
+| Cash Flow Chart | 3 |
+| Approve Payments | 3 |
+| Reorder Inventory | 3 |
+| Cost Control Dashboard | 3 |
+| Cash Position Chart | 3 |
+| Which client owes us the most? | 3 |
+| Cash position and payables | 3 |
+| Which supplier bills are still unpaid? | 2 |
+| What-if over 6 quarters | 3 |
+| Headcount and payroll | 3 |
+| Low stock | 3 |
+| Biggest expense categories | 2 |
+| Budget | 2 |
+| Receivables and overdue | 3 |
+| "What is our ESG score?" (answers "I don't have this data") | 3 |
 
-These counts were measured on e1a735f, before the aggregate tools and the prompt rule routing one-figure questions to them were added, and before the scoped approval and the what-if route; they are due again. Since that run the dashboard's projection chart and the Approve Payments message have changed (the quarterly projection now goes on the cash flow forecast chart, and the message also asks for overdue bills), so the dashboard entries and Approve Payments are owed a new measurement. Entry 1 was measured typed and entry 6 clicked; at head, entry 1 clicks its chip and entry 6 types, with the same messages.
+The threshold (all 18 entries at 3 of 3 on one commit) is **not met**. The best full pass is 17 of 18. Failures seen, by class:
 
-Counts vary between replays: an earlier series on mixed versions gave other counts (for example Cash Position 0 of 3, then 3 of 3), so read these as one sample of three, not as a rate.
+- A closing text after a dashboard that cites figures: the guard now treats every figure written after `update_dashboard` as unverified, and the prompt bans figures in that sentence.
+- A subagent's rounded "50%" admitted by the guard: its figures are now judged by its data tools' outputs, not its prose.
+- A guard retry that ended in a model service error: the retry copy now drops streamed tool calls.
+- A model rounding badged by the guard ("$730,000", then the expense category amounts): still seen on the last pass.
+- Gaps in the live check itself on the forecast tools' values and growth percentages (Budget): the check now mirrors those calculations.
+- A themed dashboard wiped by a save and reset: it is now one replacing update.
+- The supplier-bills question answered by navigating to the invoices page without naming bills: still seen on the last pass.
+
+Counts vary between replays, so read each as one sample of three, not as a rate.
+
+Earlier, off-series checks: on 2026-11-08, on API pay-as-you-go, the supplier-payment approval (selected in code, with overdue bills included) and the reorder approval passed live (`live.approval` 3 of 3 cases in 2 runs on the final fixes); `live.reference` passed 1 of 3 smoke runs because the model wrote sums of its own in the dashboard's closing text, the defect the guard rule and the prompt rule above address. On 2026-11-07, in free mode at 2 requests per minute, the rules fallback built the reference dashboard in 8 s, equal to the store. On 2026-11-06 the reference dashboard was complete in 12.8 to 14.4 s in 5 runs.
 
 ## Security
 
@@ -157,13 +174,11 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 
 ## Known limits
 
-- **Approve Payments** (0 of 3, measured with the old message and the old tool, where the model chose the bill ids) listed the bills due this week and left off the one bill already overdue ($1,850). The code now selects the bills from a scope that includes overdue ones, but this has not been measured again. The total on the card is right and rejecting changes nothing.
-- **Cash Flow Dashboard** (2 of 3): in one run the model loaded a saved template instead of building the dashboard, which misses the Cash and Accounts Payable cards and the supplier bills.
-- **Removed suggestions.** "Cost Control Dashboard" (2 of 3: one comment quoted a figure the store does not hold) and "Reorder Inventory" (2 of 3: one item left off the card) are no longer offered on the first screen; both can still be typed.
-- **Not covered** (the model wrote a figure the store does not hold, or named the wrong record): which client owes the most (it picks a draft invoice), the cash and payables follow-up (once showed the overdue receivables as payables), a what-if over 6 quarters (rounded or truncated values), and headcount and payroll (sums of its own). The percentages the model writes in a comment are not checked and vary from run to run.
+- **Free questions are not all reliable.** No full pass of the 18 entries has had every entry at 3 of 3 (best 17 of 18; see Measured behaviour). The model still rounds an amount now and then ("$730,000") or answers a supplier-bills question by navigating without naming the bills; the figure guard badges a rounded amount as "unverified".
+- **The reference series is unproven.** No run has been measured from the dashboard to the follow-up question five times in a row.
 - **Free-mode capacity.** Free mode allows 2 requests per minute per `ministral` model (since 2026-11-07) and often answers a 429 "not enough capacity" that an automatic retry does not always cure, so a live run is lost to it; enable API pay-as-you-go (see "Get a Mistral key"). On pay-as-you-go a 429 is rare (none seen in the live checks of 2026-11-08): replay it after a few minutes. Only the "Cash Flow Dashboard" request has the rules fallback; other requests show the Retry notice.
 - **Figure-guard retries.** Each retry of a reply that cites an unmatched figure is one more model request; in free mode it can end on a 429 and the Retry banner.
-- **Parallel subagents** (`ORCHESTRATOR_PARALLEL_TOOL_CALLS` in `agent/models.py`) ship off; the parallel variant is not measured.
+- **Parallel subagents** (`ORCHESTRATOR_PARALLEL_TOOL_CALLS` in `agent/models.py`) are on, measured on 2026-11-09 (see Measured behaviour).
 - **Windows only** for the stub stack launcher; validated at 1280x720, no mobile layout.
 
 ## When something fails
@@ -172,7 +187,7 @@ A failed answer (rate limit, model service error, agent not reachable) is shown 
 
 `pnpm install` fails with "The malware check could not reach api.osv.dev": uv checks every package against OSV before installing it, and the check is on purpose. Nothing was installed. Check your network or proxy (`HTTPS_PROXY`), then run `pnpm install` again (or `pnpm run postinstall` when nothing else changed).
 
-The app opens with the chat panel open and "Cash Flow Dashboard" as the first suggestion. Close it with the panel's Close button.
+The app opens with the chat panel open and seven suggestions, "Cash Flow Dashboard" first (Reorder Inventory and Cost Control Dashboard included). Close it with the panel's Close button.
 
 ## Replaying the demo
 
