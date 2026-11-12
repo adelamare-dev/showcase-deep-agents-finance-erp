@@ -107,8 +107,10 @@ export function allowedValues(toolTexts: string[], snapshot: unknown, userText: 
 
 const same = (a: number, b: number) => Math.abs(a - b) < TOLERANCE;
 
-// Decimals a figure is written with, at least one.
-const decimalsOf = (digits: string) => Math.max(digits.includes(".") ? digits.split(".")[1].length : 0, 1);
+// Decimals a figure is written with, at least `minimum`. A percentage keeps one
+// decimal at least; a scaled amount may be written whole ("$730K", "$1M").
+const decimalsOf = (digits: string, minimum = 1) =>
+  Math.max(digits.includes(".") ? digits.split(".")[1].length : 0, minimum);
 
 // Whether `value`, displayed with `decimals` decimals, may read `written`. No
 // rounding function is involved, so exact halves behave as in the Python twin.
@@ -124,7 +126,7 @@ function moneyAllowed(fig: Figure, allowed: Set<number>): boolean {
   const scale = SCALES[suffix.toLowerCase()];
   const digits = m.groups.n1 ?? m.groups.n2;
   const written = toFloat(digits);
-  return values.some((v) => within(v / scale, written, decimalsOf(digits)));
+  return values.some((v) => within(v / scale, written, decimalsOf(digits, 0)));
 }
 
 /** Whether `fig` equals an allowed value, allowing for display rounding. */

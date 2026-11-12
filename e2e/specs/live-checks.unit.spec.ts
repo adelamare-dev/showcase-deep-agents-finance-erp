@@ -128,3 +128,10 @@ test("offline.live-checks a forecast growth percentage is admitted, a wrong one 
   for (const v of pyPercents) expect(helpers.unexplainedFigures(`growth of ${v}% expected`, projFull)).toEqual([]);
   expect(helpers.unexplainedFigures("Revenue expected to grow by 11.9% quarter-over-quarter.", projFull)).toEqual(["11.9%"]);
 });
+
+test("offline.live-checks a whole K or M amount matches the value it rounds", () => {
+  expect(helpers.strangers("revenue is $730K", [729_850])).toEqual([]);
+  expect(helpers.strangers("cash is $1M", [1_045_000])).toEqual([]);
+  expect(helpers.strangers("revenue is $731K", [729_850])).toEqual(["$731K"]);
+  expect(helpers.strangers("revenue is $730,000", [729_850])).toEqual(["$730,000"]);
+});

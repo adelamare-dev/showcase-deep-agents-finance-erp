@@ -145,9 +145,13 @@ def _same(a: float, b: float) -> bool:
     return abs(a - b) < _TOLERANCE
 
 
-def _decimals(digits: str) -> int:
-    """Decimals a figure is written with, at least one."""
-    return max(len(digits.split(".")[1]) if "." in digits else 0, 1)
+def _decimals(digits: str, minimum: int = 1) -> int:
+    """Decimals a figure is written with, at least `minimum`.
+
+    A percentage keeps one decimal at least; a scaled amount may be written
+    whole ("$730K", "$1M"), so it asks for none.
+    """
+    return max(len(digits.split(".")[1]) if "." in digits else 0, minimum)
 
 
 def _within(value: float, written: float, decimals: int) -> bool:
@@ -169,7 +173,7 @@ def _money_allowed(fig: Figure, allowed: set[float]) -> bool:
     scale = _SCALES[suffix.lower()]
     digits = m.group("n1") or m.group("n2")
     written = _to_float(digits)
-    return any(_within(v / scale, written, _decimals(digits)) for v in allowed)
+    return any(_within(v / scale, written, _decimals(digits, 0)) for v in allowed)
 
 
 def is_allowed(fig: Figure, allowed: set[float]) -> bool:
