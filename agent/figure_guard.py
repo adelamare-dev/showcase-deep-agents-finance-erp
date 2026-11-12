@@ -179,18 +179,17 @@ def _money_allowed(fig: Figure, allowed: set[float]) -> bool:
 def _money_window(fig: Figure) -> float | None:
     """Half-width of the range of amounts a refused money figure may be a rounding of.
 
-    A scaled amount covers its display window ("$58.3K": 50). An unscaled whole
-    amount covers its trailing zeros ("$730,000": 5,000; "$579,000": 500). An
-    amount with neither says nothing about what it rounds.
+    An unscaled whole amount covers its trailing zeros ("$730,000": 5,000;
+    "$579,000": 500). A scaled amount ("$58.3K") has no hint: its display window
+    is the one `_money_allowed` already admits, so a refused one matches no tool
+    value. An amount with neither says nothing about what it rounds.
     """
     m = _MONEY_RE.fullmatch(fig.raw.strip("-()").strip())
     if not m:
         return None
     digits = m.group("n1") or m.group("n2")
     suffix = m.group("s1") or m.group("s2")
-    if suffix:
-        return 0.5 * 10 ** -_decimals(digits, 0) * _SCALES[suffix.lower()]
-    if "." in digits:
+    if suffix or "." in digits:
         return None
     zeros = len(digits.replace(",", "")) - len(digits.replace(",", "").rstrip("0"))
     return 0.5 * 10**zeros if zeros else None
