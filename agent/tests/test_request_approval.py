@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Callable
 from datetime import timedelta
+from typing import Any
 
 import pytest
 from langchain_core.runnables import RunnableConfig, RunnableLambda
@@ -27,22 +29,23 @@ def interrupt_spy(monkeypatch):
         answer: object = {"approved": True, "message": "ok"}
         echo_bill_ids: bool = True
         echo_items: bool = True
-        before_answer: object = None
+        before_answer: Callable[[], None] | None = None
 
     spy = Spy()
     spy.calls = []
 
-    def fake(message=None, action=None, args=None):
+    def fake(message=None, action=None, args: dict | None = None):
         spy.calls.append({"action": action, "args": args})
+        card = args or {}
         if spy.before_answer:
             spy.before_answer()
         answer = spy.answer
         # The web card sends back the bill ids it was shown; mirror that unless a test opts out.
-        if spy.echo_bill_ids and isinstance(answer, dict) and "billIds" in (args or {}):
-            answer = {"billIds": args["billIds"], **answer}
+        if spy.echo_bill_ids and isinstance(answer, dict) and "billIds" in card:
+            answer = {"billIds": card["billIds"], **answer}
         # The reorder card does the same with the lines it was shown.
-        if spy.echo_items and isinstance(answer, dict) and "estimatedTotal" in (args or {}):
-            answer = {"items": [{"sku": i["sku"], "quantity": i["reorderQty"]} for i in args["items"]], **answer}
+        if spy.echo_items and isinstance(answer, dict) and "estimatedTotal" in card:
+            answer = {"items": [{"sku": i["sku"], "quantity": i["reorderQty"]} for i in card["items"]], **answer}
         return json.dumps(answer), answer
 
     monkeypatch.setattr(frontend_tools, "copilotkit_interrupt", fake)
@@ -247,7 +250,7 @@ def _paused_payment_graph():
     builder.add_edge(START, "pay")
     builder.add_edge("pay", END)
     graph = builder.compile(checkpointer=MemorySaver())
-    thread = {"configurable": {"thread_id": "retry"}}
+    thread: RunnableConfig = {"configurable": {"thread_id": "retry"}}
     paused = graph.invoke({}, thread)
     (interrupt,) = paused["__interrupt__"]
     return graph, thread, interrupt.value["__copilotkit_interrupt_value__"]["args"]
@@ -478,7 +481,8 @@ def test_the_event_reaches_the_event_stream(shared_store, interrupt_spy):
         if e["event"] == "on_custom_event" and e["name"] == ERP_DATA_CHANGED_EVENT
     ]
     assert len(events) == 1
-    assert {c["metric"] for c in events[0]["data"]["changes"]} == {"Cash", "Accounts Payable"}
+    data: Any = events[0]["data"]
+    assert {c["metric"] for c in data["changes"]} == {"Cash", "Accounts Payable"}
 
 
 @pytest.mark.parametrize("bad_window", ["soon", [7], 3.5], ids=["text", "list", "fraction"])

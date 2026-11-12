@@ -61,7 +61,9 @@ def test_headcount_counts_active_employees_only(store):
 def test_payroll_matches_the_financial_report(store, monkeypatch):
     monkeypatch.setattr(erp_store, "_store", store)
     report = tools.generate_financial_report.invoke({"report_type": "summary"})
-    printed = int(re.search(r"Active payroll: \$([\d,]+)/yr", report).group(1).replace(",", ""))
+    match = re.search(r"Active payroll: \$([\d,]+)/yr", report)
+    assert match
+    printed = int(match.group(1).replace(",", ""))
     assert headcount_and_payroll(store.snapshot())["totalPayroll"] == printed
 
 

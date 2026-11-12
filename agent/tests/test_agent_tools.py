@@ -127,6 +127,7 @@ def test_context_objects_reach_the_prompt_without_global_patch():
             }
         }
     )
+    assert note is not None
     assert "Current page" in note and "invoices" in note
     assert json.dumps is ORIGINAL_DUMPS
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 
@@ -122,7 +123,8 @@ def test_growth_pct_out_of_range_is_rejected(store, kw):
 
 
 def test_bounds_are_inclusive(store):
-    for kw in ({"quarters": 1}, {"quarters": 8}, {"growth_pct": 50}, {"growth_pct": -50}):
+    bounds: list[dict[str, Any]] = [{"quarters": 1}, {"quarters": 8}, {"growth_pct": 50}, {"growth_pct": -50}]
+    for kw in bounds:
         assert build_dataset(store, "revenue_forecast", **kw)
 
 

@@ -32,12 +32,15 @@ def test_reference_widgets_match_the_prompt_rule():
     assert list(by_type) == ["metric_cards", "ar_aging_gauge", "invoices", "custom_chart"]
 
     # Each widget and option is the one the rule names for its element.
-    metrics = json.loads(re.search(r"metric_cards \(metrics (\[[^\]]*\])\)", rule).group(1))
+    metrics_match = re.search(r"metric_cards \(metrics (\[[^\]]*\])\)", rule)
+    assert metrics_match
+    metrics = json.loads(metrics_match.group(1))
     assert by_type["metric_cards"] == {"metrics": metrics}
     assert "AR aging in ar_aging_gauge" in rule and by_type["ar_aging_gauge"] == {}
     assert 'invoices with kind "payable"' in rule
     assert by_type["invoices"] == {"kind": "payable"}
     chart = re.search(r"one custom_chart on dataset (\w+) with quarters (\d+)", rule)
+    assert chart
     assert by_type["custom_chart"]["dataset"] == chart.group(1)
     assert by_type["custom_chart"]["quarters"] == int(chart.group(2))
 

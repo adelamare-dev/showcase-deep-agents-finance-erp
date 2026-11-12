@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import AgentState
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import tool
 
@@ -294,8 +295,9 @@ def test_the_message_kept_for_the_retry_has_no_tool_call_anywhere():
         tool_calls=[{"id": "c1", "name": "update_dashboard", "args": {}}],
         additional_kwargs={"tool_calls": raw, "other": "kept"},
     )
-    state = {"messages": [HumanMessage("budget?", id="h"), ai]}
+    state: AgentState = {"messages": [HumanMessage("budget?", id="h"), ai]}
     out = FigureGuardMiddleware(snapshot=lambda: {})._verdict(state)
+    assert out is not None
     kept = out["messages"][0]
     assert kept.tool_calls == []
     assert "tool_calls" not in kept.additional_kwargs

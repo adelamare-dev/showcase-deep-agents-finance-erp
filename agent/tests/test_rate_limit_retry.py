@@ -50,6 +50,8 @@ def _whole(content: str) -> dict:
 class Transport:
     """Answers the scripted responses in order and counts the requests."""
 
+    sleeps: list[float]
+
     def __init__(self, steps: list[httpx.Response]):
         self.steps = list(steps)
         self.requests = 0

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from typing import Any
+
+from langchain_core.language_models.base import LangSmithParams
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
@@ -27,16 +30,16 @@ class ScriptedToolCaller(BaseChatModel):
     script: list[tuple[str, dict]]
     calls: list = Field(default_factory=list)
     # Names of the tools the agent bound to the model, in order.
-    bound_tools: list = Field(default_factory=list)
+    bound_tools: set[str] = Field(default_factory=set)
 
     @property
     def _llm_type(self) -> str:
         return "scripted-tool-caller"
 
-    def _get_ls_params(self, stop=None, **kwargs):
+    def _get_ls_params(self, stop: list[str] | None = None, **kwargs: Any) -> LangSmithParams:
         # Report the provider of the client this fake stands in for, so the
         # provider-keyed harness profile applies to it.
-        return {"ls_provider": "mistral", "ls_model_type": "chat"}
+        return LangSmithParams(ls_provider="mistral", ls_model_type="chat")
 
     def bind_tools(self, tools, **kwargs):
         self.bound_tools = tool_names(tools)

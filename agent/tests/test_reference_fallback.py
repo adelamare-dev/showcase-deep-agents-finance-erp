@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 
 import httpx
 import pytest
 from copilotkit import CopilotKitMiddleware
 from langchain.agents import create_agent
+from langchain.agents.middleware import AgentMiddleware
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatResult
@@ -62,16 +64,17 @@ async def do_research(query: str) -> str:
 
 
 def run(model, question: str = HERO, context=CONTEXT):
-    agent = create_agent(
-        model,
-        tools=[update_dashboard, do_research],
-        middleware=[
-            CopilotKitMiddleware(),
-            ReferenceFallbackMiddleware(),
-            FigureGuardMiddleware(snapshot=lambda: get_store().snapshot()),
-        ],
-    )
-    state = {"messages": [HumanMessage(question)], "copilotkit": {"context": context, "actions": []}}
+    # CopilotKitMiddleware declares its own state schema, which the invariant
+    # AgentMiddleware[AgentState] parameter of create_agent does not accept.
+    middleware: list[AgentMiddleware[Any, Any, Any]] = [
+        CopilotKitMiddleware(),
+        ReferenceFallbackMiddleware(),
+        FigureGuardMiddleware(snapshot=lambda: get_store().snapshot()),
+    ]
+    agent = create_agent(model, tools=[update_dashboard, do_research], middleware=middleware)
+    # The "copilotkit" key belongs to the state schema CopilotKitMiddleware adds,
+    # which the Any-typed middleware list above hides from the type checker.
+    state: Any = {"messages": [HumanMessage(question)], "copilotkit": {"context": context, "actions": []}}
     return asyncio.run(agent.ainvoke(state))["messages"]
 
 
