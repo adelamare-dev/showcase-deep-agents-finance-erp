@@ -5,7 +5,7 @@ description = "Finance ERP deep agent powered by LangGraph and CopilotKit"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "ag-ui-langgraph>=0.0.36",
-  "copilotkit[langgraph]>=0.1.0",
+  "copilotkit>=0.1.0",
   "deepagents>=0.1.0",
   "fastapi>=0.136.3",
   "httpx>=0.28",

@@ -400,7 +400,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ag-ui-langgraph", specifier = ">=0.0.36" },
-    { name = "copilotkit", extras = ["langgraph"], specifier = ">=0.1.0" },
+    { name = "copilotkit", specifier = ">=0.1.0" },
     { name = "deepagents", specifier = ">=0.1.0" },
     { name = "fastapi", specifier = ">=0.136.3" },
     { name = "httpx", specifier = ">=0.28" },
