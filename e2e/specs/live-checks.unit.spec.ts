@@ -10,6 +10,7 @@ const helpers = new Function(source)()(null) as {
   projectedMoney: (snap: unknown) => number[];
   projectionPercents: (snap: unknown) => number[];
   strangers: (text: string, fields: number[]) => string[];
+  expenseTotals: (snap: unknown) => { byCategory: { category: string; total: number; sharePct: number }[]; total: number };
 };
 // moneyFields reads the cash position over page.request, so it runs here with a stub page.
 const withStubPage = new Function(source)()({ request: { get: async () => ({ json: async () => ({}) }) } }) as {
@@ -139,6 +140,24 @@ test("offline.live-checks a quarterly profit is admitted, a wrong one is not", a
   const fields = await withStubPage.moneyFields(quarterly, []);
   expect(helpers.strangers("Q4 profit reached $586,000 and $586K.", fields)).toEqual([]);
   expect(helpers.strangers("Q4 profit reached $586,001.", fields)).toEqual(["$586,001"]);
+});
+
+test("offline.live-checks expense category totals and shares are admitted, a re-added one is not", async () => {
+  const expenses = {
+    ...snap,
+    expenseBreakdown: [
+      { category: "Operations", amount: 277_000, percentage: 25.2 },
+      { category: "Payroll", amount: 580_000, percentage: 52.8 },
+      { category: "Other", amount: 242_000, percentage: 22.0 },
+    ],
+  };
+  const out = helpers.expenseTotals(expenses);
+  expect(out.byCategory.map((c) => c.category)).toEqual(["Payroll", "Operations", "Other"]);
+  expect(out.total).toBe(1_099_000);
+  const fields = await withStubPage.moneyFields(expenses, []);
+  expect(helpers.strangers("Payroll is $580,000, Operations $277,000, together $1,099,000.", fields)).toEqual([]);
+  expect(helpers.unexplainedFigures("Payroll is 52.8% and Operations 25.2%.", expenses)).toEqual([]);
+  expect(helpers.strangers("The top two add up to $857,000 and $1,098,000.", fields)).toEqual(["$857,000", "$1,098,000"]);
 });
 
 test("offline.live-checks a whole K or M amount matches the value it rounds", () => {

@@ -126,6 +126,16 @@
     return values.filter((v) => typeof v === "number");
   };
 
+  // The totals and shares query_monthly_expenses returns, read from the snapshot's
+  // expense breakdown: the categories largest first, and their grand total.
+  const expenseTotals = (snap) => {
+    const total = snap.expenseBreakdown.reduce((t, e) => t + e.amount, 0);
+    const byCategory = [...snap.expenseBreakdown]
+      .sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category))
+      .map((e) => ({ category: e.category, total: e.amount, sharePct: e.percentage }));
+    return { byCategory, total };
+  };
+
   // The money fields of a run, read from the store now: its totals, KPIs, aging
   // buckets, bill amounts, quarterly cash flow, quarterly revenue, expenses and
   // profit, and cash position, plus the catalog money the run drew (see catalogMoneyOf).
@@ -149,6 +159,8 @@
       // The quarterly revenue, expenses and profit of query_quarterly_financials.
       ...leaves(snap.quarterlyRevenue),
       ...leaves(cashPosition),
+      // The category totals and grand total of query_monthly_expenses.
+      ...expenseTotals(snap).byCategory.map((c) => c.total), expenseTotals(snap).total,
       // The projections of the forecast tools (see projectedMoney).
       ...projectedMoney(snap),
       ...catalogMoney,
@@ -669,7 +681,7 @@
     assert, assertEqual, expectVisible, byId,
     STUB_URL, openSettings, clickReset, stubScript, stubRelease, stubReset, stubRequests, payableBillIds, billsForApproval,
     open, visit, resetDemo, sendPrompt, waitForRunEnd, chatText, snapshot,
-    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, moneyFields, strangers, dueSoonest, itemsForRestock, projectRevenue, projectCashFlow, projectedMoney, projectionPercents, percentsIn, countsIn, unexplainedFigures, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
+    moneyIn, formatUsd, leaves, amountsIn, matches, catalogMoneyOf, expenseTotals, moneyFields, strangers, dueSoonest, itemsForRestock, projectRevenue, projectCashFlow, projectedMoney, projectionPercents, percentsIn, countsIn, unexplainedFigures, scanDashboard, clippedCardContent, classifyDashboard, runDashboardSegment, test, run,
   };
   return h;
 }
