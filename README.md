@@ -2,7 +2,7 @@
 
 A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The figures it writes in the chat text come from the books or from tool results (a subagent's figures are judged by its data tools' outputs, not by its own prose), and one that cannot be matched is badged "unverified". The model varies between runs, so a free question can still end on a badge (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
 
-**Status.** Version 0.5.1. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, approve the payments, then ask a follow-up question) passed five times in a row, and the 18 suggestions and likely questions each passed 3 of 3 on one commit (`b78f895`, 2026-11-12, API pay-as-you-go). Model output varies between runs, so these are measurements, not guarantees. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
+**Status.** Version 0.5.2. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, approve the payments, then ask a follow-up question) passed five times in a row, and the 18 suggestions and likely questions each passed 3 of 3 on one commit (`b78f895`, 2026-11-12, API pay-as-you-go). Model output varies between runs, so these are measurements, not guarantees. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
 
 **Stack:** Next.js 16 (frontend) + FastAPI / LangGraph (agent, owns the data) + CopilotKit (AI layer) + Mistral models. No database is required.
 
@@ -57,7 +57,7 @@ For development with hot reload, use `pnpm dev` instead of `pnpm demo`.
 | Variable            | Description                                                                                           |
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
 | `MISTRAL_API_KEY`   | Mistral API key, required                                                                             |
-| `FRONTEND_ORIGIN`   | Browser origin allowed by CORS (default: `http://localhost:3000`)                                     |
+| `FRONTEND_ORIGIN`   | Browser origin allowed by CORS and by the agent's Origin check (default: `http://localhost:3000`)     |
 
 ### `.env` at the repo root (optional)
 
@@ -175,7 +175,12 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 - `graphql-scalars` 1.26.0 (PhoneNumber ReDoS): not reachable. Only `GraphQLJSONObject` is used; the fix is a 2.x major.
 - `zod` 3.25.76 (memory exhaustion on oversized collections): no safe override (4.x major): `@ag-ui/client` and `zod-to-json-schema` need the same zod 3 instance as the schemas they inspect. The demo assumes a trusted machine and network (see below).
 
-**Network exposure.** The demo has no authentication: it assumes one user on a trusted machine. The agent listens on `127.0.0.1` only, but `next dev` and `next start` listen on all interfaces by default, and the `/api/copilotkit` route accepts any caller, including a `text/plain` POST from another site that needs no CORS preflight. A source review (no request was sent) shows that such a caller could start a run on your Mistral key and answer an approval card itself, so the human approval only protects the books while the web app is reachable by you alone. CORS limits what a foreign page can read, not what it can send: a cross-site `POST /api/erp/reset` still resets the demo data. Run the demo on a trusted network, set a spending cap in the Mistral console, and decline a "local network access" prompt from a site you do not know.
+**Network exposure.** The demo has no authentication: it assumes one user on one machine. Both servers listen on `127.0.0.1` only (`next dev` and `next start` with `-H 127.0.0.1`, the agent with `--host 127.0.0.1`), so another device on the network cannot reach them. A page from another site can still make your browser send requests to `localhost`, so two checks refuse them:
+
+- The `/api/copilotkit` route answers 403 to a `Host` other than `localhost`, `127.0.0.1` or `[::1]` (a DNS-rebinding page), 403 to a write whose `Origin` is not the app's own, and 415 to a POST that is not `application/json` (a cross-site `text/plain` POST needs no CORS preflight).
+- The agent answers 403 to any POST whose `Origin` is not `FRONTEND_ORIGIN`, so a foreign page can neither reset the demo data nor start a run on `:8123`.
+
+Before 0.5.2, a run against the Mistral stub (2026-11-12) showed that a cross-site page could start a run and answer the approval card itself, paying bills without a click; the same requests are now refused. A local process can still call both servers, and no per-run limit bounds model spend (message size, concurrent runs): run the demo on a machine you trust and set a spending cap in the Mistral console. Opening the app from another device would mean dropping `-H 127.0.0.1` and accepting that exposure.
 
 ## Known limits
 
