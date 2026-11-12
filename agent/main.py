@@ -34,14 +34,18 @@ from erp_api import router as erp_router
 from frontend_tools import ui_tools, hitl_tools
 from isolated_subagents import do_research, do_projections
 from models import ORCHESTRATOR_RECURSION_LIMIT
+from origin_guard import OriginGuardMiddleware
 from reference_fallback import build_reference_dashboard_tool
 
 app = FastAPI(title="Finance ERP Agent")
 
 # The browser reads the ERP routes directly; only the web app's origin may.
+# CORS only hides responses, so the guard also refuses a foreign-origin write.
+ALLOWED_ORIGINS = [os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")]
+app.add_middleware(OriginGuardMiddleware, allowed_origins=ALLOWED_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
