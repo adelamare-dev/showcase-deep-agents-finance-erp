@@ -1,8 +1,8 @@
 # Deep Agents Finance ERP
 
-A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The figures it writes in the chat text come from the books or from tool results (a subagent's figures are judged by its data tools' outputs, not by its own prose), and one that cannot be matched is badged "unverified", and some free questions still fail (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
+A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The figures it writes in the chat text come from the books or from tool results (a subagent's figures are judged by its data tools' outputs, not by its own prose), and one that cannot be matched is badged "unverified". The model varies between runs, so a free question can still end on a badge (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
 
-**Status.** A working base for a demo, not a finished one. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, then ask a follow-up question) has not passed five times in a row yet. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
+**Status.** Version 0.5.0. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, approve the payments, then ask a follow-up question) passed five times in a row, and the 18 suggestions and likely questions each passed 3 of 3 on one commit (`b78f895`, 2026-11-12, API pay-as-you-go). Model output varies between runs, so these are measurements, not guarantees. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
 
 **Stack:** Next.js 16 (frontend) + FastAPI / LangGraph (agent, owns the data) + CopilotKit (AI layer) + Mistral models. No database is required.
 
@@ -16,7 +16,7 @@ A small finance ERP whose AI assistant orchestrates sub-agents you can watch, as
 - After a payment, the cash card already in the chat keeps its first figures struck through beside the new ones
 - A what-if on revenue or cash (growth and quarters) is answered with a forecast card whose figures come from the catalog
 - No figure on a card or chart comes from the model: it names a dataset, the code fills in the numbers
-- Figure guard: every dollar amount, percentage and count in the assistant's text must match this turn's tool results, the store or your own message; otherwise it is retried once, then shown with an "unverified" badge. "Checking figures…" shows while the reply is prepared
+- Figure guard: every dollar amount, percentage and count in the assistant's text must match this turn's tool results, the store or your own message; otherwise it is retried once, then shown with an "unverified" badge. An amount written with K, M or B (or thousand, million, billion) is admitted at the decimals actually written, zero included ("$730K" for $729,850, "$1M" for $1,045,000); percentages keep at least one decimal and unscaled amounts stay exact to the cent. When an amount was rounded, the retry names the exact tool value it came from. "Checking figures…" shows while the reply is prepared
 - Rules fallback: when the model service is out of capacity on the "Cash Flow Dashboard" request, the dashboard is built from the store by fixed rules, with no model call, and a card says "Model unavailable — built from rules"
 
 ## Prerequisites
@@ -109,11 +109,11 @@ See `e2e/README.md` for the details.
 
 Models: `ministral-14b-2512` for the orchestrator and both subagents, dated ids only; the orchestrator calls the research and projections subagents in one message. The measurements below are labelled with their date; those before 2026-11-08 ran on free mode, and the 2026-11-07 ones at its 2 requests per minute. Everything from 2026-11-09 ran on API pay-as-you-go, with no 429 in any pass.
 
-**Reference scenario** (`e2e/scenarios/live.reference.js`): a click on "Cash Flow Dashboard" must build the complete dashboard, with figures equal to the store, and the follow-up question must then be answered correctly. Result: **not proven, 0 of 5 consecutive passes** (the series has not been run). The pass criterion is **60 s** from click to complete dashboard; **45 s** remains the target.
+**Reference scenario** (`e2e/scenarios/live.reference.js`): a click on "Cash Flow Dashboard" must build the complete dashboard, with figures equal to the store, and the follow-up question must then be answered correctly. Result on `b78f895` (2026-11-12, `ministral-14b-2512`, no 429, no rules fallback): **5 of 5 consecutive passes**. Each pass clicked "Cash Flow Dashboard", approved the supplier payments in the chat, then asked a follow-up. Click to complete dashboard: 23.5, 20.8, 22.6, 22.9 and 21.4 s (median 22.6 s, maximum 23.5 s); the pass criterion is **60 s** and **45 s** remains the target. Each dashboard had 4 widgets (metric cards, AR aging gauge, supplier bills, cash flow forecast chart); the research subagent listed 6 steps (5 in the last pass) and the projections subagent 1, overlapping. The approval card showed 4 bills for $50,650; Cash went from $1,092,000 to $1,041,350 and payables from $59,850 to $9,200, equal to the store, and the follow-up answer quoted $1,041,350 and $9,200. 11 to 12 model calls per pass.
 
 **Parallel subagents** (2026-11-09, `live.dashboard`, 10 valid runs per variant, no 429, every figure equal to the store). Both variants have the orchestrator call the two subagents in one message. With everything on `ministral-14b-2512`: dashboard in a median of 20.9 s (17.8 to 38.6 s), 7 model calls at the median (7 to 10). With the subagents on `ministral-8b-2512`: median 21.55 s (15.1 to 28.9 s), 8 model calls at the median (7 to 9). Both met the bar (at most 1 failure, median 45 s or less, none over 60 s, no wrong figure); the all-14b variant has the lower median and ships: the parallel call is on and every role uses `ministral-14b-2512`. The gap between medians (0.65 s) is within the noise of ten runs.
 
-**Suggestions and likely free questions** (`e2e/scenarios/live.questions.js`, 18 entries, 3 valid runs each on a fresh thread after a data reset, 2026-11-09). Figures on screen are compared with the store. Five full passes, each on the commit named, none with a 429:
+**Suggestions and likely free questions** (`e2e/scenarios/live.questions.js`, 18 entries, 3 valid runs each on a fresh thread after a data reset). Figures on screen are compared with the store. Eight full passes (the first five on 2026-11-09, the last three on 2026-11-12), each on the commit named, none with a 429:
 
 | Commit | Entries at 3 of 3 | Runs passed | Entries below 3 of 3 |
 | --- | --- | --- | --- |
@@ -122,41 +122,44 @@ Models: `ministral-14b-2512` for the orchestrator and both subagents, dated ids 
 | `6187546` | 16 of 18 | 52 of 54 | Cash Position (2), Budget (2) |
 | `8c636d3` | 17 of 18 | 53 of 54 | Budget (2) |
 | `d4da505` | 15 of 18 | 51 of 54 | Unpaid supplier bills (2), Biggest expense categories (2), Budget (2) |
+| `ae13351` | 17 of 18 | 53 of 54 | Budget (2) |
+| `bba2417` | 17 of 18 | 52 of 54 | Biggest expense categories (1) |
+| **`b78f895`** | **18 of 18** | **54 of 54** | none |
 
-Two partial replays: `80e5ee1` ran entries 0 to 7 only (23 of 24 runs; Cost Control Dashboard 2 of 3), and `73ec40b` replayed Budget alone (3 of 3) on the same demo as `8c636d3`, after a fix to the check.
+Two partial replays (2026-11-09): `80e5ee1` ran entries 0 to 7 only (23 of 24 runs; Cost Control Dashboard 2 of 3), and `73ec40b` replayed Budget alone (3 of 3) on the same demo as `8c636d3`, after a fix to the check.
 
-The last full pass, on `d4da505`, per entry (passes out of 3):
+The threshold (all 18 entries at 3 of 3 on one commit) is **met on `b78f895`**: 54 of 54 runs, no 429, no fallback, no discarded run. The two heads before it each missed it by one entry: `ae13351` on Budget (a quarterly profit of "$586K" that the live check did not yet admit, fixed in the check) and `bba2417` on Biggest expense categories (the model added the months itself and the guard badged it, fixed by returning exact category totals and shares with the monthly rows). The final pass, per entry (passes out of 3, median seconds per run):
 
-| Entry | Passes |
-| --- | --- |
-| Cash Flow Dashboard | 3 |
-| Cash Position | 3 |
-| Overdue Invoices | 3 |
-| Cash Flow Chart | 3 |
-| Approve Payments | 3 |
-| Reorder Inventory | 3 |
-| Cost Control Dashboard | 3 |
-| Cash Position Chart | 3 |
-| Which client owes us the most? | 3 |
-| Cash position and payables | 3 |
-| Which supplier bills are still unpaid? | 2 |
-| What-if over 6 quarters | 3 |
-| Headcount and payroll | 3 |
-| Low stock | 3 |
-| Biggest expense categories | 2 |
-| Budget | 2 |
-| Receivables and overdue | 3 |
-| "What is our ESG score?" (answers "I don't have this data") | 3 |
+| Entry | Passes | Median |
+| --- | --- | --- |
+| Cash Flow Dashboard | 3 | 75.6 |
+| Cash Position | 3 | 42.3 |
+| Overdue Invoices | 3 | 32.0 |
+| Cash Flow Chart | 3 | 43.1 |
+| Approve Payments | 3 | 51.2 |
+| Reorder Inventory | 3 | 39.9 |
+| Cost Control Dashboard | 3 | 41.5 |
+| Cash Position Chart | 3 | 23.2 |
+| Which client owes us the most? | 3 | 13.3 |
+| Cash position and payables | 3 | 13.5 |
+| Which supplier bills are still unpaid? | 3 | 20.7 |
+| What-if over 6 quarters | 3 | 24.0 |
+| Headcount and payroll | 3 | 16.4 |
+| Low stock | 3 | 21.1 |
+| Biggest expense categories | 3 | 37.3 |
+| Budget | 3 | 29.9 |
+| Receivables and overdue | 3 | 16.9 |
+| "What is our ESG score?" (answers "I don't have this data") | 3 | 14.1 |
 
-The threshold (all 18 entries at 3 of 3 on one commit) is **not met**. The best full pass is 17 of 18. Failures seen, by class:
+The median is the whole scenario run, checks included; the reference series above times the dashboard step alone. Failures seen over the series, by class and what addressed each:
 
-- A closing text after a dashboard that cites figures: the guard now treats every figure written after `update_dashboard` as unverified, and the prompt bans figures in that sentence.
-- A subagent's rounded "50%" admitted by the guard: its figures are now judged by its data tools' outputs, not its prose.
-- A guard retry that ended in a model service error: the retry copy now drops streamed tool calls.
-- A model rounding badged by the guard ("$730,000", then the expense category amounts): still seen on the last pass.
-- Gaps in the live check itself on the forecast tools' values and growth percentages (Budget): the check now mirrors those calculations.
-- A themed dashboard wiped by a save and reset: it is now one replacing update.
-- The supplier-bills question answered by navigating to the invoices page without naming bills: still seen on the last pass.
+- A closing text after a dashboard that cites figures: the guard treats every figure written after `update_dashboard` as unverified, and the prompt bans figures in that sentence.
+- A subagent's rounded "50%" admitted by the guard: its figures are judged by its data tools' outputs, not its prose.
+- A guard retry that ended in a model service error: the retry copy drops streamed tool calls.
+- A model rounding badged by the guard ("$730,000", then expense category amounts): the figure rule admits K and M amounts at the written decimals, the correction names the exact tool value, and the expense totals and shares come with the monthly rows.
+- Gaps in the live check itself (forecast values, growth percentages, quarterly revenue, expenses and profit): the check mirrors those calculations.
+- A themed dashboard wiped by a save and reset, or by a reset in the same run as a replacing update: one replacing update, and the web ignores a reset that follows an applied replacement in the same run.
+- The supplier-bills question answered by navigating to the invoices page without naming bills: the prompt now requires naming the matching records first.
 
 Counts vary between replays, so read each as one sample of three, not as a rate.
 
@@ -174,9 +177,8 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 
 ## Known limits
 
-- **Free questions are not all reliable.** No full pass of the 18 entries has had every entry at 3 of 3 (best 17 of 18; see Measured behaviour). The model still rounds an amount now and then ("$730,000") or answers a supplier-bills question by navigating without naming the bills; the figure guard badges a rounded amount as "unverified".
-- **The reference series is unproven.** No run has been measured from the dashboard to the follow-up question five times in a row.
-- **Free-mode capacity.** Free mode allows 2 requests per minute per `ministral` model (since 2026-11-07) and often answers a 429 "not enough capacity" that an automatic retry does not always cure, so a live run is lost to it; enable API pay-as-you-go (see "Get a Mistral key"). On pay-as-you-go a 429 is rare (none seen in the live checks of 2026-11-08): replay it after a few minutes. Only the "Cash Flow Dashboard" request has the rules fallback; other requests show the Retry notice.
+- **Model variance.** The series above passed on one commit, with three runs per entry; it is a sample, not a rate. The model can still round an amount or phrase an answer differently: the figure guard then badges the amount as "unverified", and a question outside the 18 entries has not been measured.
+- **Free-mode capacity.** Free mode allows 2 requests per minute per `ministral` model (since 2026-11-07) and often answers a 429 "not enough capacity" that an automatic retry does not always cure, so a live run is lost to it; enable API pay-as-you-go (see "Get a Mistral key"). On pay-as-you-go a 429 is rare (none seen on 2026-11-08, 2026-11-09 or 2026-11-12): replay it after a few minutes. Only the "Cash Flow Dashboard" request has the rules fallback; other requests show the Retry notice.
 - **Figure-guard retries.** Each retry of a reply that cites an unmatched figure is one more model request; in free mode it can end on a 429 and the Retry banner.
 - **Parallel subagents** (`ORCHESTRATOR_PARALLEL_TOOL_CALLS` in `agent/models.py`) are on, measured on 2026-11-09 (see Measured behaviour).
 - **Windows only** for the stub stack launcher; validated at 1280x720, no mobile layout.
