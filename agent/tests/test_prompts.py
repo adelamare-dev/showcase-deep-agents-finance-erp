@@ -198,3 +198,12 @@ def test_inventory_research_gives_the_skus_a_reorder_needs():
 @pytest.mark.parametrize("parallel", [False, True])
 def test_a_dashboard_closing_sentence_states_no_figure(parallel):
     assert "the closing sentence states no figure" in _dashboard_rule(parallel)
+
+
+def test_a_which_records_question_names_the_records_before_any_navigation():
+    rule = next(line for line in ORCHESTRATOR_PROMPT.splitlines() if line.startswith("- A question that asks which records match"))
+    assert "always answered by naming each matching record" in rule
+    assert "in addition" in rule
+    assert "never instead of naming them" in rule
+    assert 'Never write "here are" without showing them.' in rule
+    assert "or by navigate_and_filter" not in rule
