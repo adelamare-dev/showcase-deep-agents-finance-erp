@@ -179,7 +179,6 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 - **Free-mode capacity.** Free mode allows 2 requests per minute per `ministral` model (since 2026-11-07) and often answers a 429 "not enough capacity" that an automatic retry does not always cure, so a live run is lost to it; enable API pay-as-you-go (see "Get a Mistral key"). On pay-as-you-go a 429 is rare (none seen in the live checks of 2026-11-08): replay it after a few minutes. Only the "Cash Flow Dashboard" request has the rules fallback; other requests show the Retry notice.
 - **Figure-guard retries.** Each retry of a reply that cites an unmatched figure is one more model request; in free mode it can end on a 429 and the Retry banner.
 - **Parallel subagents** (`ORCHESTRATOR_PARALLEL_TOOL_CALLS` in `agent/models.py`) are on, measured on 2026-11-09 (see Measured behaviour).
-- **Reset and rebuild in one message can lose the new layout.** On the web each tool card applies its effect when its own result arrives, so a reset whose result lands after the replacing update wipes the new dashboard. The agent no longer resets on its own for a themed dashboard (it sends one replacing update).
 - **Windows only** for the stub stack launcher; validated at 1280x720, no mobile layout.
 
 ## When something fails
