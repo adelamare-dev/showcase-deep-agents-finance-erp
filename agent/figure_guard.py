@@ -238,7 +238,8 @@ def is_allowed(fig: Figure, allowed: set[float]) -> bool:
     if fig.kind == "money":
         return _money_allowed(fig, allowed)
     if fig.kind == "percent":
-        decimals = _decimals(re.match(r"[\d,.]+", fig.raw).group(0))
+        digits = re.match(r"[\d,.]+", fig.raw)
+        decimals = _decimals(digits.group(0)) if digits else 1
         return any(
             _within(v, fig.value, decimals) or (v <= 1 and _within(v * 100, fig.value, decimals))
             for v in allowed

@@ -20,7 +20,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from langchain.agents.middleware import AgentMiddleware, hook_config
+from langchain.agents.middleware import AgentMiddleware, AgentState, hook_config
 from langchain_core.messages import (
     AIMessage,
     AnyMessage,
@@ -115,7 +115,7 @@ class FigureGuardMiddleware(AgentMiddleware):
         super().__init__()
         self._snapshot = snapshot or _default_snapshot
 
-    def _verdict(self, state: dict) -> dict[str, Any] | None:
+    def _verdict(self, state: AgentState) -> dict[str, Any] | None:
         messages: list[AnyMessage] = state["messages"]
         ai = messages[-1] if messages else None
         if not isinstance(ai, AIMessage):
