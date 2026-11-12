@@ -19,7 +19,7 @@ import asyncio
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Annotated, Callable
+from typing import Annotated, Any, Callable
 
 from langchain_core.callbacks.manager import adispatch_custom_event
 from langchain_core.messages import HumanMessage, ToolMessage
@@ -59,12 +59,17 @@ def _stream_subagent(
         # No middleware — this runs in an isolated thread
     )
 
-    final_state = None
-    for mode, chunk in agent.stream(
+    final_state: dict[str, Any] | None = None
+    # With a list of stream modes the runtime yields (mode, payload) tuples, but
+    # the library stub types the items as a state dict, so unpacking needs a guard.
+    for part in agent.stream(
         {"messages": [HumanMessage(content=query)]},
         config={"recursion_limit": SUBAGENT_RECURSION_LIMIT},
         stream_mode=["updates", "values"],
     ):
+        if not isinstance(part, tuple):
+            continue
+        mode, chunk = part
         if mode == "values":
             final_state = chunk
             continue
@@ -75,6 +80,8 @@ def _stream_subagent(
             for message in messages:
                 for call in getattr(message, "tool_calls", None) or []:
                     on_tool_call(call)
+    if final_state is None:
+        raise RuntimeError("Subagent stream ended without a final state")
     own_tools = {getattr(t, "name", None) or t.__name__ for t in agent_tools}
     sources = [
         _content_text(m.content)

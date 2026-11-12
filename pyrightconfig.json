@@ -1,0 +1,7 @@
+{
+  "include": ["agent"],
+  "exclude": ["**/.venv", "**/node_modules"],
+  "venvPath": "agent",
+  "venv": ".venv",
+  "executionEnvironments": [{ "root": "agent" }]
+}
