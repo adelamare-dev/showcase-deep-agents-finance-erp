@@ -11,7 +11,7 @@ import json
 from langchain_core.tools import tool
 
 import erp_datasets
-from erp_aggregates import cash_and_payables, headcount_and_payroll, receivables_by_client
+from erp_aggregates import cash_and_payables, expense_totals, headcount_and_payroll, receivables_by_client
 from erp_store import get_store
 
 MAX_FORECAST_QUARTERS = erp_datasets.MAX_QUARTERS
@@ -317,24 +317,17 @@ def get_cash_and_payables() -> str:
 
 @tool
 def query_monthly_expenses(category: str | None = None) -> str:
-    """Return monthly expense data for the current fiscal year as JSON.
+    """Return monthly expense data and exact category totals for the trailing 12 months as JSON.
 
-    Each entry has month plus expense amounts by category.
-    Optionally filter to a single category: payroll, operations, marketing,
-    infrastructure, rnd, other.
+    Output: period, months (one row per month with amounts by category) and
+    totals_by_category (category, total, share_pct, largest first) plus the
+    grand total. The totals and shares are exact and equal what the expense
+    chart draws: quote them as returned, never add the months up yourself.
+    Optionally filter to a single category (payroll, operations, marketing,
+    infrastructure, rnd, other): months for that category plus its total and
+    share_pct.
     """
-    monthly = _snapshot()["monthlyExpenseByCategory"]
-    if category:
-        cat = category.lower().replace("&", "").replace(" ", "")
-        if cat == "rd":
-            cat = "rnd"
-        data = [
-            {"month": row["month"], category: row.get(cat, 0)}
-            for row in monthly
-        ]
-    else:
-        data = monthly
-    return json.dumps(data, indent=2)
+    return json.dumps(expense_totals(_snapshot(), category), indent=2)
 
 
 # ---------------------------------------------------------------------------

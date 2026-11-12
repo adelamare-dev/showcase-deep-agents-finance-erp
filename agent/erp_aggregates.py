@@ -86,3 +86,40 @@ def cash_and_payables(snap: dict) -> dict:
         "overdueBillsAmount": sum(b["amount"] for b in overdue),
         "cashAfterPayables": totals["cash"] - totals["accountsPayable"],
     }
+
+
+_EXPENSE_KEYS = {"Payroll": "payroll", "Operations": "operations", "Marketing": "marketing",
+                 "Infrastructure": "infrastructure", "R&D": "rnd", "Other": "other"}
+
+
+def expense_totals(snap: dict, category: str | None = None) -> dict:
+    """Monthly expense rows of the trailing year plus the exact totals per category.
+
+    Totals and shares come from `snap["expenseBreakdown"]`, the rows the expense
+    chart draws, so the figures a chart and a text answer give are the same.
+    With `category`, only that category's months, total and share are returned.
+    """
+    monthly = snap["monthlyExpenseByCategory"]
+    breakdown = snap["expenseBreakdown"]
+    period = f"{monthly[0]['month']} to {monthly[-1]['month']} (trailing 12 months)"
+    total = sum(e["amount"] for e in breakdown)
+    if category:
+        key = category.lower().replace("&", "").replace(" ", "")
+        key = "rnd" if key == "rd" else key
+        match = next((e for e in breakdown if _EXPENSE_KEYS.get(e["category"]) == key), None)
+        return {
+            "period": period,
+            "months": [{"month": row["month"], category: row.get(key, 0)} for row in monthly],
+            "category": category,
+            "total": match["amount"] if match else 0,
+            "share_pct": match["percentage"] if match else 0.0,
+        }
+    ranked = sorted(breakdown, key=lambda e: (-e["amount"], e["category"]))
+    return {
+        "period": period,
+        "months": monthly,
+        "totals_by_category": [
+            {"category": e["category"], "total": e["amount"], "share_pct": e["percentage"]} for e in ranked
+        ],
+        "total": total,
+    }

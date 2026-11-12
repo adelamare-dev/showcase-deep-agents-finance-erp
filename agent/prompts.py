@@ -200,7 +200,7 @@ structured, accurate data.
 - get_receivables_by_client() — exact open receivables per client, with the overdue total and share
 - get_headcount_and_payroll() — exact active headcount and annual payroll, per department and in total
 - get_cash_and_payables() — exact cash, payables, open and overdue supplier bills
-- query_monthly_expenses(category?) — monthly expense breakdown by category (payroll, operations, marketing, infrastructure, rnd, other). Use for spending trends and cost analysis.
+- query_monthly_expenses(category?) — monthly expenses by category (payroll, operations, marketing, infrastructure, rnd, other) plus exact totals and shares per category, largest first: quote them, never add months up. Use for spending trends and cost analysis.
 
 **Analytics:**
 - generate_financial_report(report_type?) — summary, balance_sheet, income_statement, cash_flow

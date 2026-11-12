@@ -9,6 +9,7 @@ import pytest
 import erp_store
 import tools
 from erp_aggregates import cash_and_payables, headcount_and_payroll, receivables_by_client
+from erp_datasets import build_dataset
 
 
 def test_receivables_exclude_drafts_and_paid(store):
@@ -120,3 +121,41 @@ def test_aggregate_tools_return_the_pure_functions(tool_store):
         tools.get_cash_and_payables,
     ]
     assert all(t in tools.research_tools for t in tools.aggregate_tools)
+
+
+def _check_expense_totals(store):
+    snap = store.snapshot()
+    monthly = snap["monthlyExpenseByCategory"]
+    keys = ["payroll", "operations", "marketing", "infrastructure", "rnd", "other"]
+    expected = {k: sum(row[k] for row in monthly) for k in keys}
+    out = json.loads(tools.query_monthly_expenses.invoke({}))
+    assert out["months"] == monthly
+    rows = out["totals_by_category"]
+    assert [r["total"] for r in rows] == sorted((r["total"] for r in rows), reverse=True)
+    assert sorted(r["total"] for r in rows) == sorted(expected.values())
+    assert out["total"] == sum(expected.values()) == snap["totals"]["expenses"]
+    chart = {d["label"]: d["value"] for d in build_dataset(store, "expense_breakdown")["data"]}
+    assert {r["category"]: r["total"] for r in rows} == chart
+    for r in rows:
+        assert r["share_pct"] == round(r["total"] / out["total"] * 100, 1)
+    assert abs(sum(r["share_pct"] for r in rows) - 100) < 0.5
+    return out
+
+
+def test_expense_totals_match_the_chart_and_the_monthly_rows(tool_store):
+    _check_expense_totals(tool_store)
+
+
+def test_expense_totals_filter_to_one_category(tool_store):
+    full = _check_expense_totals(tool_store)
+    out = json.loads(tools.query_monthly_expenses.invoke({"category": "R&D"}))
+    row = next(r for r in full["totals_by_category"] if r["category"] == "R&D")
+    assert out["total"] == row["total"] == sum(m["R&D"] for m in out["months"])
+    assert out["share_pct"] == row["share_pct"]
+    assert len(out["months"]) == len(full["months"])
+
+
+def test_expense_totals_follow_reset(tool_store):
+    first = _check_expense_totals(tool_store)
+    tool_store.reset()
+    assert _check_expense_totals(tool_store) == first
