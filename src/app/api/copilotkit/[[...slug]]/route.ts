@@ -4,6 +4,8 @@ import {
   createCopilotRuntimeHandler,
 } from "@copilotkit/runtime/v2";
 
+import { refuseForeignRequest } from "@/lib/request-guard";
+
 const runtime = new CopilotRuntime({
   agents: {
     finance_erp_agent: new HttpAgent({
@@ -19,5 +21,5 @@ const handler = createCopilotRuntimeHandler({
   basePath: "/api/copilotkit",
 });
 
-export const GET = handler;
-export const POST = handler;
+export const GET = (request: Request) => refuseForeignRequest(request) ?? handler(request);
+export const POST = (request: Request) => refuseForeignRequest(request) ?? handler(request);

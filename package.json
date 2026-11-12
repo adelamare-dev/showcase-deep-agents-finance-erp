@@ -14,11 +14,11 @@
   },
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --names web,agent \"pnpm:dev:web\" \"pnpm:dev:agent\"",
-    "dev:web": "next dev",
+    "dev:web": "next dev -H 127.0.0.1",
     "dev:agent": "cd agent && uv run uvicorn main:app --host 127.0.0.1 --port 8123 --reload",
     "demo": "pnpm build && concurrently --kill-others-on-fail --names web,agent \"pnpm:start\" \"pnpm:start:agent\"",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 127.0.0.1",
     "start:agent": "cd agent && uv run uvicorn main:app --host 127.0.0.1 --port 8123",
     "lint": "eslint .",
     "test:agent": "cd agent && uv run pytest -q",
