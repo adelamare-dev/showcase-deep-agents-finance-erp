@@ -99,6 +99,20 @@ def test_tool_result_of_the_turn_backs_a_figure():
     assert messages[-1].content == "Cash is $1,092,000."
 
 
+def test_the_correction_names_the_tool_value_a_round_amount_comes_from():
+    call = AIMessage("", tool_calls=[{"id": "call1", "name": "get_balance", "args": {}}])
+    model, _ = run(
+        [call, AIMessage("Cash is $1,090,000."), AIMessage("Cash is $1,092,000.")], snapshot={}
+    )
+    correction = model.calls[2][-1].content
+    assert "The tools returned $1,092,000 where you wrote $1,090,000." in correction
+
+
+def test_the_correction_gives_no_hint_from_a_snapshot_only_value():
+    model, _ = run([AIMessage("Cash is $1,090,000."), AIMessage("Cash is $1,092,000.")])
+    assert "The tools returned" not in model.calls[1][-1].content
+
+
 def test_a_figure_typed_by_the_user_is_admitted():
     model, messages = run([AIMessage("At 12% growth it rises.")], "What if growth is 12%?")
     assert len(model.calls) == 1

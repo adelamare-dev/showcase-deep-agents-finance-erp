@@ -176,6 +176,63 @@ def _money_allowed(fig: Figure, allowed: set[float]) -> bool:
     return any(_within(v / scale, written, _decimals(digits, 0)) for v in allowed)
 
 
+def _money_window(fig: Figure) -> float | None:
+    """Half-width of the range of amounts a refused money figure may be a rounding of.
+
+    A scaled amount covers its display window ("$58.3K": 50). An unscaled whole
+    amount covers its trailing zeros ("$730,000": 5,000; "$579,000": 500). An
+    amount with neither says nothing about what it rounds.
+    """
+    m = _MONEY_RE.fullmatch(fig.raw.strip("-()").strip())
+    if not m:
+        return None
+    digits = m.group("n1") or m.group("n2")
+    suffix = m.group("s1") or m.group("s2")
+    if suffix:
+        return 0.5 * 10 ** -_decimals(digits, 0) * _SCALES[suffix.lower()]
+    if "." in digits:
+        return None
+    zeros = len(digits.replace(",", "")) - len(digits.replace(",", "").rstrip("0"))
+    return 0.5 * 10**zeros if zeros else None
+
+
+def rounding_hints(figs: list[Figure], tool_texts: list[str]) -> list[tuple[str, float]]:
+    """Pairs (written figure, tool value) for refused amounts that round one tool value.
+
+    Only the tool texts of the turn are looked at, and a figure is paired only
+    when exactly one distinct value lies in its window: a hint that named the
+    wrong quantity would let a wrong figure through.
+    """
+    values: set[float] = set()
+    for text in tool_texts:
+        values |= {abs(v) for v in _numbers_in(text or "")}
+    hints: list[tuple[str, float]] = []
+    for fig in figs:
+        if fig.kind != "money":
+            continue
+        half = _money_window(fig)
+        if half is None:
+            continue
+        near = {v for v in values if abs(v - abs(fig.value)) <= half + _TOLERANCE}
+        if len(near) == 1 and all(raw != fig.raw for raw, _ in hints):
+            hints.append((fig.raw, near.pop()))
+    return hints
+
+
+def format_usd(value: float) -> str:
+    """A tool value as an amount: thousands commas, cents only when not whole."""
+    return f"${value:,.0f}" if abs(value - round(value)) < _CENT else f"${value:,.2f}"
+
+
+def correction_with_hints(raws: str, hints: list[tuple[str, float]]) -> str:
+    """The correction for `raws`, naming the tool value each hinted figure rounds."""
+    text = CORRECTION.format(raws=raws)
+    if not hints:
+        return text
+    pairs = "; ".join(f"the tools returned {format_usd(v)} where you wrote {raw}" for raw, v in hints)
+    return f"{text} {pairs[0].upper()}{pairs[1:]}."
+
+
 def is_allowed(fig: Figure, allowed: set[float]) -> bool:
     """Whether `fig` equals an allowed value, allowing for display rounding."""
     if fig.kind == "money":

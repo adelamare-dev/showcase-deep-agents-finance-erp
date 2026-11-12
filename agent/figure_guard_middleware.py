@@ -30,10 +30,11 @@ from langchain_core.messages import (
 )
 
 from figure_guard import (
-    CORRECTION,
     DASHBOARD_CORRECTION,
     allowed_values,
+    correction_with_hints,
     mark,
+    rounding_hints,
     unverified,
 )
 from frontend_tools import update_dashboard
@@ -161,11 +162,16 @@ class FigureGuardMiddleware(AgentMiddleware):
 
         if not corrections and ai.id:
             raws = ", ".join(dict.fromkeys(fig.raw for fig in bad))
+            correction = (
+                DASHBOARD_CORRECTION.format(raws=raws)
+                if closing
+                else correction_with_hints(raws, rounding_hints(bad, tool_texts))
+            )
             return {
                 "messages": [
                     _without_tool_calls(ai),
                     HumanMessage(
-                        content=(DASHBOARD_CORRECTION if closing else CORRECTION).format(raws=raws),
+                        content=correction,
                         id=f"{CORRECTION_ID_PREFIX}{uuid.uuid4().hex}",
                     ),
                 ],

@@ -9,7 +9,9 @@ from figure_guard import (
     CORRECTION,
     allowed_values,
     extract_figures,
+    correction_with_hints,
     mark,
+    rounding_hints,
     unverified,
 )
 
@@ -61,3 +63,45 @@ def test_corrections_ask_for_exact_figures_and_a_reply_that_reads_as_the_first()
         assert "this check" in low
     assert "exactly as a tool returned" in CORRECTION.lower()
     assert "no rounding of your own" in CORRECTION.lower()
+
+
+def test_rounding_hint_names_the_one_tool_value_a_round_amount_comes_from():
+    figs = unverified("Revenue is $730,000.", allowed_values(['{"revenue": 729850}'], {}, ""))
+    assert rounding_hints(figs, ['{"revenue": 729850}']) == [("$730,000", 729850.0)]
+    assert correction_with_hints("$730,000", rounding_hints(figs, ['{"revenue": 729850}'])).endswith(
+        "The tools returned $729,850 where you wrote $730,000."
+    )
+
+
+def test_rounding_hint_uses_the_window_of_the_trailing_zeros():
+    figs = extract_figures("Rent is $579,000.")
+    assert rounding_hints(figs, ['{"rent": 579250}']) == [("$579,000", 579250.0)]
+    assert rounding_hints(figs, ['{"rent": 579600}']) == []
+
+
+def test_no_rounding_hint_when_two_tool_values_fit():
+    figs = extract_figures("Revenue is $730,000.")
+    assert rounding_hints(figs, ['{"a": 729850, "b": 731000}']) == []
+
+
+def test_no_rounding_hint_for_an_amount_without_trailing_zeros():
+    figs = extract_figures("Revenue is $729,123.")
+    assert rounding_hints(figs, ['{"revenue": 729150}']) == []
+
+
+def test_no_rounding_hint_from_a_value_only_the_snapshot_holds():
+    figs = extract_figures("Revenue is $730,000.")
+    assert rounding_hints(figs, ['{"other": 12}']) == []
+
+
+def test_rounding_hint_prints_cents_only_when_not_whole():
+    figs = extract_figures("Revenue is $730,000.")
+    assert correction_with_hints("$730,000", rounding_hints(figs, ['{"r": 729850.5}'])).endswith(
+        "The tools returned $729,850.50 where you wrote $730,000."
+    )
+
+
+def test_hints_are_joined_with_a_semicolon():
+    figs = extract_figures("Rent $730,000 and pay $579,000.")
+    out = correction_with_hints("x", rounding_hints(figs, ['{"a": 729850, "b": 579250}']))
+    assert out.endswith("The tools returned $729,850 where you wrote $730,000; the tools returned $579,250 where you wrote $579,000.")
