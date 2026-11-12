@@ -2,13 +2,18 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 // The helpers are one expression that takes a page; the figure checks never use it.
-const helpers = new Function(`return (${readFileSync("e2e/lib/helpers.js", "utf8").trim().replace(/;+$/, "")}\n)`)()(null) as {
+const source = `return (${readFileSync("e2e/lib/helpers.js", "utf8").trim().replace(/;+$/, "")}\n)`;
+const helpers = new Function(source)()(null) as {
   unexplainedFigures: (text: string, snap: unknown, bodies?: unknown[], typed?: string, extra?: number[]) => string[];
   projectRevenue: (snap: unknown, quarters?: number, method?: string) => { revenue: number; expenses: number; profit: number }[];
   projectCashFlow: (snap: unknown, quarters?: number) => { operating: number; investing: number; financing: number; net: number; balance: number }[];
   projectedMoney: (snap: unknown) => number[];
   projectionPercents: (snap: unknown) => number[];
   strangers: (text: string, fields: number[]) => string[];
+};
+// moneyFields reads the cash position over page.request, so it runs here with a stub page.
+const withStubPage = new Function(source)()({ request: { get: async () => ({ json: async () => ({}) }) } }) as {
+  moneyFields: (snap: unknown, catalogMoney: number[]) => Promise<number[]>;
 };
 
 const quarters = [100_000, 110_000, 125_000, 130_000];
@@ -127,6 +132,13 @@ test("offline.live-checks growth percentages of the forecast tools equal the Pyt
 test("offline.live-checks a forecast growth percentage is admitted, a wrong one is not", () => {
   for (const v of pyPercents) expect(helpers.unexplainedFigures(`growth of ${v}% expected`, projFull)).toEqual([]);
   expect(helpers.unexplainedFigures("Revenue expected to grow by 11.9% quarter-over-quarter.", projFull)).toEqual(["11.9%"]);
+});
+
+test("offline.live-checks a quarterly profit is admitted, a wrong one is not", async () => {
+  const quarterly = { ...snap, quarterlyRevenue: [{ quarter: "Q4 2026", revenue: 900_000, expenses: 314_000, profit: 586_000 }] };
+  const fields = await withStubPage.moneyFields(quarterly, []);
+  expect(helpers.strangers("Q4 profit reached $586,000 and $586K.", fields)).toEqual([]);
+  expect(helpers.strangers("Q4 profit reached $586,001.", fields)).toEqual(["$586,001"]);
 });
 
 test("offline.live-checks a whole K or M amount matches the value it rounds", () => {

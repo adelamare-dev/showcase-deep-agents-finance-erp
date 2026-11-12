@@ -127,8 +127,8 @@
   };
 
   // The money fields of a run, read from the store now: its totals, KPIs, aging
-  // buckets, bill amounts, quarterly cash flow and cash position, plus the
-  // catalog money the run drew (see catalogMoneyOf).
+  // buckets, bill amounts, quarterly cash flow, quarterly revenue, expenses and
+  // profit, and cash position, plus the catalog money the run drew (see catalogMoneyOf).
   const moneyFields = async (snap, catalogMoney) => {
     const cashPosition = await (await page.request.get(ERP_URL + "/api/erp/datasets/cash_position")).json();
     const ar = { ...snap.arAging };
@@ -146,6 +146,8 @@
       ...leaves(ar),
       ...snap.bills.map((b) => b.amount),
       ...leaves(snap.cashFlowData),
+      // The quarterly revenue, expenses and profit of query_quarterly_financials.
+      ...leaves(snap.quarterlyRevenue),
       ...leaves(cashPosition),
       // The projections of the forecast tools (see projectedMoney).
       ...projectedMoney(snap),
