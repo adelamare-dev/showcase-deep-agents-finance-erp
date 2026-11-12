@@ -273,4 +273,35 @@ async (page, h) => {
     await h.stubReset();
     return { cashText, payablesText, paid };
   });
+
+  // One assistant message carries a reset and a replacing update; the dashboard
+  // ends with exactly the widgets given, whichever order the calls come in.
+  for (const [label, order] of [["a reset then a replace", ["reset", "replace"]], ["a replace then a reset", ["replace", "reset"]]]) {
+    await h.test(`${label} in one message leaves exactly the replaced widgets`, async () => {
+      await h.stubReset();
+      await h.resetDemo();
+      await h.open("/");
+      const calls = {
+        reset: { name: "manage_dashboard", args: { action: "reset" } },
+        replace: {
+          name: "update_dashboard",
+          args: {
+            replace: true,
+            widgets: [
+              { type: "metric_cards", config: { metrics: ["Cash"] } },
+              { type: "ar_aging_gauge", config: {} },
+            ],
+          },
+        },
+      };
+      await h.stubScript([{ toolCalls: order.map((k) => calls[k]) }, { text: "Done." }]);
+      await h.sendPrompt("Reset the dashboard and build the cash view");
+      await h.waitForRunEnd();
+      await page.waitForTimeout(1500);
+      const types = (await h.scanDashboard()).widgets.map((w) => w.type);
+      h.assertEqual(types, ["metric-cards", "ar-aging-gauge"], "exactly the replaced widgets remain");
+      await h.stubReset();
+      return { types };
+    });
+  }
 }

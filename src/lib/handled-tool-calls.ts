@@ -12,8 +12,26 @@ export function claimToolCall(key: string): boolean {
   return true;
 }
 
+// A dashboard reset that lands after a replacing update of the same run would
+// wipe the dashboard just built (each card applies when its own result
+// arrives), so it is ignored. The flag is cleared when a run starts.
+let replacedThisRun = false;
+
+export function markDashboardReplaced(): void {
+  replacedThisRun = true;
+}
+
+export function dashboardReplacedThisRun(): boolean {
+  return replacedThisRun;
+}
+
+export function clearDashboardReplaced(): void {
+  replacedThisRun = false;
+}
+
 // A demo reset empties the conversation, so a call with the same arguments
 // must take effect again on the next take.
 export function forgetToolCalls(): void {
   handled.clear();
+  replacedThisRun = false;
 }

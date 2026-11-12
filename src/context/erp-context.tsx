@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/context/dashboard-context";
 import { fetchSnapshot, resetErpData, type ErpSnapshot } from "@/lib/erp-api";
 import { forgetFigureVerdicts } from "@/lib/figure-verdicts";
-import { forgetToolCalls } from "@/lib/handled-tool-calls";
+import { clearDashboardReplaced, forgetToolCalls } from "@/lib/handled-tool-calls";
 import { clearSubagentSteps } from "@/lib/subagent-steps";
 
 // Custom event the agent sends once an approved action has changed the books.
@@ -131,6 +131,7 @@ export function ErpProvider({ children }: { children: React.ReactNode }) {
   const { agent } = useAgent({ agentId: "finance_erp_agent", updates: [] });
   useEffect(() => {
     const subscription = agent.subscribe({
+      onRunInitialized: () => clearDashboardReplaced(),
       onCustomEvent: ({ event }) => {
         if (event.name !== ERP_DATA_CHANGED_EVENT) return;
         const changes = readChanges(event.value);

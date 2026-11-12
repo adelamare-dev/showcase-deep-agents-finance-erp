@@ -5,7 +5,7 @@ import { useRenderTool, ToolCallStatus } from "@copilotkit/react-core/v2";
 import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
-import { claimToolCall } from "@/lib/handled-tool-calls";
+import { claimToolCall, dashboardReplacedThisRun } from "@/lib/handled-tool-calls";
 
 interface ReorderUpdate {
   widgetId: string;
@@ -37,7 +37,7 @@ function DashboardManager({
 
     queueMicrotask(() => {
       if (action === "reset") {
-        resetToDefault();
+        if (!dashboardReplacedThisRun()) resetToDefault();
       } else if (action === "remove" && widgetId) {
         removeWidget(widgetId);
       } else if (action === "reorder" && updates) {

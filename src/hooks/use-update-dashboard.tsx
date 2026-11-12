@@ -6,7 +6,7 @@ import { z } from "zod";
 import { useDashboard } from "@/context/dashboard-context";
 import { CompletedToolCard } from "@/components/chat/tool-card";
 import { isChartDatasetId } from "@/lib/erp-api";
-import { claimToolCall } from "@/lib/handled-tool-calls";
+import { claimToolCall, markDashboardReplaced } from "@/lib/handled-tool-calls";
 import type { CustomChartWidget, DashboardWidget, WidgetType } from "@/types/dashboard";
 
 /** Map agent widget type names to internal WidgetType values. */
@@ -127,7 +127,10 @@ function DashboardUpdater({
         }
       }
       // The layout becomes exactly the widgets given, in their order.
-      if (replace) setWidgets(placed);
+      if (replace) {
+        setWidgets(placed);
+        markDashboardReplaced();
+      }
     });
   }, [status, widgets, replace, result, upsertWidget, addWidget, setWidgets, getWidgets]);
 
