@@ -304,4 +304,44 @@ async (page, h) => {
       return { types };
     });
   }
+
+  // The guard lasts one run: a reset asked in the next run applies again.
+  await h.test("a reset asked in a later run applies after a replacing update", async () => {
+    await h.stubReset();
+    await h.resetDemo();
+    await h.open("/");
+    const defaults = (await h.scanDashboard()).widgets.map((w) => w.type);
+    await h.stubScript([
+      {
+        toolCall: {
+          name: "update_dashboard",
+          args: {
+            replace: true,
+            widgets: [
+              { type: "metric_cards", config: { metrics: ["Cash"] } },
+              { type: "ar_aging_gauge", config: {} },
+            ],
+          },
+        },
+      },
+      { text: "Done." },
+    ]);
+    await h.sendPrompt("Build the cash view");
+    await h.waitForRunEnd();
+    await page.waitForTimeout(1000);
+    const built = (await h.scanDashboard()).widgets.map((w) => w.type);
+    h.assertEqual(built, ["metric-cards", "ar-aging-gauge"], "the first run left the replaced widgets");
+
+    await h.stubScript([
+      { toolCall: { name: "manage_dashboard", args: { action: "reset" } } },
+      { text: "Reset." },
+    ]);
+    await h.sendPrompt("Put the default dashboard back");
+    await h.waitForRunEnd();
+    await page.waitForTimeout(1500);
+    const types = (await h.scanDashboard()).widgets.map((w) => w.type);
+    h.assertEqual(types, defaults, "the second run restored the default widgets");
+    await h.stubReset();
+    return { built, types };
+  });
 }
