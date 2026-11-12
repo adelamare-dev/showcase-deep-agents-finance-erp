@@ -2,7 +2,7 @@
 
 A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The figures it writes in the chat text come from the books or from tool results (a subagent's figures are judged by its data tools' outputs, not by its own prose), and one that cannot be matched is badged "unverified". The model varies between runs, so a free question can still end on a badge (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
 
-**Status.** Version 0.5.0. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, approve the payments, then ask a follow-up question) passed five times in a row, and the 18 suggestions and likely questions each passed 3 of 3 on one commit (`b78f895`, 2026-11-12, API pay-as-you-go). Model output varies between runs, so these are measurements, not guarantees. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
+**Status.** Version 0.5.1. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, approve the payments, then ask a follow-up question) passed five times in a row, and the 18 suggestions and likely questions each passed 3 of 3 on one commit (`b78f895`, 2026-11-12, API pay-as-you-go). Model output varies between runs, so these are measurements, not guarantees. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
 
 **Stack:** Next.js 16 (frontend) + FastAPI / LangGraph (agent, owns the data) + CopilotKit (AI layer) + Mistral models. No database is required.
 
@@ -173,7 +173,9 @@ An exception is always exact and commented; a rule is never loosened. `@copilotk
 
 - `undici` 5.29.0 (5 advisories) and `@fastify/busboy` 2.1.1: not reachable. The WebSocket, TLS and multipart code is never loaded; the patched versions are 6.x/3.x majors.
 - `graphql-scalars` 1.26.0 (PhoneNumber ReDoS): not reachable. Only `GraphQLJSONObject` is used; the fix is a 2.x major.
-- `zod` 3.25.76 (memory exhaustion on oversized collections): no safe override (4.x major): `@ag-ui/client` and `zod-to-json-schema` need the same zod 3 instance as the schemas they inspect. Input comes only from the local browser and agent in this demo.
+- `zod` 3.25.76 (memory exhaustion on oversized collections): no safe override (4.x major): `@ag-ui/client` and `zod-to-json-schema` need the same zod 3 instance as the schemas they inspect. The demo assumes a trusted machine and network (see below).
+
+**Network exposure.** The demo has no authentication: it assumes one user on a trusted machine. The agent listens on `127.0.0.1` only, but `next dev` and `next start` listen on all interfaces by default, and the `/api/copilotkit` route accepts any caller, including a `text/plain` POST from another site that needs no CORS preflight. A source review (no request was sent) shows that such a caller could start a run on your Mistral key and answer an approval card itself, so the human approval only protects the books while the web app is reachable by you alone. CORS limits what a foreign page can read, not what it can send: a cross-site `POST /api/erp/reset` still resets the demo data. Run the demo on a trusted network, set a spending cap in the Mistral console, and decline a "local network access" prompt from a site you do not know.
 
 ## Known limits
 
