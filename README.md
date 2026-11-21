@@ -128,6 +128,8 @@ Models: `ministral-14b-2512` for the orchestrator and both subagents, dated ids 
 
 Two partial replays (2026-11-09): `80e5ee1` ran entries 0 to 7 only (23 of 24 runs; Cost Control Dashboard 2 of 3), and `73ec40b` replayed Budget alone (3 of 3) on the same demo as `8c636d3`, after a fix to the check.
 
+One run per entry (2026-11-21, `e585b26`, Next 16.4.6, CopilotKit 1.88.0, no prompt, tool or model change since `b78f895`): 18 of 18 entries passed at the first run; no 429, no fallback, no run discarded.
+
 The threshold (all 18 entries at 3 of 3 on one commit) is **met on `b78f895`**: 54 of 54 runs, no 429, no fallback, no discarded run. The two heads before it each missed it by one entry: `ae13351` on Budget (a quarterly profit of "$586K" that the live check did not yet admit, fixed in the check) and `bba2417` on Biggest expense categories (the model added the months itself and the guard badged it, fixed by returning exact category totals and shares with the monthly rows). The final pass, per entry (passes out of 3, median seconds per run):
 
 | Entry | Passes | Median |
