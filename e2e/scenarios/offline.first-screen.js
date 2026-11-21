@@ -21,6 +21,40 @@ async (page, h) => {
     return { suggestions: chips };
   });
 
+  await h.test("A suggestion is highlighted on hover once the assistant is ready", async () => {
+    await firstLoad("/");
+    const suggestion = page.getByTestId("copilot-sidebar").getByRole("button", { name: "Cash Flow Dashboard", exact: true });
+    const handle = await suggestion.elementHandle();
+    // A waiting suggestion is disabled and is not meant to light up, so the
+    // check starts only once it is enabled.
+    await page.waitForFunction((el) => !el.disabled, handle, { timeout: 15000 });
+    const colours = () =>
+      suggestion.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { background: s.backgroundColor, border: s.borderTopColor };
+      });
+    await page.mouse.move(0, 0);
+    const resting = await colours();
+    await suggestion.hover();
+    h.assert(await suggestion.evaluate((el) => el.matches(":hover")), "the pointer is over the suggestion");
+    // The colours ease in (a transition), so wait for them to leave the resting values.
+    await page
+      .waitForFunction(
+        ([el, rest]) => {
+          const s = getComputedStyle(el);
+          return s.backgroundColor !== rest.background && s.borderTopColor !== rest.border;
+        },
+        [handle, resting],
+        { timeout: 2000 },
+      )
+      .catch(() => {});
+    const hovered = await colours();
+    await page.mouse.move(0, 0);
+    h.assert(hovered.background !== resting.background, `the background changes on hover (${resting.background} -> ${hovered.background})`);
+    h.assert(hovered.border !== resting.border, `the border colour changes on hover (${resting.border} -> ${hovered.border})`);
+    return { resting, hovered };
+  });
+
   await h.test("The header has no search and no bell; the avatar is not a control", async () => {
     await firstLoad("/");
     const header = page.locator("main header");

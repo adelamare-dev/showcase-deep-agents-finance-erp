@@ -4,7 +4,8 @@
 // points must therefore wait for the runtime, then send once it is ready:
 // - a typed prompt, whose send button stays disabled until the runtime is ready;
 // - a welcome-screen suggestion, whose button stays disabled likewise (a run
-//   started on the provisional agent would be lost).
+//   started on the provisional agent would be lost), which is also not
+//   highlighted on hover while it waits.
 // Either way the user message must reach the chat, and approving the card it
 // leads to must refresh the KPI figures.
 // Needs the stub stack (`node e2e/fixtures/stack.mjs`, or `pnpm e2e`).
@@ -79,6 +80,24 @@ async (page, h) => {
         h.assert(hold.held > 0, "the runtime's /info request was held back");
         h.assert(hold.releasedAt === null, "the runtime had not answered yet");
         h.assert(await suggestion.isDisabled(), "the suggestion waits for the runtime");
+        // A waiting suggestion must not light up on hover. An absence cannot be
+        // polled, so wait twice the transition (at least 300 ms) before reading.
+        const colours = () =>
+          suggestion.evaluate((el) => {
+            const s = getComputedStyle(el);
+            return { background: s.backgroundColor, border: s.borderTopColor, transition: s.transitionDuration };
+          });
+        await page.mouse.move(0, 0);
+        const resting = await colours();
+        await suggestion.hover();
+        h.assert(await suggestion.evaluate((el) => el.matches(":hover")), "the pointer is over the suggestion");
+        const seconds = Math.max(...resting.transition.split(",").map((d) => parseFloat(d) * (d.includes("ms") ? 0.001 : 1)), 0);
+        await page.waitForTimeout(Math.max(300, seconds * 2000));
+        const hovered = await colours();
+        await page.mouse.move(0, 0);
+        h.assertEqual(hovered.background, resting.background, "a waiting suggestion is not highlighted on hover (background)");
+        h.assertEqual(hovered.border, resting.border, "a waiting suggestion is not highlighted on hover (border)");
+        h.assert(hold.releasedAt === null, "the runtime still had not answered after the hover");
         await suggestion.click();
         h.assert(hold.releasedAt !== null, "the suggestion left once the runtime answered");
       }),
