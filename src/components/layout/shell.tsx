@@ -118,10 +118,13 @@ function FinanceSidebarWelcomeScreen({
   className,
   ...props
 }: React.ComponentProps<typeof CopilotSidebarView.WelcomeScreen>) {
-  const { agent } = useAgent({ agentId: "finance_erp_agent" });
+  const { agent, isReady } = useAgent({ agentId: "finance_erp_agent" });
   const { copilotkit } = useCopilotKit();
 
+  // Until the runtime answers, useAgent returns a provisional agent whose runs
+  // never reach the chat: the suggestions wait for the real one.
   const handlePromptClick = (message: string) => {
+    if (!isReady) return;
     agent.addMessage({
       id: crypto.randomUUID(),
       role: "user",
@@ -147,8 +150,9 @@ function FinanceSidebarWelcomeScreen({
               <button
                 key={suggestion.title}
                 type="button"
+                disabled={!isReady}
                 onClick={() => handlePromptClick(suggestion.message)}
-                className="cpk:rounded-full cpk:border cpk:border-border cpk:bg-background cpk:px-4 cpk:py-2 cpk:text-sm cpk:font-medium cpk:text-foreground cpk:transition-colors hover:cpk:border-primary hover:cpk:bg-muted"
+                className="cpk:rounded-full cpk:border cpk:border-border cpk:bg-background cpk:px-4 cpk:py-2 cpk:text-sm cpk:font-medium cpk:text-foreground cpk:transition-colors hover:cpk:border-primary hover:cpk:bg-muted disabled:cpk:cursor-not-allowed disabled:cpk:opacity-50"
               >
                 {suggestion.title}
               </button>
