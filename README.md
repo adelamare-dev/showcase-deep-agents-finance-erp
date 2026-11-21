@@ -168,7 +168,7 @@ Earlier, off-series checks: on 2026-11-08, on API pay-as-you-go, the supplier-pa
 ## Security
 
 Dependencies follow a strict policy: a 7-day release cooldown, `trustPolicy: no-downgrade`, no exotic or build-script dependencies, and `pnpm audit` at the `high` level.
-An exception is always exact and commented; a rule is never loosened. `@copilotkit/*` stays on 1.80.0.
+An exception is always exact and commented; a rule is never loosened. `@copilotkit/react-core` and `@copilotkit/runtime` are pinned exactly (1.88.0): a bump is an explicit decision.
 `pnpm audit` currently reports 8 high alerts, all in transitive dependencies of `@copilotkit/*`, none fixable with a safe override:
 
 - `undici` 5.29.0 (5 advisories) and `@fastify/busboy` 2.1.1: not reachable. The WebSocket, TLS and multipart code is never loaded; the patched versions are 6.x/3.x majors.
