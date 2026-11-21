@@ -2,7 +2,7 @@
 
 A small finance ERP whose AI assistant orchestrates sub-agents you can watch, asks for your approval before it acts, and shows only ERP figures on its cards and charts. The figures it writes in the chat text come from the books or from tool results (a subagent's figures are judged by its data tools' outputs, not by its own prose), and one that cannot be matched is badged "unverified". The model varies between runs, so a free question can still end on a badge (see [Known limits](#known-limits)). Ask for a cash flow dashboard, a list of overdue invoices or a what-if on revenue; approve a supplier payment and see the cash and the bills change on screen.
 
-**Status.** Version 0.5.3. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, approve the payments, then ask a follow-up question) passed five times in a row, and the 18 suggestions and likely questions each passed 3 of 3 on one commit (`b78f895`, 2026-11-12, API pay-as-you-go). Model output varies between runs, so these are measurements, not guarantees. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
+**Status.** Version 0.5.4. The reference scenario (click "Cash Flow Dashboard", get a complete dashboard, approve the payments, then ask a follow-up question) passed five times in a row, and the 18 suggestions and likely questions each passed 3 of 3 on one commit (`b78f895`, 2026-11-12, API pay-as-you-go). Model output varies between runs, so these are measurements, not guarantees. See [Measured behaviour](#measured-behaviour) and [Known limits](#known-limits).
 
 **Stack:** Next.js 16 (frontend) + FastAPI / LangGraph (agent, owns the data) + CopilotKit (AI layer) + Mistral models. No database is required.
 
