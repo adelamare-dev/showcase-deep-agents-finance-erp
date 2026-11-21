@@ -43,6 +43,13 @@ async (page, h) => {
       },
       { text: "The dashboard is ready." },
     ]);
+    // Listen before the prompt is sent. The run's stream is the one POST to the
+    // runtime answered as text/event-stream; its headers are read further down.
+    const streamed = page.waitForResponse(
+      async (r) => r.url().includes("/api/copilotkit") && r.request().method() === "POST"
+        && ((await r.allHeaders())["content-type"] || "").includes("text/event-stream"),
+      { timeout: 30000 },
+    );
     await h.sendPrompt("Build the cash dashboard");
 
     let together = null;
@@ -57,6 +64,14 @@ async (page, h) => {
     h.assertEqual(titles, ["Projecting", "Researching"], "one card per subagent");
     h.assertEqual(together.map((c) => c.steps.length), [1, 1], "each card holds the one step of its own subagent");
 
+    // A compressed stream is buffered before it reaches the browser, so the
+    // subagent steps would only appear once the run ends. The stream must
+    // arrive without a content-encoding (or as identity).
+    const headers = await (await streamed).allHeaders();
+    const contentEncoding = headers["content-encoding"] ?? null;
+    h.assert(contentEncoding === null || contentEncoding === "identity",
+      "the runtime stream is not compressed, content-encoding: " + contentEncoding);
+
     await h.waitForRunEnd();
     const done = await readCards();
     h.assertEqual(done.length, 2, "still two cards");
@@ -65,6 +80,6 @@ async (page, h) => {
     h.assert((await h.chatText()).includes("The dashboard is ready."), "the closing text is shown");
     h.assertEqual((await h.stubRequests()).length, 7, "one orchestrator message, two subagent runs, the update and the closing text");
     await h.stubReset();
-    return { titles };
+    return { titles, contentEncoding };
   });
 }
