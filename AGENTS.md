@@ -63,6 +63,7 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 - **Dates are relative to today**, never hard-coded.
 - **Validated at 1280x720**; no mobile work.
 - **No agent pushes.** No `--force`, no `--hard`, no deletion beyond what the task produces.
+- **An agent session never leaves the app running.** Start servers from Git Bash with `nohup ... > log 2>&1 &` (never `Start-Process`, which opens a console window on the desktop), after checking ports 3000 and 8123 (and 8790 for the stub) are free. Before handing back, stop the tree with `taskkill /PID <concurrently pid> /T /F` (from Git Bash through `powershell -NoProfile -Command`, or `//PID`; `node e2e/fixtures/stack.mjs stop` for the stub stack) and check the ports are free again. Never kill by process name: `node`, `python` and `uv` also run the session's MCP servers.
 - Commits follow **Conventional Commits**, with no AI attribution.
 
 ## Conventions
@@ -95,9 +96,9 @@ Prerequisites: Node >= 20.9 (`.nvmrc` pins 24), pnpm 11, uv >= 0.11 (Python 3.12
 - **CORS allows only `FRONTEND_ORIGIN`**, default `http://localhost:3000`. Opening the app on `http://127.0.0.1:3000` makes the snapshot request fail. Use `localhost`, or set `FRONTEND_ORIGIN`.
 - **Two request guards stand in for access control** (no route is authenticated, and the runtime takes a caller-supplied `resume` as the human approval). Both servers bind `127.0.0.1` (`-H` in `package.json`). `src/lib/request-guard.ts` wraps GET and POST of the runtime route: 403 for a `Host` other than `localhost`, `127.0.0.1` or `[::1]`, 403 for a write whose `Origin` host differs from `Host` (no `Origin` passes), 415 for a POST that is not `application/json`. `agent/origin_guard.py` answers 403 to any non-GET/HEAD/OPTIONS request whose `Origin` is outside the CORS list. The runtime forwards only `authorization` and `x-*` headers, so a run through the web app reaches the agent with no `Origin`. A new route or a non-JSON POST must pass them; tests: `agent/tests/test_origin_guard.py`, `e2e/specs/request-guard.*.spec.ts`.
 - **`agent/.env` is not readable by agents** (workstation policy). Never try; check for the key with a script that prints only `bool(os.environ.get("MISTRAL_API_KEY"))`.
-- **Background servers start from Git Bash** with `nohup ... > log 2>&1 &`, never `Start-Process`, which opens a visible console window on the user's desktop. Check ports 3000 and 8123 are free first, stop what you started, and verify the ports are free again.
 - **Tool-call effects are applied once per key** (`src/lib/handled-tool-calls.ts`, keyed by tool name and arguments, not by call id). A reset forgets the keys; any new frontend tool that applies a side effect must claim its key there, or a replayed demo will skip it.
 - **E2E has two runners over one source.** `@playwright/test` (`pnpm e2e`, `pnpm e2e:live`) and the Playwright plugin (`browser_run_code_unsafe`) both load `e2e/scenarios/` through `e2e/lib/load-scenario.mjs`. A scenario is still one single expression with no `import`. `stub.agent-down` is plugin-only (skipped in the runner). For the plugin path run `pnpm e2e:build` first; its files live in `.playwright-mcp/` (gitignored). `h.chatText(skip)` is the single reader of chat text (a TreeWalker over the live list that skips struck-through `changed-value-before` values): a scenario must not read the chat another way.
+- **`SecurityFatalError` at `next build` or `next dev` under an agent**: Next blocks once per published advisory that affects the installed version. Relay the advisory, check it, and rerun the same command once (a one-shot receipt lets it through for 5 minutes); never turn off `experimental.agentUpgrade` to get past it.
 
 ## Verification
 
