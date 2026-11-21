@@ -152,7 +152,7 @@ function FinanceSidebarWelcomeScreen({
                 type="button"
                 disabled={!isReady}
                 onClick={() => handlePromptClick(suggestion.message)}
-                className="cpk:rounded-full cpk:border cpk:border-border cpk:bg-background cpk:px-4 cpk:py-2 cpk:text-sm cpk:font-medium cpk:text-foreground cpk:transition-colors hover:cpk:border-primary hover:cpk:bg-muted disabled:cpk:cursor-not-allowed disabled:cpk:opacity-50"
+                className="cpk:rounded-full cpk:border cpk:border-border cpk:bg-background cpk:px-4 cpk:py-2 cpk:text-sm cpk:font-medium cpk:text-foreground cpk:transition-colors hover:cpk:border-primary hover:cpk:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {suggestion.title}
               </button>
